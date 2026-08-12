@@ -8,6 +8,7 @@ import {
   businesses,
   businessServices,
   categories,
+  categoryFields,
   cities,
   InsertUser,
   jobs,
@@ -59,6 +60,18 @@ export async function getActiveCategories() {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(categories).where(eq(categories.isActive, true)).orderBy(categories.sortOrder, categories.name);
+}
+
+export async function getActiveCities() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(cities).where(eq(cities.isActive, true)).orderBy(cities.name);
+}
+
+export async function getPublicCategoryFields(categoryId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(categoryFields).where(and(eq(categoryFields.categoryId, categoryId), eq(categoryFields.isPublic, true))).orderBy(categoryFields.sortOrder, categoryFields.label);
 }
 
 export async function getPublicBusinesses(query?: string, citySlug?: string) {
@@ -165,6 +178,17 @@ export async function getAdminCounts() {
   return { businesses: businessCount[0]?.value ?? 0, pendingBusinesses: pendingCount[0]?.value ?? 0, users: userCount[0]?.value ?? 0, jobs: jobCount[0]?.value ?? 0 };
 }
 
+export async function getPendingBusinesses() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({ id: businesses.id, name: businesses.name, status: businesses.status, shortDescription: businesses.shortDescription, createdAt: businesses.createdAt, category: categories.name, city: cities.name })
+    .from(businesses)
+    .innerJoin(categories, eq(businesses.categoryId, categories.id))
+    .innerJoin(cities, eq(businesses.cityId, cities.id))
+    .where(eq(businesses.status, "submitted"))
+    .orderBy(desc(businesses.updatedAt));
+}
+
 export async function getPublishedJobs(query?: string, citySlug?: string) {
   const db = await getDb();
   if (!db) return [];
@@ -183,5 +207,12 @@ export async function getPublishedJobs(query?: string, citySlug?: string) {
 export async function getCategorySchemas() {
   const db = await getDb();
   if (!db) return [];
-  return db.select({ category: categories, subcategory: subcategories }).from(categories).leftJoin(subcategories, eq(subcategories.categoryId, categories.id)).orderBy(categories.sortOrder, subcategories.sortOrder);
+  const [schemas, fields] = await Promise.all([
+    db.select({ category: categories, subcategory: subcategories }).from(categories).leftJoin(subcategories, eq(subcategories.categoryId, categories.id)).orderBy(categories.sortOrder, subcategories.sortOrder),
+    db.select().from(categoryFields).orderBy(categoryFields.sortOrder, categoryFields.label),
+  ]);
+  return schemas.map(schema => ({
+    ...schema,
+    fields: fields.filter(field => field.categoryId === schema.category.id && field.subcategoryId === (schema.subcategory?.id ?? null)),
+  }));
 }

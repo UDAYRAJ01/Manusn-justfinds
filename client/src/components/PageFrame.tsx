@@ -15,8 +15,18 @@ const links = [
 export function PageFrame({ children, className }: { children: React.ReactNode; className?: string }) {
   const [location] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [skipFocused, setSkipFocused] = useState(false);
   return (
     <div className={cn("min-h-screen bg-[#f8f8f6] text-slate-950", className)}>
+      <a
+        href="#main-content"
+        className="skip-link"
+        data-focused={skipFocused ? "true" : undefined}
+        onFocus={() => setSkipFocused(true)}
+        onBlur={() => setSkipFocused(false)}
+      >
+        Skip to main content
+      </a>
       <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-[#fcfcfa]/92 backdrop-blur-xl">
         <div className="container flex h-[72px] items-center justify-between gap-4">
           <JustFindsLogo />
@@ -43,7 +53,7 @@ export function PageFrame({ children, className }: { children: React.ReactNode; 
           </div>
         </div>}
       </header>
-      <main>{children}</main>
+      <main id="main-content" tabIndex={-1}>{children}</main>
       <nav className="fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-[420px] items-center justify-around rounded-2xl border border-white/50 bg-slate-950 px-2 py-2 shadow-[0_20px_45px_rgba(15,23,42,.32)] md:hidden" aria-label="Mobile navigation">
         <MobileNav href="/" icon={Home} label="Home" active={location === "/"} />
         <MobileNav href="/search" icon={Search} label="Search" active={location.startsWith("/search")} />

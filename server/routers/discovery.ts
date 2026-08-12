@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { demoBusinesses, demoCategories } from "../demoData";
-import { getActiveCategories, getPublicBusinessByRoute, getPublicBusinesses } from "../db";
+import { getActiveCategories, getActiveCities, getPublicBusinessByRoute, getPublicBusinesses, getPublicCategoryFields } from "../db";
 import { calculateRecommendationScore, haversineDistanceKm } from "../domain/ranking";
 import { publicProcedure, router } from "../_core/trpc";
 
@@ -20,20 +19,20 @@ function matchesQuery(item: { name: string; category: string; shortDescription: 
 }
 
 export const discoveryRouter = router({
-  categories: publicProcedure.query(async () => {
-    const rows = await getActiveCategories();
-    return rows.length ? rows : demoCategories;
-  }),
+  categories: publicProcedure.query(() => getActiveCategories()),
+  locations: publicProcedure.query(() => getActiveCities()),
+  categoryFields: publicProcedure.input(z.object({ categoryId: z.number().int().positive() })).query(({ input }) => getPublicCategoryFields(input.categoryId)),
   suggestions: publicProcedure.input(z.object({ query: z.string().max(100).default("") })).query(async ({ input }) => {
     const term = input.query.trim().toLowerCase();
-    const categorySuggestions = demoCategories.filter(category => !term || category.name.toLowerCase().includes(term)).map(category => ({ kind: "Category", label: category.name, detail: "Browse nearby places" }));
-    const businessSuggestions = demoBusinesses.filter(item => !term || item.name.toLowerCase().includes(term) || item.category.toLowerCase().includes(term)).map(item => ({ kind: "Business", label: item.name, detail: `${item.locality}, ${item.city}` }));
-    const popular = term ? [] : ["Hospitals near me", "Restaurants near me", "Jobs in Kanpur"].map(label => ({ kind: "Popular", label, detail: "Popular on Just Finds" }));
-    return [...businessSuggestions, ...categorySuggestions, ...popular].slice(0, 8);
+    const [categories, businesses] = await Promise.all([getActiveCategories(), getPublicBusinesses(input.query)]);
+    const categorySuggestions = categories.filter(category => !term || category.name.toLowerCase().includes(term)).map(category => ({ kind: "Category", label: category.name, detail: "Browse this category" }));
+    const businessSuggestions = businesses.filter(item => !term || item.name.toLowerCase().includes(term) || item.category.toLowerCase().includes(term)).map(item => ({ kind: "Business", label: item.name, detail: `${item.locality ?? "Local area"}, ${item.city}` }));
+    const suggestedSearches = term ? [] : ["Hospitals near me", "Restaurants near me", "Jobs near me"].map(label => ({ kind: "Suggested", label, detail: "Suggested search" }));
+    return [...businessSuggestions, ...categorySuggestions, ...suggestedSearches].slice(0, 8);
   }),
   search: publicProcedure.input(searchInput).query(async ({ input }) => {
     const rows = await getPublicBusinesses(input.query, input.city);
-    const source = rows.length ? rows.map(row => ({
+    const source = rows.map(row => ({
       id: row.id,
       name: row.name,
       slug: row.slug,
@@ -56,7 +55,7 @@ export const discoveryRouter = router({
       phone: row.phone ?? undefined,
       whatsapp: row.whatsapp ?? undefined,
       website: row.website ?? undefined,
-    })) : [...demoBusinesses];
+    }));
     const filtered = source.filter(item => matchesQuery(item, input.query) && (!input.city || item.citySlug === input.city));
     const ranked = filtered.map(item => {
       const distanceKm = input.latitude !== undefined && input.longitude !== undefined
@@ -69,9 +68,6 @@ export const discoveryRouter = router({
   }),
   business: publicProcedure.input(z.object({ slug: z.string().min(2).max(240) })).query(async ({ input }) => {
     const detail = await getPublicBusinessByRoute(input.slug);
-    if (detail) return { ...detail, isDemo: false, reviewSummary: "No Just Finds reviews yet" };
-    const sample = demoBusinesses.find(item => item.slug === input.slug);
-    if (!sample) return null;
-    return { business: sample, category: { name: sample.category, slug: sample.categorySlug }, city: { name: sample.city, slug: sample.citySlug }, locality: { name: sample.locality }, services: sample.services.map(name => ({ name, description: null })), hours: [], fields: [], ai: null, isDemo: true, reviewSummary: "No Just Finds reviews yet" };
+    return detail ? { ...detail, isFixture: false, reviewSummary: "No Just Finds reviews yet" } : null;
   }),
 });

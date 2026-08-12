@@ -15,6 +15,13 @@
       "when": 1786514216179,
       "tag": "0001_cheerful_omega_sentinel",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1786539087120,
+      "tag": "0002_narrow_justin_hammer",
+      "breakpoints": true
     }
   ]
 }

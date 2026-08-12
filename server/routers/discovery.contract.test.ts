@@ -9,19 +9,18 @@ vi.mock("../db", () => ({
 import { discoveryRouter } from "./discovery";
 
 describe("public discovery contract", () => {
-  it("returns a bounded suggestion collection without requiring a session", async () => {
+  it("does not create public suggestions from sample business data when the database is empty", async () => {
     const caller = discoveryRouter.createCaller({} as never);
     const results = await caller.suggestions({ query: "Aarohan" });
-    expect(results.length).toBeGreaterThan(0);
+    expect(results).toEqual([]);
     expect(results.length).toBeLessThanOrEqual(8);
-    expect(results.some(item => item.label.includes("Aarohan"))).toBe(true);
   });
 
-  it("returns search items with ranking and pagination metadata", async () => {
+  it("returns an accurate empty search contract without public sample business data", async () => {
     const caller = discoveryRouter.createCaller({} as never);
     const results = await caller.search({ query: "wellness", limit: 10, offset: 0 });
-    expect(results.total).toBeGreaterThan(0);
-    expect(results.items[0]).toMatchObject({ name: expect.any(String), rankScore: expect.any(Number), reviewSummary: "No Just Finds reviews yet" });
+    expect(results.total).toBe(0);
+    expect(results.items).toEqual([]);
     expect(results.nextOffset).toBeNull();
   });
 });

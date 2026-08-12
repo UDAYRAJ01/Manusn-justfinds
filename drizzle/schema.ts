@@ -20,8 +20,11 @@ export const users = mysqlTable("users", {
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
+  phone: varchar("phone", { length: 32 }),
+  avatarUrl: varchar("avatarUrl", { length: 1000 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", userRoleValues).default("user").notNull(),
+  status: mysqlEnum("status", ["active", "suspended"]).default("active").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -54,8 +57,10 @@ export const categories = mysqlTable("categories", {
   slug: varchar("slug", { length: 120 }).notNull().unique(),
   description: text("description"),
   icon: varchar("icon", { length: 100 }).notNull().default("Sparkles"),
+  imageUrl: varchar("imageUrl", { length: 1000 }),
   sortOrder: int("sortOrder").default(0).notNull(),
   isActive: boolean("isActive").default(true).notNull(),
+  status: mysqlEnum("status", ["active", "inactive"]).default("active").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, table => [index("category_active_sort_idx").on(table.isActive, table.sortOrder)]);
@@ -65,8 +70,11 @@ export const subcategories = mysqlTable("subcategories", {
   categoryId: int("categoryId").notNull().references(() => categories.id),
   name: varchar("name", { length: 100 }).notNull(),
   slug: varchar("slug", { length: 120 }).notNull(),
+  description: text("description"),
+  icon: varchar("icon", { length: 100 }),
   sortOrder: int("sortOrder").default(0).notNull(),
   isActive: boolean("isActive").default(true).notNull(),
+  status: mysqlEnum("status", ["active", "inactive"]).default("active").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, table => [uniqueIndex("subcategory_category_slug_uidx").on(table.categoryId, table.slug), index("subcategory_category_idx").on(table.categoryId)]);
 
@@ -76,8 +84,10 @@ export const categoryFields = mysqlTable("category_fields", {
   subcategoryId: int("subcategoryId").references(() => subcategories.id),
   fieldKey: varchar("fieldKey", { length: 80 }).notNull(),
   label: varchar("label", { length: 120 }).notNull(),
-  fieldType: mysqlEnum("fieldType", ["text", "number", "select", "multiselect", "boolean", "url", "textarea"]).notNull(),
+  fieldType: mysqlEnum("fieldType", ["text", "textarea", "number", "currency", "boolean", "select", "multiselect", "multi_select", "date", "time", "image", "url", "phone", "email"]).notNull(),
+  placeholder: varchar("placeholder", { length: 240 }),
   options: json("options"),
+  validationRules: json("validationRules"),
   isRequired: boolean("isRequired").default(false).notNull(),
   isPublic: boolean("isPublic").default(true).notNull(),
   sortOrder: int("sortOrder").default(0).notNull(),
@@ -99,6 +109,7 @@ export const businesses = mysqlTable("businesses", {
   postcode: varchar("postcode", { length: 20 }),
   phone: varchar("phone", { length: 32 }),
   whatsapp: varchar("whatsapp", { length: 32 }),
+  email: varchar("email", { length: 320 }),
   website: varchar("website", { length: 500 }),
   heroImageUrl: varchar("heroImageUrl", { length: 1000 }),
   latitude: varchar("latitude", { length: 24 }),
@@ -151,6 +162,7 @@ export const businessImages = mysqlTable("business_images", {
   id: int("id").autoincrement().primaryKey(),
   businessId: int("businessId").notNull().references(() => businesses.id),
   url: varchar("url", { length: 1000 }).notNull(),
+  imageType: mysqlEnum("imageType", ["logo", "cover", "gallery"]).default("gallery").notNull(),
   alt: varchar("alt", { length: 240 }),
   sortOrder: int("sortOrder").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -270,6 +282,73 @@ export const bulkImportRows = mysqlTable("bulk_import_rows", {
   duplicateCandidateId: int("duplicateCandidateId").references(() => businesses.id),
   status: mysqlEnum("status", ["pending", "valid", "invalid", "imported", "duplicate"]).default("pending").notNull(),
 }, table => [uniqueIndex("import_row_number_uidx").on(table.importId, table.rowNumber), index("import_row_status_idx").on(table.importId, table.status)]);
+
+export const businessFacilities = mysqlTable("business_facilities", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  name: varchar("name", { length: 160 }).notNull(),
+  details: text("details"),
+  sortOrder: int("sortOrder").default(0).notNull(),
+}, table => [index("facility_business_idx").on(table.businessId)]);
+
+export const businessVerifications = mysqlTable("business_verifications", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  status: mysqlEnum("status", ["unverified", "pending", "verified", "rejected"]).default("unverified").notNull(),
+  evidenceUrl: varchar("evidenceUrl", { length: 1000 }),
+  reviewedById: int("reviewedById").references(() => users.id),
+  reviewNote: text("reviewNote"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  reviewedAt: timestamp("reviewedAt"),
+}, table => [uniqueIndex("verification_business_uidx").on(table.businessId), index("verification_status_idx").on(table.status)]);
+
+export const businessReputation = mysqlTable("business_reputation", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  score: int("score").default(0).notNull(),
+  explanation: json("explanation"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [uniqueIndex("reputation_business_uidx").on(table.businessId)]);
+
+export const businessRankings = mysqlTable("business_rankings", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  queryScope: varchar("queryScope", { length: 180 }).notNull().default("default"),
+  score: int("score").default(0).notNull(),
+  factors: json("factors"),
+  calculatedAt: timestamp("calculatedAt").defaultNow().notNull(),
+}, table => [index("ranking_business_scope_idx").on(table.businessId, table.queryScope)]);
+
+export const approvalQueue = mysqlTable("approval_queue", {
+  id: int("id").autoincrement().primaryKey(),
+  entityType: mysqlEnum("entityType", ["business", "job", "profile_change"]).notNull(),
+  businessId: int("businessId").references(() => businesses.id),
+  jobId: int("jobId").references(() => jobs.id),
+  submittedById: int("submittedById").notNull().references(() => users.id),
+  status: mysqlEnum("status", ["pending", "approved", "rejected", "cancelled"]).default("pending").notNull(),
+  reviewerId: int("reviewerId").references(() => users.id),
+  reviewerNote: text("reviewerNote"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  resolvedAt: timestamp("resolvedAt"),
+}, table => [index("approval_status_created_idx").on(table.status, table.createdAt), index("approval_business_idx").on(table.businessId)]);
+
+export const savedBusinesses = mysqlTable("saved_businesses", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [uniqueIndex("saved_business_user_uidx").on(table.userId, table.businessId)]);
+
+export const searchLogs = mysqlTable("search_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").references(() => users.id),
+  query: varchar("query", { length: 300 }).notNull(),
+  cityId: int("cityId").references(() => cities.id),
+  latitude: varchar("latitude", { length: 24 }),
+  longitude: varchar("longitude", { length: 24 }),
+  resultCount: int("resultCount").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [index("search_log_query_idx").on(table.query, table.createdAt), index("search_log_user_idx").on(table.userId, table.createdAt)]);
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;

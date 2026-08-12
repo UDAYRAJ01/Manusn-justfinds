@@ -1,9 +1,11 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { PageMeta } from "@/components/PageMeta";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import AdminWorkspace from "./pages/AdminWorkspace";
+import AuthEntry from "./pages/AuthEntry";
 import BusinessDetail from "./pages/BusinessDetail";
 import Categories from "./pages/Categories";
 import Home from "./pages/Home";
@@ -18,8 +20,14 @@ function Router() {
     <Route path="/" component={Home} />
     <Route path="/search" component={SearchResults} />
     <Route path="/categories" component={Categories} />
+    <Route path="/login" component={AuthEntry} />
+    <Route path="/signup" component={AuthEntry} />
+    <Route path="/forgot-password" component={AuthEntry} />
     <Route path="/jobs" component={Jobs} />
     <Route path="/saved" component={Saved} />
+    <Route path="/dashboard" component={OwnerWorkspace} />
+    <Route path="/business" component={OwnerWorkspace} />
+    <Route path="/business/:rest*" component={OwnerWorkspace} />
     <Route path="/owner" component={OwnerWorkspace} />
     <Route path="/owner/:rest*" component={OwnerWorkspace} />
     <Route path="/admin" component={AdminWorkspace} />
@@ -31,7 +39,7 @@ function Router() {
 }
 
 function App() {
-  return <ErrorBoundary><ThemeProvider defaultTheme="light"><TooltipProvider><Toaster /><Router /></TooltipProvider></ThemeProvider></ErrorBoundary>;
+  return <ErrorBoundary><ThemeProvider defaultTheme="light"><TooltipProvider><PageMeta /><Toaster /><Router /></TooltipProvider></ThemeProvider></ErrorBoundary>;
 }
 
 export default App;

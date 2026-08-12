@@ -13,3 +13,29 @@
 - [x] Write and run Vitest coverage for search ranking, permission boundaries, business data isolation, bulk-import statuses, and public API behavior.
 - [ ] Connect production providers for live map tiles, voice audio synthesis, custom-domain DNS verification, and managed import workers when their credentials and run-time services are selected.
 - [x] Verify desktop and mobile presentation, inspect application logs, and save a release checkpoint.
+- [x] Compare the complete new Phase 1 specification with the current Just Finds implementation and document conflicts, including its no-demo-data constraint.
+- [x] Reconcile the requested route inventory and protected-route architecture with the current public, owner, and admin navigation.
+- [x] Assess the requested PostgreSQL/Supabase and email-password authentication requirements against the managed MySQL and Manus OAuth foundation, then obtain an approved migration decision before any destructive change.
+- [x] Replace any non-compliant mock, demo-only, or fabricated data behavior with clearly sourced data flows or explicit empty states while preserving the prohibition on fabricated reviews, ratings, and testimonials.
+- [x] Audit the Phase 1 database model for the specified normalized entities, role hierarchy, category-field engine, and backend-enforced authorization boundaries.
+- [x] Validate the Phase 1 mobile breakpoints, accessibility states, public metadata, and protected-route behavior after the approved reconciliation work.
+- [x] Implement the agreed Phase 1 foundation on the current managed MySQL and Manus OAuth stack, keeping the Supabase/email-password requirement documented as a future infrastructure migration rather than silently substituting it.
+- [x] Verify and document accessibility coverage for the reconciled Phase 1 routes, including keyboard navigation, visible focus states, loading/error/empty states, and protected-route denial states.
+- [x] Validate the public metadata/head output for the reconciled routes, including title, description, canonical URL, and Open Graph basics where applicable.
+- [x] Verify keyboard accessibility on the public, auth, owner, and administrator Phase 1 routes, including visible focus, native control order, and loading, denial, and empty states; record concrete evidence.
+- [x] Add automated validation for route-specific title, description, canonical URL, Open Graph title, description, and URL metadata, and execute it in the regular test suite.
+- [x] Verify keyboard traversal, visible focus, skip links, and representative loading, empty, and denial states on public, auth, owner, and administrator routes; record the route-level results.
+- [x] Mount and test emitted document-head metadata for public, auth, owner, and admin route classes, including title, description, canonical, Open Graph title, description, and URL.
+- [x] Investigate and resolve the stale protected-workspace runtime import error for `getPendingBusinesses` before final route validation.
+- [x] Prevent unauthenticated protected-route renders from issuing workspace API queries and logging expected access-denial errors.
+- [x] Re-verify keyboard traversal and visible focus on representative public, auth, owner, and admin routes; document concrete results for skip links, loading, empty, and denial states.
+- [x] Revalidate unauthenticated owner and admin routes after query gating, then confirm from fresh logs that protected workspace procedures do not fire and expected login errors are not emitted.
+- [x] Ensure the skip link becomes visibly exposed for programmatic and keyboard focus states across browsers, then revalidate its rendered focus position.
+- [x] Re-test representative public, auth, owner, and admin routes with per-route evidence for keyboard order, visible focus, skip links, and loading, empty, or denial states.
+- [x] Create a fresh timestamp boundary for browser and network logs, then re-open unauthenticated owner and admin routes to verify no protected workspace request or expected-login error is emitted.
+- [x] Confirm the skip link is visibly on-screen for browser keyboard and programmatic focus, or correct its styling and capture the final rendered position.
+- [x] Capture direct browser evidence of keyboard focus and a representative loading, empty, or denial state for public, auth, owner, and admin route classes.
+- [x] Programmatically focus the live browser skip link, then record its active element, computed top, and rendered bounding position to verify it is on-screen.
+- [x] Capture explicit keyboard-focused-element evidence plus a representative empty, loading, or denial state for each public, auth, owner, and admin route class.
+- [x] Call the live skip link’s `focus()` method, wait for its transition to settle, and record active-element, computed-position, and bounding-rect evidence without manually setting a focus attribute.
+- [x] Clarify and document the route-class validation criterion for the static managed-auth page, which has no asynchronous loading, empty, or access-denial state by design; capture any intended loading evidence separately.
