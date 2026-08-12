@@ -1,42 +1,37 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import AdminWorkspace from "./pages/AdminWorkspace";
+import BusinessDetail from "./pages/BusinessDetail";
+import Categories from "./pages/Categories";
 import Home from "./pages/Home";
+import Jobs from "./pages/Jobs";
+import NotFound from "./pages/NotFound";
+import OwnerWorkspace from "./pages/OwnerWorkspace";
+import Saved from "./pages/Saved";
+import SearchResults from "./pages/SearchResults";
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
-  return (
-    <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
-      <Route component={NotFound} />
-    </Switch>
-  );
+  return <Switch>
+    <Route path="/" component={Home} />
+    <Route path="/search" component={SearchResults} />
+    <Route path="/categories" component={Categories} />
+    <Route path="/jobs" component={Jobs} />
+    <Route path="/saved" component={Saved} />
+    <Route path="/owner" component={OwnerWorkspace} />
+    <Route path="/owner/:rest*" component={OwnerWorkspace} />
+    <Route path="/admin" component={AdminWorkspace} />
+    <Route path="/admin/:rest*" component={AdminWorkspace} />
+    <Route path="/:category/:city/:slug" component={BusinessDetail} />
+    <Route path="/404" component={NotFound} />
+    <Route component={NotFound} />
+  </Switch>;
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
 function App() {
-  return (
-    <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
-      </ThemeProvider>
-    </ErrorBoundary>
-  );
+  return <ErrorBoundary><ThemeProvider defaultTheme="light"><TooltipProvider><Toaster /><Router /></TooltipProvider></ThemeProvider></ErrorBoundary>;
 }
 
 export default App;

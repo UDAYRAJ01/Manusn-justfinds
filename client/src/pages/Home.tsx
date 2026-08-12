@@ -1,33 +1,35 @@
-import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
-import { Streamdown } from 'streamdown';
+import { BusinessCard, BusinessCardData } from "@/components/BusinessCard";
+import { JustFindsLogo } from "@/components/JustFindsLogo";
+import { LocationPill, PageFrame } from "@/components/PageFrame";
+import { SearchHero } from "@/components/SearchHero";
+import { trpc } from "@/lib/trpc";
+import { ArrowRight, BadgeCheck, BriefcaseBusiness, Building2, ChevronRight, CircleHelp, HeartPulse, Hotel, MapPinned, Sparkles, Utensils, Wrench } from "lucide-react";
+import { useMemo } from "react";
+import { Link } from "wouter";
 
-/**
- * All content in this page are only for example, replace with your own feature implementation
- * When building pages, remember your instructions in Frontend Workflow, Frontend Best Practices, Design Guide and Common Pitfalls
- */
+const iconMap: Record<string, React.ElementType> = { HeartPulse, Utensils, Wrench, BriefcaseBusiness, Hotel, Building2 };
+
 export default function Home() {
-  // The useAuth hook provides authentication state.
-  // To implement login/logout, call logout(), or start login from an event
-  // handler: onClick={() => startLogin()} (imported from "@/const"). Never call
-  // startLogin() during render (no href={startLogin()}) — it mints a one-time
-  // nonce cookie and must run only at the moment of navigation.
-  let { user, loading, error, isAuthenticated, logout } = useAuth();
-
-  // If theme is switchable in App.tsx, we can implement theme toggling like this:
-  // const { theme, toggleTheme } = useTheme();
-
-  return (
-    <div className="min-h-screen flex flex-col">
-      <main>
-        {/* Example: lucide-react for icons */}
-        <Loader2 className="animate-spin" />
-        Example Page
-        {/* Example: Streamdown for markdown rendering */}
-        <Streamdown>Any **markdown** content</Streamdown>
-        <Button variant="default">Example Button</Button>
-      </main>
-    </div>
-  );
+  const searchInput = useMemo(() => ({ query: "", offset: 0, limit: 3 }), []);
+  const { data: featured, isLoading } = trpc.discovery.search.useQuery(searchInput);
+  const { data: categories } = trpc.discovery.categories.useQuery();
+  const cardItems = (featured?.items ?? []) as BusinessCardData[];
+  return <PageFrame>
+    <section className="overflow-hidden bg-[#f6f5f2] pb-16 pt-8 sm:pb-24 sm:pt-14">
+      <div className="container">
+        <div className="relative overflow-hidden rounded-[30px] bg-[#102a6b] px-6 pb-14 pt-12 text-white shadow-[0_25px_70px_rgba(17,42,107,.22)] sm:px-12 sm:pb-20 sm:pt-20">
+          <div className="absolute -right-20 -top-28 size-[460px] rounded-full bg-[#2754c7] opacity-55 blur-3xl" /><div className="absolute -bottom-44 left-[34%] size-[350px] rounded-full bg-[#d76b4c] opacity-35 blur-3xl" />
+          <div className="relative mx-auto max-w-4xl text-center"><div className="mb-6 flex justify-center"><span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-blue-100"><Sparkles className="size-3.5" />Local discovery, refined</span></div><h1 className="mx-auto max-w-3xl text-balance text-4xl font-semibold tracking-[-.055em] sm:text-6xl">Find anything nearby.<br /><span className="text-blue-200">Know it before you go.</span></h1><p className="mx-auto mt-5 max-w-xl text-pretty text-base leading-7 text-blue-100/80 sm:text-lg">Search local businesses, compare what matters, and connect with confidence — all from one thoughtful place.</p></div>
+          <div className="relative mt-9"><SearchHero /></div>
+          <div className="relative mt-5 flex flex-wrap justify-center gap-2 text-xs text-blue-100/75"><span className="inline-flex items-center gap-1.5"><MapPinned className="size-3.5" />GPS-aware nearby discovery</span><span className="hidden sm:block">•</span><span>Independent Just Finds profiles</span><span className="hidden sm:block">•</span><span>Built for local decisions</span></div>
+        </div>
+      </div>
+    </section>
+    <section className="py-14 sm:py-20"><div className="container"><div className="flex items-end justify-between gap-5"><div><p className="eyebrow">Explore by need</p><h2 className="section-title">A clearer way to start.</h2><p className="mt-2 max-w-lg text-sm leading-6 text-slate-500">Every category can carry its own details, filters, and structure — so the right information appears first.</p></div><Link href="/search" className="hidden items-center gap-1 text-sm font-semibold text-[#1f51c8] sm:inline-flex">All categories <ChevronRight className="size-4" /></Link></div><div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">{(categories ?? []).slice(0, 6).map((category, index) => { const Icon = iconMap[category.icon] ?? Building2; return <Link href={`/search?category=${category.slug}`} key={category.slug} className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_6px_17px_rgba(15,23,42,.035)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_25px_rgba(15,23,42,.08)]"><span className={`grid size-10 place-items-center rounded-xl ${["bg-rose-50 text-rose-600","bg-orange-50 text-orange-600","bg-sky-50 text-sky-600","bg-indigo-50 text-indigo-600","bg-violet-50 text-violet-600","bg-teal-50 text-teal-600"][index]}`}><Icon className="size-5" /></span><p className="mt-4 text-sm font-semibold text-slate-800">{category.name}</p><p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{category.description ?? "Explore nearby"}</p></Link>})}</div></div></section>
+    <section className="bg-white py-14 sm:py-20"><div className="container"><div className="grid gap-8 lg:grid-cols-[1.25fr_.75fr]"><div><div className="flex items-end justify-between gap-5"><div><p className="eyebrow">Recommended nearby</p><h2 className="section-title">Made for the next decision.</h2></div><LocationPill /></div><div className="mt-7 grid gap-4">{isLoading ? [...Array(3)].map((_, index) => <div key={index} className="h-48 animate-pulse rounded-3xl bg-slate-100" />) : cardItems.map((item, index) => <BusinessCard item={item} imageIndex={index} key={item.id} />)}</div><Link href="/search" className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-[#1f51c8]">See more nearby <ArrowRight className="size-4" /></Link></div><aside className="relative overflow-hidden rounded-[26px] bg-[#f4efe9] p-6 sm:p-8"><div className="absolute -right-12 top-24 size-48 rounded-full bg-[#e3c8ae] blur-3xl" /><div className="relative"><span className="grid size-11 place-items-center rounded-2xl bg-[#d76546] text-white shadow-lg"><MapPinned className="size-5" /></span><h3 className="mt-6 text-2xl font-semibold tracking-[-.04em] text-slate-900">Nearby means more than a pin on a map.</h3><p className="mt-4 text-sm leading-7 text-slate-600">Just Finds balances category fit, distance, verified information, profile quality, availability, and relevant interactions — without treating a rating as the whole story.</p><div className="mt-7 grid gap-3"><ScoreLine label="Category relevance" value="Matched" /><ScoreLine label="Distance awareness" value="GPS-ready" /><ScoreLine label="Profile confidence" value="Verified signals" /></div><Link href="/search" className="mt-8 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-transform active:scale-[.97]">Explore how it works <ArrowRight className="size-4" /></Link></div></aside></div></div></section>
+    <section className="py-14 sm:py-20"><div className="container"><div className="relative overflow-hidden rounded-[28px] bg-[#f0f5ff] px-6 py-9 sm:px-10 sm:py-12"><div className="absolute inset-y-0 right-0 hidden w-[42%] bg-[linear-gradient(135deg,transparent_20%,rgba(35,84,201,.11)_20%,rgba(35,84,201,.11)_70%,transparent_70%)] lg:block" /><div className="relative grid gap-8 lg:grid-cols-[1fr_.75fr] lg:items-center"><div><p className="eyebrow text-[#315fcb]">For local businesses</p><h2 className="mt-2 text-3xl font-semibold tracking-[-.05em] text-slate-950 sm:text-4xl">Your business, represented with clarity.</h2><p className="mt-4 max-w-xl text-sm leading-7 text-slate-600">Manage category-specific information, leads, landing pages, independent reviews, and AI content from one focused workspace.</p><div className="mt-7 flex flex-wrap gap-3"><Link href="/owner"><Button className="rounded-xl bg-[#173d9c]">List your business <ArrowRight className="ml-1 size-4" /></Button></Link><Link href="/owner"><Button variant="outline" className="rounded-xl bg-white">Owner workspace</Button></Link></div></div><div className="rounded-2xl border border-white/90 bg-white/75 p-5 shadow-[0_16px_30px_rgba(23,61,156,.09)] backdrop-blur"><div className="flex items-center justify-between"><span className="text-sm font-semibold text-slate-800">Profile readiness</span><BadgeCheck className="size-5 text-[#1f51c8]" /></div><div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full w-[86%] rounded-full bg-[linear-gradient(90deg,#2457d6,#547ce0)]" /></div><div className="mt-5 grid grid-cols-2 gap-3 text-sm"><MiniStat label="Business fields" value="Dynamic" /><MiniStat label="AI content" value="Approval-led" /><MiniStat label="Leads" value="Private" /><MiniStat label="Domains" value="Ready" /></div></div></div></div></div></section>
+  </PageFrame>;
 }
+function ScoreLine({ label, value }: { label: string; value: string }) { return <div className="flex items-center justify-between rounded-xl bg-white/75 px-3.5 py-3 text-sm"><span className="text-slate-600">{label}</span><span className="font-semibold text-slate-900">{value}</span></div>; }
+function MiniStat({ label, value }: { label: string; value: string }) { return <div className="rounded-xl bg-slate-50 px-3 py-3"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 font-semibold text-slate-800">{value}</p></div>; }
