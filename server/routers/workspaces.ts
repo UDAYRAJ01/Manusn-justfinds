@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { approvalQueue, businesses, businessFieldValues, categories, categoryFields, cities } from "../../drizzle/schema";
-import { getAdminCounts, getCategorySchemas, getDb, getOwnerBusinesses, getPendingBusinesses } from "../db";
+import { deleteInternalValidationBusiness, getAdminCounts, getCategorySchemas, getDb, getInternalValidationBusinesses, getOwnerBusinesses, getPendingBusinesses } from "../db";
 import { canManageAdmins, canManageBusiness, canModerate } from "../domain/permissions";
 import { buildVoiceIntroductionScript } from "../domain/voiceScript";
 import { storagePut } from "../storage";
@@ -59,6 +59,16 @@ export const workspaceRouter = router({
   pendingBusinesses: protectedProcedure.query(async ({ ctx }) => {
     requireModerator(ctx.user.role);
     return getPendingBusinesses();
+  }),
+  internalValidationBusinesses: protectedProcedure.query(async ({ ctx }) => {
+    requireModerator(ctx.user.role);
+    return getInternalValidationBusinesses();
+  }),
+  deleteInternalValidationBusiness: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), confirmation: z.literal("DELETE TEST LISTING") })).mutation(async ({ ctx, input }) => {
+    requireModerator(ctx.user.role);
+    const deleted = await deleteInternalValidationBusiness(input.businessId);
+    if (!deleted) throw new TRPCError({ code: "NOT_FOUND", message: "Only designated Just Finds internal test listings can be deleted here." });
+    return { deleted: true };
   }),
   createCategory: protectedProcedure.input(z.object({ name: z.string().min(2).max(100), slug: z.string().min(2).max(120).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/), description: z.string().max(1000).optional(), icon: z.string().min(1).max(100).default("Sparkles") })).mutation(async ({ ctx, input }) => {
     requireSuperAdmin(ctx.user.role);

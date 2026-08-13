@@ -66,3 +66,18 @@
 - [x] Validate the internal voice listing through the authenticated owner workspace UI: select the listing, trigger generation, observe the owner success and audio state, and reconfirm the stored audio remains public on the published profile.
 - [x] Capture explicit post-generation owner and public audio-element evidence, then verify the persisted voice URL and timestamp were refreshed by the authenticated owner-interface request.
 - [x] Capture explicit managed-map rendering evidence on the dedicated internal map-validation profile and confirm it required no user API-key prompt or user-supplied credential.
+- [x] Add accessible loading, success, retry, and actionable failure states to the owner’s ElevenLabs voice-introduction generation workflow.
+- [x] Add focused test coverage for owner-facing ElevenLabs failure-message mapping and retry guidance.
+- [x] Add a guarded administrator interface to identify, review, and permanently delete only clearly labelled internal test listings, with explicit confirmation and no impact on real listings.
+- [x] Add focused server-side safety coverage proving that internal-listing cleanup never permits a real listing or a loosely named record.
+- [x] Add a mobile-first guided owner onboarding flow for business basics, coordinate verification, approval-ready descriptions, and final submission to the existing moderation workflow.
+- [x] Add focused validation coverage for the guided onboarding coordinate and approval-ready-description acceptance rules.
+- [x] Capture live browser interaction evidence for the confirmation-protected internal-listing cleanup flow; the gate was verified across empty, wrong-case, and exact confirmation states, and one internal test-only record was removed during the check (recorded in the validation document).
+- [x] Capture live browser interaction evidence for the guided onboarding draft creation and moderation-submission flow without fabricating listing claims.
+- [x] Add a focused router contract test for protected internal-listing cleanup, including administrator enforcement, exact confirmation, and refusal to delete non-internal records.
+- [x] Add DOM interaction validation for the typed cleanup confirmation gate without deleting the retained validation records.
+- [x] Add DOM interaction validation for the guided owner onboarding form through draft creation and moderation submission without fabricating claims.
+- [x] Diagnose the reported "invalid OAuth state" error during administrator sign-in: it is the expected one-time login-nonce CSRF guard rejecting a stale or superseded login, resolved by starting and completing a fresh sign-in in the same tab.
+- [x] Recreate a clearly labelled internal map-validation listing so retained internal map coverage is restored after the accidental removal.
+- [x] Harden the administrator cleanup dialog so enabling the destructive control cannot shift the cancel control's position, keeping cancellation predictable.
+- [x] Repeat the administrator cleanup-gate validation non-destructively, proving the empty, wrong-case, and exact confirmation states and a successful cancellation with no record deleted.

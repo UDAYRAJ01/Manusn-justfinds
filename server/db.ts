@@ -2,23 +2,35 @@ import { and, asc, count, desc, eq, isNotNull, like, ne, or, sql } from "drizzle
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   businessAiContent,
+  businessCertificates,
+  businessDomains,
   businessFieldValues,
+  businessFacilities,
   businessHours,
+  businessImages,
   businessLeads,
+  businessRankings,
+  businessReputation,
+  businessReviews,
   businesses,
   businessServices,
+  businessVerifications,
+  approvalQueue,
   categories,
   categoryFields,
   cities,
   InsertUser,
   jobs,
+  jobApplications,
   localities,
   searchInteractions,
   searchLogs,
+  savedBusinesses,
   subcategories,
   users,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import { internalValidationCategorySlug, isInternalValidationBusiness } from "./domain/internalValidation";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -273,6 +285,32 @@ export async function getOwnerBusinesses(ownerId: number) {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(businesses).where(eq(businesses.ownerId, ownerId)).orderBy(desc(businesses.updatedAt));
+}
+
+export async function getInternalValidationBusinesses() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({ id: businesses.id, name: businesses.name, slug: businesses.slug, status: businesses.status, voiceIntroductionUrl: businesses.voiceIntroductionUrl, createdAt: businesses.createdAt, category: categories.name, city: cities.name })
+    .from(businesses).innerJoin(categories, eq(businesses.categoryId, categories.id)).innerJoin(cities, eq(businesses.cityId, cities.id))
+    .where(and(eq(categories.slug, internalValidationCategorySlug), like(businesses.name, "Just Finds Internal %TEST ONLY"))).orderBy(desc(businesses.createdAt));
+}
+
+export async function deleteInternalValidationBusiness(businessId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+  const matches = await db.select({ name: businesses.name, categorySlug: categories.slug }).from(businesses).innerJoin(categories, eq(businesses.categoryId, categories.id)).where(eq(businesses.id, businessId)).limit(1);
+  const business = matches[0];
+  if (!business || !isInternalValidationBusiness(business)) return false;
+  await db.transaction(async tx => {
+    const childId = <T>(column: T) => eq(column as never, businessId);
+    const testJobs = await tx.select({ id: jobs.id }).from(jobs).where(eq(jobs.businessId, businessId));
+    if (testJobs.length) await tx.delete(jobApplications).where(sql`${jobApplications.jobId} IN (${sql.join(testJobs.map(job => sql`${job.id}`), sql`, `)})`);
+    await Promise.all([
+      tx.delete(businessFieldValues).where(childId(businessFieldValues.businessId)), tx.delete(businessHours).where(childId(businessHours.businessId)), tx.delete(businessServices).where(childId(businessServices.businessId)), tx.delete(businessImages).where(childId(businessImages.businessId)), tx.delete(businessReviews).where(childId(businessReviews.businessId)), tx.delete(businessLeads).where(childId(businessLeads.businessId)), tx.delete(businessAiContent).where(childId(businessAiContent.businessId)), tx.delete(businessDomains).where(childId(businessDomains.businessId)), tx.delete(businessCertificates).where(childId(businessCertificates.businessId)), tx.delete(businessFacilities).where(childId(businessFacilities.businessId)), tx.delete(businessVerifications).where(childId(businessVerifications.businessId)), tx.delete(businessReputation).where(childId(businessReputation.businessId)), tx.delete(businessRankings).where(childId(businessRankings.businessId)), tx.delete(approvalQueue).where(eq(approvalQueue.businessId, businessId)), tx.delete(savedBusinesses).where(childId(savedBusinesses.businessId)), tx.delete(searchInteractions).where(childId(searchInteractions.businessId)), tx.delete(jobs).where(eq(jobs.businessId, businessId)),
+    ]);
+    await tx.delete(businesses).where(eq(businesses.id, businessId));
+  });
+  return true;
 }
 
 export async function getAdminCounts() {
