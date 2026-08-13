@@ -77,5 +77,5 @@
 
 - [x] Add an interactive profile location picker that updates latitude and longitude from map interaction, with validation
 - [x] Extend weekly hours UI to create, edit, and remove multiple daily intervals
-- [ ] Add explicit desktop/mobile owner preview states and verify mobile dashboard polish
-- [ ] Add focused Vitest coverage for claim workflow states, hours validation edge cases, and offer auto-expiry behavior
+- [x] Add explicit desktop/mobile owner preview states and verify mobile dashboard polish
+- [x] Add focused Vitest coverage for claim workflow states, hours validation edge cases, and offer auto-expiry behavior
