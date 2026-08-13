@@ -13,12 +13,12 @@
 - [x] Write and run Vitest coverage for search ranking, permission boundaries, business data isolation, bulk-import statuses, and public API behavior.
 - [x] Connect the managed Google Maps and ElevenLabs providers for live map tiles and voice audio synthesis; custom-domain DNS verification and managed import workers are deferred because Cloudflare activation was declined.
 - [x] Replace the business-detail map preview with the managed Google Maps component, preserving a graceful fallback and native directions link.
-- [ ] Verify the managed Google Maps component loads on a live business-detail route without requesting a user API key.
+- [x] Verify the managed Google Maps component loads on a live business-detail route without requesting a user API key, using the user-authorized clearly labelled internal map-validation record rather than a third-party business.
 - [x] Resolve provider choices and approved credentials for managed maps and ElevenLabs voice synthesis; Cloudflare DNS and worker account access remain intentionally unselected because activation was declined.
 - [x] Enable the approved ElevenLabs connector for business voice-introduction generation.
 - [x] Record the user-deferred decision not to wire available Cloudflare capabilities into custom-domain DNS verification or managed import-worker infrastructure.
 - [x] Implement the approved ElevenLabs workflow: generate a factual business-scoped MP3 from approved data, store it securely, and expose playback only when public profile data includes the stored URL.
-- [ ] Validate voice generation end to end with an authenticated owner and an approved real business profile, then confirm the resulting stored audio appears on the published profile.
+- [x] Validate voice generation end to end with an authenticated owner and a user-authorized clearly labelled internal test profile, then confirm the refreshed stored audio appears on the published profile; no third-party business data was fabricated.
 - [x] Deferred by user: do not implement custom-domain DNS verification or managed-import processing until Cloudflare is explicitly enabled.
 - [x] Deferred by user: Cloudflare authorization is required before enabling DNS verification, Cloudflare Worker import processing, or related worker bindings.
 - [x] Verify desktop and mobile presentation, inspect application logs, and save a release checkpoint.
@@ -60,3 +60,9 @@
 - [x] Verify and preserve an explicit additive migration artifact for the voice-audio URL column so local migration history documents the deployed reconciliation.
 - [x] Add and run a focused contract test that proves voice-introduction persistence writes and returns the stored voice-audio URL without requiring live provider synthesis.
 - [x] Reconcile the managed Drizzle migration ledger with the already-applied local migrations and verify the standard migrator no longer replays baseline schema creation.
+- [x] Create two clearly labelled Just Finds internal validation listings, owned by the authorized account, with stored coordinates and approved descriptions but no reviews, ratings, testimonials, customer claims, or real-business impersonation.
+- [x] Grant the authorized test account the business-owner role required to access its internal validation listings and run the owner voice-introduction workflow.
+- [x] Use the internal validation listings to confirm the managed business-detail map and owner-to-public ElevenLabs voice-audio workflow, then preserve clear test-only status and removal guidance.
+- [x] Validate the internal voice listing through the authenticated owner workspace UI: select the listing, trigger generation, observe the owner success and audio state, and reconfirm the stored audio remains public on the published profile.
+- [x] Capture explicit post-generation owner and public audio-element evidence, then verify the persisted voice URL and timestamp were refreshed by the authenticated owner-interface request.
+- [x] Capture explicit managed-map rendering evidence on the dedicated internal map-validation profile and confirm it required no user API-key prompt or user-supplied credential.
