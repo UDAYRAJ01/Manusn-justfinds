@@ -1,0 +1,1 @@
+ALTER TABLE `business_hours` ADD `intervals` json;

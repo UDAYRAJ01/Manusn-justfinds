@@ -105,6 +105,12 @@ export const businesses = mysqlTable("businesses", {
   slug: varchar("slug", { length: 240 }).notNull().unique(),
   shortDescription: text("shortDescription"),
   approvedDescription: text("approvedDescription"),
+  aboutDescription: text("aboutDescription"),
+  socialLinks: json("socialLinks"),
+  seoTitle: varchar("seoTitle", { length: 180 }),
+  metaDescription: varchar("metaDescription", { length: 300 }),
+  rejectionReason: text("rejectionReason"),
+  onboardingStep: int("onboardingStep").default(1).notNull(),
   address: text("address").notNull(),
   postcode: varchar("postcode", { length: 20 }),
   phone: varchar("phone", { length: 32 }),
@@ -149,6 +155,7 @@ export const businessHours = mysqlTable("business_hours", {
   dayOfWeek: int("dayOfWeek").notNull(),
   opensAt: varchar("opensAt", { length: 5 }),
   closesAt: varchar("closesAt", { length: 5 }),
+  intervals: json("intervals"),
   isClosed: boolean("isClosed").default(false).notNull(),
   isTwentyFourHours: boolean("isTwentyFourHours").default(false).notNull(),
 }, table => [index("hours_business_day_idx").on(table.businessId, table.dayOfWeek)]);
@@ -158,8 +165,13 @@ export const businessServices = mysqlTable("business_services", {
   businessId: int("businessId").notNull().references(() => businesses.id),
   name: varchar("name", { length: 160 }).notNull(),
   description: text("description"),
+  price: varchar("price", { length: 80 }),
+  priceType: mysqlEnum("priceType", ["fixed", "starting_from", "contact", "free"]).default("contact").notNull(),
+  duration: varchar("duration", { length: 80 }),
+  imageUrl: varchar("imageUrl", { length: 1000 }),
+  isEnabled: boolean("isEnabled").default(true).notNull(),
   sortOrder: int("sortOrder").default(0).notNull(),
-});
+}, table => [index("service_business_idx").on(table.businessId)]);
 
 export const businessImages = mysqlTable("business_images", {
   id: int("id").autoincrement().primaryKey(),
@@ -179,6 +191,7 @@ export const businessReviews = mysqlTable("business_reviews", {
   content: text("content"),
   status: mysqlEnum("status", ["pending", "published", "reported", "removed"]).default("pending").notNull(),
   businessResponse: text("businessResponse"),
+  respondedAt: timestamp("respondedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, table => [uniqueIndex("review_business_user_uidx").on(table.businessId, table.userId), index("review_moderation_idx").on(table.status, table.createdAt)]);
@@ -193,6 +206,7 @@ export const businessLeads = mysqlTable("business_leads", {
   source: varchar("source", { length: 100 }).notNull().default("business-page"),
   page: varchar("page", { length: 500 }),
   status: mysqlEnum("status", ["new", "contacted", "qualified", "converted", "closed"]).default("new").notNull(),
+  notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, table => [index("lead_business_status_idx").on(table.businessId, table.status)]);
 
@@ -361,4 +375,95 @@ export const searchLogs = mysqlTable("search_logs", {
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+export const businessReviewReports = mysqlTable("business_review_reports", {
+  id: int("id").autoincrement().primaryKey(),
+  reviewId: int("reviewId").notNull().references(() => businessReviews.id),
+  reporterId: int("reporterId").notNull().references(() => users.id),
+  reason: varchar("reason", { length: 240 }).notNull(),
+  details: text("details"),
+  status: mysqlEnum("status", ["pending", "reviewed", "dismissed"]).default("pending").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [index("review_report_status_idx").on(table.status, table.createdAt), index("review_report_review_idx").on(table.reviewId)]);
+
+export const claimStatusValues = ["claim_requested", "under_review", "verification_required", "approved", "rejected"] as const;
+
+export const businessClaims = mysqlTable("business_claims", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  userId: int("userId").notNull().references(() => users.id),
+  status: mysqlEnum("status", claimStatusValues).default("claim_requested").notNull(),
+  evidenceNote: text("evidenceNote"),
+  submittedAt: timestamp("submittedAt").defaultNow().notNull(),
+  reviewedAt: timestamp("reviewedAt"),
+  reviewedBy: int("reviewedBy").references(() => users.id),
+  rejectionReason: text("rejectionReason"),
+}, table => [index("claim_user_status_idx").on(table.userId, table.status), index("claim_business_idx").on(table.businessId)]);
+
+export const businessSpecialHours = mysqlTable("business_special_hours", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  date: varchar("date", { length: 10 }).notNull(),
+  label: varchar("label", { length: 160 }).notNull(),
+  isClosed: boolean("isClosed").default(false).notNull(),
+  intervals: json("intervals"),
+}, table => [uniqueIndex("special_hours_business_date_uidx").on(table.businessId, table.date)]);
+
+export const businessItems = mysqlTable("business_items", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  itemType: mysqlEnum("itemType", ["product", "menu", "room", "consultation"]).default("product").notNull(),
+  name: varchar("name", { length: 180 }).notNull(),
+  description: text("description"),
+  price: varchar("price", { length: 80 }),
+  imageUrl: varchar("imageUrl", { length: 1000 }),
+  isEnabled: boolean("isEnabled").default(true).notNull(),
+  sortOrder: int("sortOrder").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [index("item_business_type_idx").on(table.businessId, table.itemType)]);
+
+export const businessOffers = mysqlTable("business_offers", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  title: varchar("title", { length: 180 }).notNull(),
+  description: text("description"),
+  discount: varchar("discount", { length: 80 }),
+  startsAt: timestamp("startsAt").notNull(),
+  endsAt: timestamp("endsAt").notNull(),
+  terms: text("terms"),
+  cta: varchar("cta", { length: 120 }),
+  status: mysqlEnum("status", ["draft", "active", "expired"]).default("draft").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [index("offer_business_status_idx").on(table.businessId, table.status, table.endsAt)]);
+
+export const businessNotifications = mysqlTable("business_notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id),
+  businessId: int("businessId").references(() => businesses.id),
+  type: varchar("type", { length: 80 }).notNull(),
+  title: varchar("title", { length: 180 }).notNull(),
+  body: text("body"),
+  isRead: boolean("isRead").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [index("notification_user_read_idx").on(table.userId, table.isRead, table.createdAt)]);
+
+export const businessRevisions = mysqlTable("business_revisions", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  createdBy: int("createdBy").notNull().references(() => users.id),
+  changeType: varchar("changeType", { length: 80 }).notNull(),
+  payload: json("payload").notNull(),
+  status: mysqlEnum("status", ["draft", "submitted", "approved", "rejected"]).default("draft").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [index("revision_business_status_idx").on(table.businessId, table.status, table.createdAt)]);
+
+export const ownerNotificationPrefs = mysqlTable("owner_notification_prefs", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id),
+  emailEnabled: boolean("emailEnabled").default(true).notNull(),
+  leadAlerts: boolean("leadAlerts").default(true).notNull(),
+  reviewAlerts: boolean("reviewAlerts").default(true).notNull(),
+  statusAlerts: boolean("statusAlerts").default(true).notNull(),
+}, table => [uniqueIndex("owner_notification_prefs_user_uidx").on(table.userId)]);
+
 export type Business = typeof businesses.$inferSelect;
