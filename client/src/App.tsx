@@ -17,6 +17,7 @@ import NotFound from "./pages/NotFound";
 import OwnerWorkspace from "./pages/OwnerWorkspace";
 import Saved from "./pages/Saved";
 import SearchResults from "./pages/SearchResults";
+import VerifyBusiness from "./pages/VerifyBusiness";
 
 function Router() {
   return <Switch>
@@ -41,6 +42,7 @@ function Router() {
     <Route path="/owner/:rest*" component={OwnerWorkspace} />
     <Route path="/admin" component={AdminWorkspace} />
     <Route path="/admin/:rest*" component={AdminWorkspace} />
+    <Route path="/verify/:slug" component={VerifyBusiness} />
     <Route path="/:category/:city/:slug" component={BusinessDetail} />
     <Route path="/404" component={NotFound} />
     <Route component={NotFound} />

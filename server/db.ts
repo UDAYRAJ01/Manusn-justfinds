@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, isNotNull, like, ne, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
+  aiContentVersions,
   businessAiContent,
   businessCertificates,
   businessDomains,
@@ -8,12 +9,16 @@ import {
   businessFacilities,
   businessHours,
   businessImages,
+  businessItems,
   businessLeads,
   businessRankings,
   businessReputation,
   businessReviews,
+  businessReviewReports,
   businesses,
   businessServices,
+  businessSpecialHours,
+  businessOffers,
   businessVerifications,
   approvalQueue,
   categories,
@@ -229,7 +234,7 @@ export async function logPublicSearch(input: { userId?: number; query: string; c
   ]);
 }
 
-export async function logPublicInteraction(input: { userId?: number; businessId: number; action: "click" | "call" | "whatsapp" | "directions" | "website" | "save" | "inquiry"; query?: string; sessionId?: string }) {
+export async function logPublicInteraction(input: { userId?: number; businessId: number; action: "click" | "call" | "whatsapp" | "directions" | "website" | "save" | "inquiry" | "share"; query?: string; sessionId?: string }) {
   const db = await getDb();
   if (!db) return;
   await db.insert(searchInteractions).values({ userId: input.userId, businessId: input.businessId, action: input.action, query: input.query?.slice(0, 300), sessionId: input.sessionId?.slice(0, 64) });
@@ -253,13 +258,40 @@ export async function getPublicBusinessByRoute(slug: string) {
     .limit(1);
   const row = rows[0];
   if (!row) return undefined;
-  const [services, hours, fields, ai] = await Promise.all([
-    db.select().from(businessServices).where(eq(businessServices.businessId, row.business.id)),
-    db.select().from(businessHours).where(eq(businessHours.businessId, row.business.id)),
+  const now = new Date();
+  const [services, hours, specialHours, fields, images, facilities, items, offers, reviews, certificates, verifications, reputation, ai, approvedAiContent] = await Promise.all([
+    db.select().from(businessServices).where(and(eq(businessServices.businessId, row.business.id), eq(businessServices.isEnabled, true))).orderBy(asc(businessServices.sortOrder)),
+    db.select().from(businessHours).where(eq(businessHours.businessId, row.business.id)).orderBy(asc(businessHours.dayOfWeek)),
+    db.select().from(businessSpecialHours).where(eq(businessSpecialHours.businessId, row.business.id)).orderBy(asc(businessSpecialHours.date)),
     db.select().from(businessFieldValues).where(eq(businessFieldValues.businessId, row.business.id)),
-    db.select().from(businessAiContent).where(eq(businessAiContent.businessId, row.business.id)).limit(1),
+    db.select().from(businessImages).where(eq(businessImages.businessId, row.business.id)).orderBy(asc(businessImages.sortOrder), asc(businessImages.id)),
+    db.select().from(businessFacilities).where(eq(businessFacilities.businessId, row.business.id)).orderBy(asc(businessFacilities.sortOrder)),
+    db.select().from(businessItems).where(and(eq(businessItems.businessId, row.business.id), eq(businessItems.isEnabled, true))).orderBy(asc(businessItems.sortOrder)),
+    db.select().from(businessOffers).where(and(eq(businessOffers.businessId, row.business.id), eq(businessOffers.status, "active"), sql`${businessOffers.startsAt} <= ${now}`, sql`${businessOffers.endsAt} >= ${now}`)).orderBy(asc(businessOffers.endsAt)),
+    db.select({ id: businessReviews.id, rating: businessReviews.rating, content: businessReviews.content, businessResponse: businessReviews.businessResponse, respondedAt: businessReviews.respondedAt, createdAt: businessReviews.createdAt, authorName: users.name }).from(businessReviews).innerJoin(users, eq(businessReviews.userId, users.id)).where(and(eq(businessReviews.businessId, row.business.id), eq(businessReviews.status, "published"))).orderBy(desc(businessReviews.createdAt)),
+    db.select().from(businessCertificates).where(eq(businessCertificates.businessId, row.business.id)).orderBy(desc(businessCertificates.issuedAt)).limit(1),
+    db.select().from(businessVerifications).where(eq(businessVerifications.businessId, row.business.id)).orderBy(desc(businessVerifications.createdAt)).limit(1),
+    db.select().from(businessReputation).where(eq(businessReputation.businessId, row.business.id)).limit(1),
+    db.select().from(businessAiContent).where(and(eq(businessAiContent.businessId, row.business.id), eq(businessAiContent.status, "completed"))).orderBy(desc(businessAiContent.updatedAt)).limit(1),
+    db.select().from(aiContentVersions).where(and(eq(aiContentVersions.businessId, row.business.id), eq(aiContentVersions.status, "published"))).orderBy(desc(aiContentVersions.updatedAt)),
   ]);
-  return { ...row, services, hours, fields, ai: ai[0] };
+  return {
+    ...row,
+    services,
+    hours,
+    specialHours,
+    fields,
+    images,
+    facilities,
+    items,
+    offers,
+    reviews,
+    certificate: certificates[0],
+    verification: verifications[0],
+    reputation: reputation[0],
+    ai: ai[0],
+    approvedAiContent,
+  };
 }
 
 export async function getBusinessAiFacts(businessId: number, publicOnly = false) {
@@ -328,10 +360,10 @@ export async function getBusinessChatContext(businessId: number) {
   return { business: business[0], services, hours, ai: ai[0] };
 }
 
-export async function createBusinessLead(input: { businessId: number; name: string; phone?: string; email?: string; message?: string; page?: string }) {
+export async function createBusinessLead(input: { businessId: number; name: string; phone?: string; email?: string; message?: string; page?: string; consentGiven: true; consentAt?: Date }) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
-  await db.insert(businessLeads).values({ ...input, source: "business-page" });
+  await db.insert(businessLeads).values({ ...input, source: "business-page", consentGiven: true, consentAt: input.consentAt ?? new Date() });
 }
 
 export async function getOwnerBusinesses(ownerId: number) {
@@ -415,4 +447,61 @@ export async function getCategorySchemas() {
     ...schema,
     fields: fields.filter(field => field.categoryId === schema.category.id && field.subcategoryId === (schema.subcategory?.id ?? null)),
   }));
+}
+
+
+export async function togglePublicSavedBusiness(userId: number, businessId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+  const published = await db.select({ id: businesses.id }).from(businesses).where(and(eq(businesses.id, businessId), eq(businesses.status, "published"))).limit(1);
+  if (!published[0]) return { saved: false, reason: "not_found" as const };
+  const existing = await db.select({ id: savedBusinesses.id }).from(savedBusinesses).where(and(eq(savedBusinesses.userId, userId), eq(savedBusinesses.businessId, businessId))).limit(1);
+  if (existing[0]) {
+    await db.delete(savedBusinesses).where(eq(savedBusinesses.id, existing[0].id));
+    return { saved: false, reason: "removed" as const };
+  }
+  await db.insert(savedBusinesses).values({ userId, businessId });
+  return { saved: true, reason: "saved" as const };
+}
+
+export async function getPublicSavedBusiness(userId: number, businessId: number) {
+  const db = await getDb();
+  if (!db) return false;
+  const row = await db.select({ id: savedBusinesses.id }).from(savedBusinesses).where(and(eq(savedBusinesses.userId, userId), eq(savedBusinesses.businessId, businessId))).limit(1);
+  return Boolean(row[0]);
+}
+
+export async function createPublicBusinessReview(input: { userId: number; businessId: number; rating: number; content?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+  const published = await db.select({ id: businesses.id }).from(businesses).where(and(eq(businesses.id, input.businessId), eq(businesses.status, "published"))).limit(1);
+  if (!published[0]) return { ok: false, reason: "not_found" as const };
+  const existing = await db.select({ id: businessReviews.id, status: businessReviews.status }).from(businessReviews).where(and(eq(businessReviews.businessId, input.businessId), eq(businessReviews.userId, input.userId))).limit(1);
+  if (existing[0]) return { ok: false, reason: "already_reviewed" as const, review: existing[0] };
+  await db.insert(businessReviews).values({ businessId: input.businessId, userId: input.userId, rating: input.rating, content: input.content?.trim() || null, status: "pending" });
+  const created = await db.select({ id: businessReviews.id, rating: businessReviews.rating, content: businessReviews.content, status: businessReviews.status, createdAt: businessReviews.createdAt }).from(businessReviews).where(and(eq(businessReviews.businessId, input.businessId), eq(businessReviews.userId, input.userId))).limit(1);
+  return { ok: true, reason: "created" as const, review: created[0] };
+}
+
+export async function reportPublicBusinessReview(input: { reporterId: number; reviewId: number; reason: string; details?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+  const review = await db.select({ id: businessReviews.id }).from(businessReviews).innerJoin(businesses, eq(businessReviews.businessId, businesses.id)).where(and(eq(businessReviews.id, input.reviewId), eq(businesses.status, "published"))).limit(1);
+  if (!review[0]) return { ok: false, reason: "not_found" as const };
+  await db.insert(businessReviewReports).values({ reviewId: input.reviewId, reporterId: input.reporterId, reason: input.reason.trim(), details: input.details?.trim() || null });
+  await db.update(businessReviews).set({ status: "reported" }).where(eq(businessReviews.id, input.reviewId));
+  return { ok: true, reason: "reported" as const };
+}
+
+export async function getPublicCertificateVerification(slug: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const row = await db.select({ business: businesses, certificate: businessCertificates, verification: businessVerifications }).from(businesses).innerJoin(businessCertificates, eq(businessCertificates.businessId, businesses.id)).leftJoin(businessVerifications, eq(businessVerifications.businessId, businesses.id)).where(and(eq(businesses.slug, slug), eq(businesses.status, "published"))).orderBy(desc(businessCertificates.issuedAt)).limit(1);
+  if (!row[0]) return null;
+  return {
+    valid: row[0].verification?.status === "verified" || row[0].business.isVerified,
+    business: { id: row[0].business.id, name: row[0].business.name, slug: row[0].business.slug, address: row[0].business.address },
+    certificate: row[0].certificate,
+    verification: row[0].verification,
+  };
 }

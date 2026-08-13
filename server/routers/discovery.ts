@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { getActiveCategories, getActiveCities, getPublicBusinessByRoute, getPublicBusinesses, getPublicCategoryBySlug, getPublicCategoryFields, getPublicCityBySlug, getPublicLocalities, getPublicSearchPage, getPublicSubcategories, logPublicInteraction, logPublicSearch } from "../db";
+import { createPublicBusinessReview, getActiveCategories, getActiveCities, getPublicBusinessByRoute, getPublicBusinesses, getPublicCategoryBySlug, getPublicCategoryFields, getPublicCityBySlug, getPublicLocalities, getPublicSavedBusiness, getPublicSearchPage, getPublicSubcategories, getPublicCertificateVerification, logPublicInteraction, logPublicSearch, reportPublicBusinessReview, togglePublicSavedBusiness } from "../db";
 import { parseSearchIntent } from "../domain/searchIntent";
-import { publicProcedure, router } from "../_core/trpc";
+import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 
 const searchInput = z.object({
   query: z.string().max(200).optional().default(""),
@@ -81,7 +81,7 @@ export const discoveryRouter = router({
       sort,
     };
   }),
-  interaction: publicProcedure.input(z.object({ businessId: z.number().int().positive(), action: z.enum(["click", "call", "whatsapp", "directions", "website", "save", "inquiry"]), query: z.string().max(300).optional(), sessionId: z.string().max(64).optional() })).mutation(async ({ ctx, input }) => {
+  interaction: publicProcedure.input(z.object({ businessId: z.number().int().positive(), action: z.enum(["click", "call", "whatsapp", "directions", "website", "save", "inquiry", "share"]), query: z.string().max(300).optional(), sessionId: z.string().max(64).optional() })).mutation(async ({ ctx, input }) => {
     await logPublicInteraction({ userId: ctx.user?.id, ...input });
     return { ok: true };
   }),
@@ -89,4 +89,9 @@ export const discoveryRouter = router({
     const detail = await getPublicBusinessByRoute(input.slug);
     return detail ? { ...detail, isFixture: false, reviewSummary: "No Just Finds reviews yet" } : null;
   }),
+  saved: protectedProcedure.input(z.object({ businessId: z.number().int().positive() })).query(({ ctx, input }) => getPublicSavedBusiness(ctx.user.id, input.businessId)),
+  toggleSave: protectedProcedure.input(z.object({ businessId: z.number().int().positive() })).mutation(async ({ ctx, input }) => togglePublicSavedBusiness(ctx.user.id, input.businessId)),
+  submitReview: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), rating: z.number().int().min(1).max(5), content: z.string().trim().max(2000).optional() })).mutation(({ ctx, input }) => createPublicBusinessReview({ ...input, userId: ctx.user.id })),
+  reportReview: protectedProcedure.input(z.object({ reviewId: z.number().int().positive(), reason: z.string().trim().min(3).max(240), details: z.string().trim().max(1000).optional() })).mutation(({ ctx, input }) => reportPublicBusinessReview({ ...input, reporterId: ctx.user.id })),
+  certificate: publicProcedure.input(z.object({ slug: z.string().min(2).max(240) })).query(({ input }) => getPublicCertificateVerification(input.slug)),
 });

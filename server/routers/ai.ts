@@ -25,12 +25,13 @@ export const aiRouter = router({
         phone: !input.customerContact.includes("@") ? input.customerContact : undefined,
         message: `Lead captured via AI Chatbot session ${input.sessionId ?? "anonymous"}: ${input.question}`,
         page: "AI Chatbot",
+        consentGiven: true,
       });
     }
     return result;
   }),
-  createLead: publicProcedure.input(z.object({ businessId: z.number().int().positive(), name: z.string().min(2).max(160), phone: z.string().max(32).optional(), email: z.string().email().optional(), message: z.string().max(2000).optional(), page: z.string().max(500).optional() })).mutation(async ({ input }) => {
-    await createBusinessLead(input);
+  createLead: publicProcedure.input(z.object({ businessId: z.number().int().positive(), name: z.string().min(2).max(160), phone: z.string().max(32).optional(), email: z.string().email().optional(), message: z.string().max(2000).optional(), page: z.string().max(500).optional(), consentGiven: z.literal(true) })).mutation(async ({ input }) => {
+    await createBusinessLead({ ...input, consentGiven: true });
     return { success: true };
   }),
   refreshKnowledge: protectedProcedure.input(z.object({ businessId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {

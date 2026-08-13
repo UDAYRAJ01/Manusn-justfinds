@@ -114,3 +114,25 @@
 - [x] Apply heightened safety rules for medical and other sensitive categories, blocking guarantees, success rates, diagnoses, and prescriptions.
 - [x] Expand automated coverage for queue transitions, stale-content cleanup after regeneration, and full Phase 1–4 regression flows.
 - [x] Verify no Phase 1–4 regressions across login, search, GPS nearby, categories, imports, approvals, dashboards, reviews, and leads.
+
+## Phase 6 — Premium public business detail
+
+- [x] Repair the duplicated-export corruption in client/src/lib/businessHours.ts, then re-run TypeScript and regression tests before continuing Phase 6.
+- [x] Extend the published-only business detail projection with truthful images, hours, services, facilities, offers, reviews, certificates, verification, reputation, and approved AI content.
+- [x] Build the premium mobile-first business detail shell with clear hero, trust, contact, hours, services, facilities, offers, FAQs, map, voice, reviews, chatbot, and lead sections.
+- [x] Implement timezone-aware open/closed status with special-hour overrides and overnight intervals.
+- [x] Add mobile sticky actions, copy/directions/share/save/report controls, and event tracking through existing server procedures.
+- [x] Add full-size image gallery/lightbox and missing-image fallback without fabricated imagery.
+- [x] Add authenticated review submission and owner review-response flows with pending, published, reported, and removed states.
+- [x] Add certificate verification route and truthful verified-badge rendering.
+- [x] Add business-scoped chatbot, consent-gated lead capture, unanswered-question feedback, and cross-business isolation tests.
+- [x] Add profile SEO metadata, JSON-LD, canonical/indexability rules, and published-only sitemap/robots validation.
+- [x] Add empty/error/loading states, responsive screenshots, accessibility checks, and Phase 1–5 regression coverage.
+- [x] Save a Phase 6 checkpoint without starting Phase 7.
+
+- [x] Wire authenticated save, review submission, and review reporting controls into the premium public business profile.
+- [x] Add a public certificate verification route that validates the business certificate procedure and preserves the no-fabrication trust boundary.
+- [x] Add first-party conversion tracking for call, WhatsApp, website, directions, save, enquiry, and share actions with truthful unavailable states.
+- [x] Harden gallery fallback/media rendering and add focused regression coverage for public profile interactions.
+- [x] Run full Vitest and TypeScript validation, then capture desktop and mobile profile evidence before the Phase 6 checkpoint.
+- [x] Enforce explicit consent on public lead capture in both the profile form and server procedure.

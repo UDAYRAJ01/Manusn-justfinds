@@ -1,0 +1,7 @@
+# Phase 6 visual verification notes
+
+The desktop preview reached the registered `/verify/:slug` route and rendered the intended certificate-unavailable state when the internal validation listing had no published certificate row. This is truthful and avoids presenting a fabricated certificate. The first business-profile screenshot captured the existing loading skeleton before the database response completed; a delayed capture is still required for the fully rendered profile shell.
+
+The delayed browser navigation resolved the profile beyond the skeleton. The published internal map-validation record rendered its test-only identity, truthful no-review state, explicit no-photo state, consent-gated enquiry entry point, interaction actions, managed-location loading/fallback panel, and isolated chatbot copy. The certificate route correctly rendered “Certificate unavailable” because no published certificate row exists for this internal record. The screenshot utility captured the profile before the asynchronous tRPC response settled, so the browser text capture—not the early screenshot—was used as the final load-state evidence.
+
+The 375px mobile capture shows the profile fitting without horizontal overflow: compact hero, action grid, horizontal section tabs, photo/service/hour/review modules, reputation state, location panel, voice-unavailable state, and isolated chatbot card. The verification route remains readable and centered on mobile with an explicit unavailable state and an escape link to discovery.
