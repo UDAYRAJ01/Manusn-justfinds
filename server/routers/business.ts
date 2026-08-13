@@ -353,6 +353,7 @@ export const businessRouter = router({
     const { business } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
     return { public: business.status === "published", url: business.status === "published" ? `/business/${business.slug}` : null };
   }),
+  getSettings: protectedProcedure.query(async ({ ctx }) => { const db = await dbOrThrow(); const rows = await db.select().from(ownerNotificationPrefs).where(eq(ownerNotificationPrefs.userId, ctx.user.id)).limit(1); return rows[0] ?? { emailEnabled: true, leadAlerts: true, reviewAlerts: true, statusAlerts: true }; }),
   saveSettings: protectedProcedure.input(z.object({ emailEnabled: z.boolean(), leadAlerts: z.boolean(), reviewAlerts: z.boolean(), statusAlerts: z.boolean() })).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
     await db.insert(ownerNotificationPrefs).values({ userId: ctx.user.id, ...input }).onDuplicateKeyUpdate({ set: input });

@@ -27,14 +27,19 @@
 
 ## Frontend (/business/*)
 - [x] /business entry: Grow-your-business CTA or My Businesses cards
-- [ ] Guided 10-step onboarding with progress, autosave, resume
-- [ ] Find/claim existing business flow
-- [ ] Dashboard overview: business switcher, status banner, completeness, real analytics
+- [x] Guided 10-step onboarding with progress, autosave, resume
+- [x] Find/claim existing business flow
+- [x] Dashboard overview: business switcher, status banner, completeness, real analytics
+- [x] Render BusinessSwitcher in the active dashboard branch and make dashboard loading/error states recoverable
+- [x] Fix the selected-business dashboard spinner observed during screenshot verification
+- [x] Add a retry/recovery path for top-level myBusinesses errors
+- [x] Capture fresh screenshots after the selected dashboard renders successfully
+- [x] Verify the dashboard route after the switcher and loading-state fix
 - [ ] Profile editor (category-aware dynamic fields), location picker with map
 - [ ] Hours editor (multi-interval, copy actions, OPEN NOW preview) + special hours
 - [x] Services, Facilities, Items (menu/products/rooms), Photos managers
 - [x] Reviews respond/report, Leads inbox + detail, Offers manager
-- [ ] AI Content studio, SEO settings, Certificate, QR code, Notifications, Settings
+- [x] AI Content studio, SEO settings, Certificate, QR code, Notifications, Settings
 - [ ] Preview listing (desktop/mobile), public profile link, mobile dashboard polish
 
 ## Verification
@@ -61,3 +66,11 @@
 - [x] Add frontend lead detail, status, and notes controls using existing owner-scoped procedures
 - [x] Add photo reorder controls matching the server reorder mutation
 - [x] Fresh checkpoint after final full-suite validation and expanded owner-flow screenshots
+- [x] Replace onboarding steps 5–10 placeholder blocks with real hours, services, facilities, photos, preview, and submit content while preserving local resume state
+- [x] Add claim evidence input, success/error feedback, duplicate/in-review handling, and visible My Claims status history
+- [x] Load existing owner notification settings before editing and verify save feedback for advanced settings and owner panels
+- [x] Persist onboarding hours, service, facilities, and photo values into real business records after draft creation
+- [x] Add visible settings loading and save error states and verify advanced owner panels consistently handle loading, empty, and error states
+- [x] Parse the entered onboarding hours text into the actual persisted intervals rather than hardcoding 09:00–17:00
+- [x] Preserve local onboarding state and show recovery feedback when post-draft persistence mutations fail
+- [x] Clarify onboarding photo input as URL-only unless storage-backed upload is added to that step
