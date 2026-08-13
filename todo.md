@@ -48,3 +48,4 @@
 - [x] Capture explicit keyboard-focused-element evidence plus a representative empty, loading, or denial state for each public, auth, owner, and admin route class.
 - [x] Call the live skip link’s `focus()` method, wait for its transition to settle, and record active-element, computed-position, and bounding-rect evidence without manually setting a focus attribute.
 - [x] Clarify and document the route-class validation criterion for the static managed-auth page, which has no asynchronous loading, empty, or access-denial state by design; capture any intended loading evidence separately.
+- [x] Remove the business-detail coordinate fallback so the managed map never presents an unrelated location when a profile has no verified coordinates.
