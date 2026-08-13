@@ -1,594 +1,9 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "d834b620-78bc-49e7-8f4c-f6390b34805c",
+  "id": "9be6c6b4-7211-467b-bb31-dac303bda089",
   "prevId": "e20b21f0-1317-4b60-b369-be5a32d3aee1",
   "tables": {
-    "ai_content_versions": {
-      "name": "ai_content_versions",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "businessId": {
-          "name": "businessId",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "contentType": {
-          "name": "contentType",
-          "type": "enum('short_description','about_business','seo_title','meta_description','faq','service_description','category_description','local_landing','business_highlights','cta_copy')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "version": {
-          "name": "version",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 1
-        },
-        "content": {
-          "name": "content",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "structured": {
-          "name": "structured",
-          "type": "json",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "sourceFields": {
-          "name": "sourceFields",
-          "type": "json",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "validationFlags": {
-          "name": "validationFlags",
-          "type": "json",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "reviewRequired": {
-          "name": "reviewRequired",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "status": {
-          "name": "status",
-          "type": "enum('draft','pending_review','approved','published','rejected')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'draft'"
-        },
-        "authorship": {
-          "name": "authorship",
-          "type": "enum('ai_generated','owner_edited','admin_edited')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'ai_generated'"
-        },
-        "provider": {
-          "name": "provider",
-          "type": "varchar(80)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "model": {
-          "name": "model",
-          "type": "varchar(120)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "promptTemplate": {
-          "name": "promptTemplate",
-          "type": "varchar(80)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "promptVersion": {
-          "name": "promptVersion",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 1
-        },
-        "contentHash": {
-          "name": "contentHash",
-          "type": "varchar(128)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "generatedById": {
-          "name": "generatedById",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "reviewedById": {
-          "name": "reviewedById",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "reviewNote": {
-          "name": "reviewNote",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "generatedAt": {
-          "name": "generatedAt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(now())"
-        },
-        "updatedAt": {
-          "name": "updatedAt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "onUpdate": true,
-          "default": "(now())"
-        },
-        "publishedAt": {
-          "name": "publishedAt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "ai_content_version_uidx": {
-          "name": "ai_content_version_uidx",
-          "columns": [
-            "businessId",
-            "contentType",
-            "version"
-          ],
-          "isUnique": true
-        },
-        "ai_content_business_type_status_idx": {
-          "name": "ai_content_business_type_status_idx",
-          "columns": [
-            "businessId",
-            "contentType",
-            "status"
-          ],
-          "isUnique": false
-        },
-        "ai_content_review_idx": {
-          "name": "ai_content_review_idx",
-          "columns": [
-            "status",
-            "reviewRequired"
-          ],
-          "isUnique": false
-        },
-        "ai_content_hash_idx": {
-          "name": "ai_content_hash_idx",
-          "columns": [
-            "contentType",
-            "contentHash"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "ai_content_versions_businessId_businesses_id_fk": {
-          "name": "ai_content_versions_businessId_businesses_id_fk",
-          "tableFrom": "ai_content_versions",
-          "tableTo": "businesses",
-          "columnsFrom": [
-            "businessId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "ai_content_versions_generatedById_users_id_fk": {
-          "name": "ai_content_versions_generatedById_users_id_fk",
-          "tableFrom": "ai_content_versions",
-          "tableTo": "users",
-          "columnsFrom": [
-            "generatedById"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "ai_content_versions_reviewedById_users_id_fk": {
-          "name": "ai_content_versions_reviewedById_users_id_fk",
-          "tableFrom": "ai_content_versions",
-          "tableTo": "users",
-          "columnsFrom": [
-            "reviewedById"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "ai_content_versions_id": {
-          "name": "ai_content_versions_id",
-          "columns": [
-            "id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraint": {}
-    },
-    "ai_generation_jobs": {
-      "name": "ai_generation_jobs",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "businessId": {
-          "name": "businessId",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "contentType": {
-          "name": "contentType",
-          "type": "enum('short_description','about_business','seo_title','meta_description','faq','service_description','category_description','local_landing','business_highlights','cta_copy')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "enum('queued','processing','completed','failed','retrying','cancelled')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'queued'"
-        },
-        "batchId": {
-          "name": "batchId",
-          "type": "varchar(64)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "requestedById": {
-          "name": "requestedById",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "attempts": {
-          "name": "attempts",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "maxAttempts": {
-          "name": "maxAttempts",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 3
-        },
-        "errorCategory": {
-          "name": "errorCategory",
-          "type": "varchar(80)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "resultVersionId": {
-          "name": "resultVersionId",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "createdAt": {
-          "name": "createdAt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(now())"
-        },
-        "startedAt": {
-          "name": "startedAt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "finishedAt": {
-          "name": "finishedAt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "ai_job_status_created_idx": {
-          "name": "ai_job_status_created_idx",
-          "columns": [
-            "status",
-            "createdAt"
-          ],
-          "isUnique": false
-        },
-        "ai_job_business_idx": {
-          "name": "ai_job_business_idx",
-          "columns": [
-            "businessId",
-            "status"
-          ],
-          "isUnique": false
-        },
-        "ai_job_batch_idx": {
-          "name": "ai_job_batch_idx",
-          "columns": [
-            "batchId",
-            "status"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "ai_generation_jobs_businessId_businesses_id_fk": {
-          "name": "ai_generation_jobs_businessId_businesses_id_fk",
-          "tableFrom": "ai_generation_jobs",
-          "tableTo": "businesses",
-          "columnsFrom": [
-            "businessId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "ai_generation_jobs_requestedById_users_id_fk": {
-          "name": "ai_generation_jobs_requestedById_users_id_fk",
-          "tableFrom": "ai_generation_jobs",
-          "tableTo": "users",
-          "columnsFrom": [
-            "requestedById"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "ai_generation_jobs_resultVersionId_ai_content_versions_id_fk": {
-          "name": "ai_generation_jobs_resultVersionId_ai_content_versions_id_fk",
-          "tableFrom": "ai_generation_jobs",
-          "tableTo": "ai_content_versions",
-          "columnsFrom": [
-            "resultVersionId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "ai_generation_jobs_id": {
-          "name": "ai_generation_jobs_id",
-          "columns": [
-            "id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraint": {}
-    },
-    "ai_usage_events": {
-      "name": "ai_usage_events",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "businessId": {
-          "name": "businessId",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "jobId": {
-          "name": "jobId",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "generationType": {
-          "name": "generationType",
-          "type": "varchar(80)",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "provider": {
-          "name": "provider",
-          "type": "varchar(80)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "model": {
-          "name": "model",
-          "type": "varchar(120)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "promptTokens": {
-          "name": "promptTokens",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "completionTokens": {
-          "name": "completionTokens",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "totalTokens": {
-          "name": "totalTokens",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "estimatedCostMicros": {
-          "name": "estimatedCostMicros",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "costAvailable": {
-          "name": "costAvailable",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "succeeded": {
-          "name": "succeeded",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": true
-        },
-        "createdAt": {
-          "name": "createdAt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(now())"
-        }
-      },
-      "indexes": {
-        "ai_usage_created_idx": {
-          "name": "ai_usage_created_idx",
-          "columns": [
-            "createdAt"
-          ],
-          "isUnique": false
-        },
-        "ai_usage_business_idx": {
-          "name": "ai_usage_business_idx",
-          "columns": [
-            "businessId",
-            "createdAt"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "ai_usage_events_businessId_businesses_id_fk": {
-          "name": "ai_usage_events_businessId_businesses_id_fk",
-          "tableFrom": "ai_usage_events",
-          "tableTo": "businesses",
-          "columnsFrom": [
-            "businessId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "ai_usage_events_jobId_ai_generation_jobs_id_fk": {
-          "name": "ai_usage_events_jobId_ai_generation_jobs_id_fk",
-          "tableFrom": "ai_usage_events",
-          "tableTo": "ai_generation_jobs",
-          "columnsFrom": [
-            "jobId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "ai_usage_events_id": {
-          "name": "ai_usage_events_id",
-          "columns": [
-            "id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraint": {}
-    },
     "approval_queue": {
       "name": "approval_queue",
       "columns": {
@@ -1154,8 +569,8 @@
       },
       "checkConstraint": {}
     },
-    "business_chat_messages": {
-      "name": "business_chat_messages",
+    "business_claims": {
+      "name": "business_claims",
       "columns": {
         "id": {
           "name": "id",
@@ -1167,112 +582,6 @@
         "businessId": {
           "name": "businessId",
           "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "sessionId": {
-          "name": "sessionId",
-          "type": "varchar(64)",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "role": {
-          "name": "role",
-          "type": "enum('user','assistant')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "message": {
-          "name": "message",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "answered": {
-          "name": "answered",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": true
-        },
-        "knowledgeItemIds": {
-          "name": "knowledgeItemIds",
-          "type": "json",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "createdAt": {
-          "name": "createdAt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(now())"
-        }
-      },
-      "indexes": {
-        "chat_message_scope_idx": {
-          "name": "chat_message_scope_idx",
-          "columns": [
-            "businessId",
-            "sessionId",
-            "createdAt"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "business_chat_messages_businessId_businesses_id_fk": {
-          "name": "business_chat_messages_businessId_businesses_id_fk",
-          "tableFrom": "business_chat_messages",
-          "tableTo": "businesses",
-          "columnsFrom": [
-            "businessId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "business_chat_messages_id": {
-          "name": "business_chat_messages_id",
-          "columns": [
-            "id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraint": {}
-    },
-    "business_chat_sessions": {
-      "name": "business_chat_sessions",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "businessId": {
-          "name": "businessId",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "sessionId": {
-          "name": "sessionId",
-          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -1281,65 +590,75 @@
           "name": "userId",
           "type": "int",
           "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "enum('claim_requested','under_review','verification_required','approved','rejected')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'claim_requested'"
+        },
+        "evidenceNote": {
+          "name": "evidenceNote",
+          "type": "text",
+          "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "messageCount": {
-          "name": "messageCount",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "unansweredCount": {
-          "name": "unansweredCount",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "createdAt": {
-          "name": "createdAt",
+        "submittedAt": {
+          "name": "submittedAt",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": "(now())"
         },
-        "lastMessageAt": {
-          "name": "lastMessageAt",
+        "reviewedAt": {
+          "name": "reviewedAt",
           "type": "timestamp",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "onUpdate": true,
-          "default": "(now())"
+          "notNull": false,
+          "autoincrement": false
+        },
+        "reviewedBy": {
+          "name": "reviewedBy",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "rejectionReason": {
+          "name": "rejectionReason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
-        "chat_session_uidx": {
-          "name": "chat_session_uidx",
+        "claim_user_status_idx": {
+          "name": "claim_user_status_idx",
           "columns": [
-            "businessId",
-            "sessionId"
+            "userId",
+            "status"
           ],
-          "isUnique": true
+          "isUnique": false
         },
-        "chat_session_business_idx": {
-          "name": "chat_session_business_idx",
+        "claim_business_idx": {
+          "name": "claim_business_idx",
           "columns": [
-            "businessId",
-            "lastMessageAt"
+            "businessId"
           ],
           "isUnique": false
         }
       },
       "foreignKeys": {
-        "business_chat_sessions_businessId_businesses_id_fk": {
-          "name": "business_chat_sessions_businessId_businesses_id_fk",
-          "tableFrom": "business_chat_sessions",
+        "business_claims_businessId_businesses_id_fk": {
+          "name": "business_claims_businessId_businesses_id_fk",
+          "tableFrom": "business_claims",
           "tableTo": "businesses",
           "columnsFrom": [
             "businessId"
@@ -1350,9 +669,9 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "business_chat_sessions_userId_users_id_fk": {
-          "name": "business_chat_sessions_userId_users_id_fk",
-          "tableFrom": "business_chat_sessions",
+        "business_claims_userId_users_id_fk": {
+          "name": "business_claims_userId_users_id_fk",
+          "tableFrom": "business_claims",
           "tableTo": "users",
           "columnsFrom": [
             "userId"
@@ -1362,11 +681,24 @@
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
+        },
+        "business_claims_reviewedBy_users_id_fk": {
+          "name": "business_claims_reviewedBy_users_id_fk",
+          "tableFrom": "business_claims",
+          "tableTo": "users",
+          "columnsFrom": [
+            "reviewedBy"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
-        "business_chat_sessions_id": {
-          "name": "business_chat_sessions_id",
+        "business_claims_id": {
+          "name": "business_claims_id",
           "columns": [
             "id"
           ]
@@ -1812,8 +1144,8 @@
       "uniqueConstraints": {},
       "checkConstraint": {}
     },
-    "business_knowledge_items": {
-      "name": "business_knowledge_items",
+    "business_items": {
+      "name": "business_items",
       "columns": {
         "id": {
           "name": "id",
@@ -1829,41 +1161,65 @@
           "notNull": true,
           "autoincrement": false
         },
-        "sourceType": {
-          "name": "sourceType",
-          "type": "enum('profile','service','facility','hours','offer','faq','category_field','owner_content','ai_content')",
+        "itemType": {
+          "name": "itemType",
+          "type": "enum('product','menu','room','consultation')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'product'"
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(180)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "sourceId": {
-          "name": "sourceId",
-          "type": "int",
+        "description": {
+          "name": "description",
+          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "label": {
-          "name": "label",
-          "type": "varchar(200)",
+        "price": {
+          "name": "price",
+          "type": "varchar(80)",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
-        "content": {
-          "name": "content",
-          "type": "text",
+        "imageUrl": {
+          "name": "imageUrl",
+          "type": "varchar(1000)",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
-        "status": {
-          "name": "status",
-          "type": "enum('active','stale','disabled')",
+        "isEnabled": {
+          "name": "isEnabled",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'active'"
+          "default": true
+        },
+        "sortOrder": {
+          "name": "sortOrder",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
         },
         "updatedAt": {
           "name": "updatedAt",
@@ -1876,28 +1232,19 @@
         }
       },
       "indexes": {
-        "knowledge_scope_uidx": {
-          "name": "knowledge_scope_uidx",
+        "item_business_type_idx": {
+          "name": "item_business_type_idx",
           "columns": [
             "businessId",
-            "sourceType",
-            "label"
-          ],
-          "isUnique": true
-        },
-        "knowledge_business_status_idx": {
-          "name": "knowledge_business_status_idx",
-          "columns": [
-            "businessId",
-            "status"
+            "itemType"
           ],
           "isUnique": false
         }
       },
       "foreignKeys": {
-        "business_knowledge_items_businessId_businesses_id_fk": {
-          "name": "business_knowledge_items_businessId_businesses_id_fk",
-          "tableFrom": "business_knowledge_items",
+        "business_items_businessId_businesses_id_fk": {
+          "name": "business_items_businessId_businesses_id_fk",
+          "tableFrom": "business_items",
           "tableTo": "businesses",
           "columnsFrom": [
             "businessId"
@@ -1910,8 +1257,8 @@
         }
       },
       "compositePrimaryKeys": {
-        "business_knowledge_items_id": {
-          "name": "business_knowledge_items_id",
+        "business_items_id": {
+          "name": "business_items_id",
           "columns": [
             "id"
           ]
@@ -1988,6 +1335,13 @@
           "autoincrement": false,
           "default": "'new'"
         },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "createdAt": {
           "name": "createdAt",
           "type": "timestamp",
@@ -2025,6 +1379,238 @@
       "compositePrimaryKeys": {
         "business_leads_id": {
           "name": "business_leads_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "business_notifications": {
+      "name": "business_notifications",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "userId": {
+          "name": "userId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "businessId": {
+          "name": "businessId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "type": {
+          "name": "type",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(180)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "isRead": {
+          "name": "isRead",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        }
+      },
+      "indexes": {
+        "notification_user_read_idx": {
+          "name": "notification_user_read_idx",
+          "columns": [
+            "userId",
+            "isRead",
+            "createdAt"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "business_notifications_userId_users_id_fk": {
+          "name": "business_notifications_userId_users_id_fk",
+          "tableFrom": "business_notifications",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "business_notifications_businessId_businesses_id_fk": {
+          "name": "business_notifications_businessId_businesses_id_fk",
+          "tableFrom": "business_notifications",
+          "tableTo": "businesses",
+          "columnsFrom": [
+            "businessId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "business_notifications_id": {
+          "name": "business_notifications_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "business_offers": {
+      "name": "business_offers",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "businessId": {
+          "name": "businessId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(180)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "discount": {
+          "name": "discount",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "startsAt": {
+          "name": "startsAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "endsAt": {
+          "name": "endsAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "terms": {
+          "name": "terms",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "cta": {
+          "name": "cta",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "enum('draft','active','expired')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'draft'"
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        }
+      },
+      "indexes": {
+        "offer_business_status_idx": {
+          "name": "offer_business_status_idx",
+          "columns": [
+            "businessId",
+            "status",
+            "endsAt"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "business_offers_businessId_businesses_id_fk": {
+          "name": "business_offers_businessId_businesses_id_fk",
+          "tableFrom": "business_offers",
+          "tableTo": "businesses",
+          "columnsFrom": [
+            "businessId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "business_offers_id": {
+          "name": "business_offers_id",
           "columns": [
             "id"
           ]
@@ -2110,171 +1696,6 @@
       "compositePrimaryKeys": {
         "business_rankings_id": {
           "name": "business_rankings_id",
-          "columns": [
-            "id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraint": {}
-    },
-    "business_recommendation_signals": {
-      "name": "business_recommendation_signals",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "businessId": {
-          "name": "businessId",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "relevanceScore": {
-          "name": "relevanceScore",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "distanceScore": {
-          "name": "distanceScore",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "ratingScore": {
-          "name": "ratingScore",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "reviewScore": {
-          "name": "reviewScore",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "completenessScore": {
-          "name": "completenessScore",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "verificationScore": {
-          "name": "verificationScore",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "activityScore": {
-          "name": "activityScore",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "availabilityScore": {
-          "name": "availabilityScore",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "freshnessScore": {
-          "name": "freshnessScore",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "manualPriorityScore": {
-          "name": "manualPriorityScore",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "featuredScore": {
-          "name": "featuredScore",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "recommendationScore": {
-          "name": "recommendationScore",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "calculatedAt": {
-          "name": "calculatedAt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "onUpdate": true,
-          "default": "(now())"
-        }
-      },
-      "indexes": {
-        "recommendation_signal_business_uidx": {
-          "name": "recommendation_signal_business_uidx",
-          "columns": [
-            "businessId"
-          ],
-          "isUnique": true
-        },
-        "recommendation_signal_score_idx": {
-          "name": "recommendation_signal_score_idx",
-          "columns": [
-            "recommendationScore"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "business_recommendation_signals_businessId_businesses_id_fk": {
-          "name": "business_recommendation_signals_businessId_businesses_id_fk",
-          "tableFrom": "business_recommendation_signals",
-          "tableTo": "businesses",
-          "columnsFrom": [
-            "businessId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "business_recommendation_signals_id": {
-          "name": "business_recommendation_signals_id",
           "columns": [
             "id"
           ]
@@ -2413,6 +1834,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "respondedAt": {
+          "name": "respondedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "createdAt": {
           "name": "createdAt",
           "type": "timestamp",
@@ -2488,6 +1916,111 @@
       "uniqueConstraints": {},
       "checkConstraint": {}
     },
+    "business_revisions": {
+      "name": "business_revisions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "businessId": {
+          "name": "businessId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "createdBy": {
+          "name": "createdBy",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "changeType": {
+          "name": "changeType",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "payload": {
+          "name": "payload",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "enum('draft','submitted','approved','rejected')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'draft'"
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        }
+      },
+      "indexes": {
+        "revision_business_status_idx": {
+          "name": "revision_business_status_idx",
+          "columns": [
+            "businessId",
+            "status",
+            "createdAt"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "business_revisions_businessId_businesses_id_fk": {
+          "name": "business_revisions_businessId_businesses_id_fk",
+          "tableFrom": "business_revisions",
+          "tableTo": "businesses",
+          "columnsFrom": [
+            "businessId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "business_revisions_createdBy_users_id_fk": {
+          "name": "business_revisions_createdBy_users_id_fk",
+          "tableFrom": "business_revisions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "createdBy"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "business_revisions_id": {
+          "name": "business_revisions_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
     "business_services": {
       "name": "business_services",
       "columns": {
@@ -2519,6 +2052,43 @@
           "notNull": false,
           "autoincrement": false
         },
+        "price": {
+          "name": "price",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "priceType": {
+          "name": "priceType",
+          "type": "enum('fixed','starting_from','contact','free')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'contact'"
+        },
+        "duration": {
+          "name": "duration",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "imageUrl": {
+          "name": "imageUrl",
+          "type": "varchar(1000)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "isEnabled": {
+          "name": "isEnabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
         "sortOrder": {
           "name": "sortOrder",
           "type": "int",
@@ -2528,7 +2098,15 @@
           "default": 0
         }
       },
-      "indexes": {},
+      "indexes": {
+        "service_business_idx": {
+          "name": "service_business_idx",
+          "columns": [
+            "businessId"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {
         "business_services_businessId_businesses_id_fk": {
           "name": "business_services_businessId_businesses_id_fk",
@@ -2555,8 +2133,8 @@
       "uniqueConstraints": {},
       "checkConstraint": {}
     },
-    "business_unanswered_questions": {
-      "name": "business_unanswered_questions",
+    "business_special_hours": {
+      "name": "business_special_hours",
       "columns": {
         "id": {
           "name": "id",
@@ -2572,84 +2150,50 @@
           "notNull": true,
           "autoincrement": false
         },
-        "question": {
-          "name": "question",
-          "type": "varchar(400)",
+        "date": {
+          "name": "date",
+          "type": "varchar(10)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "questionHash": {
-          "name": "questionHash",
-          "type": "varchar(128)",
+        "label": {
+          "name": "label",
+          "type": "varchar(160)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "askCount": {
-          "name": "askCount",
-          "type": "int",
+        "isClosed": {
+          "name": "isClosed",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 1
+          "default": false
         },
-        "status": {
-          "name": "status",
-          "type": "enum('open','resolved','dismissed')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'open'"
-        },
-        "resolutionNote": {
-          "name": "resolutionNote",
-          "type": "text",
+        "intervals": {
+          "name": "intervals",
+          "type": "json",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
-        },
-        "firstAskedAt": {
-          "name": "firstAskedAt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(now())"
-        },
-        "lastAskedAt": {
-          "name": "lastAskedAt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "onUpdate": true,
-          "default": "(now())"
         }
       },
       "indexes": {
-        "unanswered_scope_uidx": {
-          "name": "unanswered_scope_uidx",
+        "special_hours_business_date_uidx": {
+          "name": "special_hours_business_date_uidx",
           "columns": [
             "businessId",
-            "questionHash"
+            "date"
           ],
           "isUnique": true
-        },
-        "unanswered_business_status_idx": {
-          "name": "unanswered_business_status_idx",
-          "columns": [
-            "businessId",
-            "status",
-            "askCount"
-          ],
-          "isUnique": false
         }
       },
       "foreignKeys": {
-        "business_unanswered_questions_businessId_businesses_id_fk": {
-          "name": "business_unanswered_questions_businessId_businesses_id_fk",
-          "tableFrom": "business_unanswered_questions",
+        "business_special_hours_businessId_businesses_id_fk": {
+          "name": "business_special_hours_businessId_businesses_id_fk",
+          "tableFrom": "business_special_hours",
           "tableTo": "businesses",
           "columnsFrom": [
             "businessId"
@@ -2662,8 +2206,8 @@
         }
       },
       "compositePrimaryKeys": {
-        "business_unanswered_questions_id": {
-          "name": "business_unanswered_questions_id",
+        "business_special_hours_id": {
+          "name": "business_special_hours_id",
           "columns": [
             "id"
           ]
@@ -2861,6 +2405,49 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "aboutDescription": {
+          "name": "aboutDescription",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "socialLinks": {
+          "name": "socialLinks",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "seoTitle": {
+          "name": "seoTitle",
+          "type": "varchar(180)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "metaDescription": {
+          "name": "metaDescription",
+          "type": "varchar(300)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "rejectionReason": {
+          "name": "rejectionReason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "onboardingStep": {
+          "name": "onboardingStep",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
         },
         "address": {
           "name": "address",
@@ -3898,8 +3485,8 @@
       "uniqueConstraints": {},
       "checkConstraint": {}
     },
-    "recommendation_weights": {
-      "name": "recommendation_weights",
+    "owner_notification_prefs": {
+      "name": "owner_notification_prefs",
       "columns": {
         "id": {
           "name": "id",
@@ -3908,61 +3495,62 @@
           "notNull": true,
           "autoincrement": true
         },
-        "signalKey": {
-          "name": "signalKey",
-          "type": "varchar(60)",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "label": {
-          "name": "label",
-          "type": "varchar(120)",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "weightPercent": {
-          "name": "weightPercent",
+        "userId": {
+          "name": "userId",
           "type": "int",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
-          "default": 0
+          "autoincrement": false
         },
-        "isActive": {
-          "name": "isActive",
+        "emailEnabled": {
+          "name": "emailEnabled",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": true
         },
-        "updatedById": {
-          "name": "updatedById",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "updatedAt": {
-          "name": "updatedAt",
-          "type": "timestamp",
+        "leadAlerts": {
+          "name": "leadAlerts",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "onUpdate": true,
-          "default": "(now())"
+          "default": true
+        },
+        "reviewAlerts": {
+          "name": "reviewAlerts",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "statusAlerts": {
+          "name": "statusAlerts",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
         }
       },
-      "indexes": {},
+      "indexes": {
+        "owner_notification_prefs_user_uidx": {
+          "name": "owner_notification_prefs_user_uidx",
+          "columns": [
+            "userId"
+          ],
+          "isUnique": true
+        }
+      },
       "foreignKeys": {
-        "recommendation_weights_updatedById_users_id_fk": {
-          "name": "recommendation_weights_updatedById_users_id_fk",
-          "tableFrom": "recommendation_weights",
+        "owner_notification_prefs_userId_users_id_fk": {
+          "name": "owner_notification_prefs_userId_users_id_fk",
+          "tableFrom": "owner_notification_prefs",
           "tableTo": "users",
           "columnsFrom": [
-            "updatedById"
+            "userId"
           ],
           "columnsTo": [
             "id"
@@ -3972,21 +3560,14 @@
         }
       },
       "compositePrimaryKeys": {
-        "recommendation_weights_id": {
-          "name": "recommendation_weights_id",
+        "owner_notification_prefs_id": {
+          "name": "owner_notification_prefs_id",
           "columns": [
             "id"
           ]
         }
       },
-      "uniqueConstraints": {
-        "recommendation_weights_signalKey_unique": {
-          "name": "recommendation_weights_signalKey_unique",
-          "columns": [
-            "signalKey"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "checkConstraint": {}
     },
     "saved_businesses": {

@@ -10,7 +10,7 @@ describe("business router contracts", () => {
       "businessDetail",
       "createDraft",
       "saveOnboardingStep",
-      "submitBusiness",
+      "submitForApproval",
       "searchDirectory",
       "requestClaim",
       "myClaims",

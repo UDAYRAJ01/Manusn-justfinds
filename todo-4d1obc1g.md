@@ -39,10 +39,13 @@
 
 ## Verification
 - [ ] Vitest: ownership isolation, claim workflow, hours validation, offers expiry
-- [ ] pnpm check + pnpm test green
+- [x] pnpm check + pnpm test green
 - [ ] Screenshot key flows, checkpoint, deliver
 
-- [ ] Preserve concurrent Phase 5 AI/content work while merging Phase 4 business-owner changes
-- [ ] Resolve shared schema, migration metadata, router, and todo conflicts without overwriting either branch
-- [ ] Re-run checks and tests after the combined merge
+- [x] Preserve concurrent Phase 5 AI/content work while merging Phase 4 business-owner changes
+- [x] Resolve shared schema, migration metadata, router, and todo conflicts while preserving both branches
+- [x] Re-run checks and tests after the combined merge
 - [ ] Save a checkpoint containing the combined Phase 4 + Phase 5 project
+- [x] Reconcile Drizzle migration metadata so both Phase 4 and Phase 5 migration histories are represented correctly
+- [x] Verify the merged schema/database state matches both branches and validate the combined migration chain
+- [x] Re-check shared-file merge outcomes after fixing migration metadata
