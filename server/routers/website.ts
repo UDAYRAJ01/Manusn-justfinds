@@ -1,0 +1,185 @@
+import { TRPCError } from "@trpc/server";
+import { and, asc, eq } from "drizzle-orm";
+import { z } from "zod";
+import { businessImages, businessServices, businessReviews, businesses, businessPages, pageAnalytics, pagePublishHistory, pageSections, pageVersions, categories, cities } from "../../drizzle/schema";
+import { canManageBusiness } from "../domain/permissions";
+import { getDb } from "../db";
+import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
+
+export const sectionRegistry = [
+  { type: "hero", label: "Hero", allowedCategories: ["all"] },
+  { type: "about", label: "About", allowedCategories: ["all"] },
+  { type: "services", label: "Services", allowedCategories: ["all"] },
+  { type: "facilities", label: "Facilities", allowedCategories: ["all"] },
+  { type: "gallery", label: "Gallery", allowedCategories: ["all"] },
+  { type: "hours", label: "Business hours", allowedCategories: ["all"] },
+  { type: "contact", label: "Contact", allowedCategories: ["all"] },
+  { type: "map", label: "Map", allowedCategories: ["all"] },
+  { type: "reviews", label: "Reviews", allowedCategories: ["all"] },
+  { type: "faq", label: "FAQ", allowedCategories: ["all"] },
+  { type: "cta", label: "Call to action", allowedCategories: ["all"] },
+  { type: "footer", label: "Footer", allowedCategories: ["all"] },
+  { type: "menu", label: "Menu", allowedCategories: ["restaurant"] },
+  { type: "rooms", label: "Rooms", allowedCategories: ["hotel"] },
+  { type: "doctors", label: "Doctors", allowedCategories: ["doctor", "hospital"] },
+  { type: "offers", label: "Offers", allowedCategories: ["all"] },
+] as const;
+
+export const defaultDesignConfig = {
+  theme: "modern",
+  typography: "clean",
+  buttonStyle: "rounded",
+  cardStyle: "soft",
+  radius: "lg",
+  spacing: "comfortable",
+  sectionWidth: "wide",
+  primary: "#2456c8",
+  secondary: "#173d9c",
+  background: "#f8fafc",
+  surface: "#ffffff",
+  text: "#0f172a",
+  muted: "#64748b",
+  accent: "#f59e0b",
+} as const;
+
+const sectionInput = z.object({
+  id: z.number().int().positive().optional(),
+  sectionType: z.string().min(2).max(60),
+  displayOrder: z.number().int().min(0),
+  enabled: z.boolean(),
+  config: z.record(z.string(), z.unknown()).optional(),
+});
+const designInput = z.object({
+  businessId: z.number().int().positive(),
+  sections: z.array(sectionInput).min(1).max(30),
+  designConfig: z.record(z.string(), z.unknown()),
+  seoTitle: z.string().max(180).optional(),
+  metaDescription: z.string().max(300).optional(),
+});
+
+async function dbOrThrow() {
+  const db = await getDb();
+  if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The website builder is temporarily unavailable." });
+  return db;
+}
+
+async function ownedPage(businessId: number, userId: number, role: string) {
+  const db = await dbOrThrow();
+  const businessRows = await db.select().from(businesses).where(eq(businesses.id, businessId)).limit(1);
+  const business = businessRows[0];
+  if (!business) throw new TRPCError({ code: "NOT_FOUND", message: "Business not found." });
+  if (!canManageBusiness(role as "user" | "business_owner" | "admin" | "super_admin", userId, business.ownerId)) throw new TRPCError({ code: "FORBIDDEN", message: "You cannot manage this website." });
+  const pageRows = await db.select().from(businessPages).where(eq(businessPages.businessId, businessId)).limit(1);
+  let page = pageRows[0];
+  if (!page) {
+    const inserted = await db.insert(businessPages).values({ businessId, slug: `${business.slug}-website`, status: "draft" });
+    const created = await db.select().from(businessPages).where(eq(businessPages.id, Number(inserted[0].insertId))).limit(1);
+    page = created[0];
+  }
+  if (!page) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Website page could not be initialized." });
+  return { db, business, page };
+}
+
+function defaultSections(categoryName?: string | null) {
+  const category = (categoryName ?? "").toLowerCase();
+  const types = category.includes("restaurant") ? ["hero", "about", "menu", "services", "gallery", "offers", "reviews", "faq", "map", "contact", "footer"] : category.includes("hotel") ? ["hero", "about", "rooms", "gallery", "offers", "reviews", "map", "contact", "footer"] : category.includes("doctor") ? ["hero", "about", "services", "facilities", "reviews", "faq", "contact", "map", "footer"] : category.includes("hospital") ? ["hero", "about", "doctors", "facilities", "reviews", "faq", "map", "contact", "footer"] : ["hero", "about", "services", "gallery", "hours", "reviews", "map", "contact", "footer"];
+  return types.map((sectionType, displayOrder) => ({ sectionType, displayOrder, enabled: true, config: {} }));
+}
+
+export const websiteRouter = router({
+  registry: publicProcedure.query(() => sectionRegistry),
+  create: protectedProcedure.input(z.object({ businessId: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const { page } = await ownedPage(input.businessId, ctx.user.id, ctx.user.role); return { id: page.id, slug: page.slug, status: page.status }; }),
+  versions: protectedProcedure.input(z.object({ businessId: z.number().int().positive() })).query(async ({ ctx, input }) => { const { db, page } = await ownedPage(input.businessId, ctx.user.id, ctx.user.role); return db.select().from(pageVersions).where(eq(pageVersions.pageId, page.id)).orderBy(asc(pageVersions.versionNumber)); }),
+  reorder: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), sectionIds: z.array(z.number().int().positive()).min(1).max(30) })).mutation(async ({ ctx, input }) => { const { db, page } = await ownedPage(input.businessId, ctx.user.id, ctx.user.role); const sections = await db.select().from(pageSections).where(eq(pageSections.pageId, page.id)); const ids = new Set(sections.map(section => section.id)); if (input.sectionIds.some(id => !ids.has(id)) || input.sectionIds.length !== sections.length) throw new TRPCError({ code: "BAD_REQUEST", message: "Section order does not match this page." }); for (let displayOrder = 0; displayOrder < input.sectionIds.length; displayOrder++) { const id = input.sectionIds[displayOrder]; await db.update(pageSections).set({ displayOrder }).where(and(eq(pageSections.id, id), eq(pageSections.pageId, page.id))); } return { success: true }; }),
+  setSectionEnabled: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), sectionId: z.number().int().positive(), enabled: z.boolean() })).mutation(async ({ ctx, input }) => { const { db, page } = await ownedPage(input.businessId, ctx.user.id, ctx.user.role); await db.update(pageSections).set({ enabled: input.enabled }).where(and(eq(pageSections.id, input.sectionId), eq(pageSections.pageId, page.id))); return { success: true }; }),
+  builder: protectedProcedure.input(z.object({ businessId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+    const { db, business, page } = await ownedPage(input.businessId, ctx.user.id, ctx.user.role);
+    let sections = await db.select().from(pageSections).where(eq(pageSections.pageId, page.id)).orderBy(asc(pageSections.displayOrder));
+    if (!sections.length) {
+      const categoryRows = await db.select({ name: categories.name }).from(categories).where(eq(categories.id, business.categoryId)).limit(1);
+      const initial = defaultSections(categoryRows[0]?.name);
+      await db.insert(pageSections).values(initial.map(section => ({ ...section, pageId: page.id })));
+      sections = await db.select().from(pageSections).where(eq(pageSections.pageId, page.id)).orderBy(asc(pageSections.displayOrder));
+    }
+    const versions = await db.select().from(pageVersions).where(and(eq(pageVersions.pageId, page.id), eq(pageVersions.businessId, input.businessId))).orderBy(asc(pageVersions.versionNumber));
+    return { page, business, sections, versions, designConfig: versions.at(-1)?.designConfig ?? defaultDesignConfig, registry: sectionRegistry };
+  }),
+  saveDraft: protectedProcedure.input(designInput).mutation(async ({ ctx, input }) => {
+    const { db, business, page } = await ownedPage(input.businessId, ctx.user.id, ctx.user.role);
+    const invalid = input.sections.some(section => !sectionRegistry.some(item => item.type === section.sectionType));
+    if (invalid) throw new TRPCError({ code: "BAD_REQUEST", message: "The page contains an unsupported section." });
+    await db.delete(pageSections).where(eq(pageSections.pageId, page.id));
+    await db.insert(pageSections).values(input.sections.map(section => ({ pageId: page.id, sectionType: section.sectionType, displayOrder: section.displayOrder, enabled: section.enabled, config: section.config ?? {} })));
+    const latest = await db.select().from(pageVersions).where(eq(pageVersions.pageId, page.id)).orderBy(asc(pageVersions.versionNumber));
+    const versionNumber = (latest.at(-1)?.versionNumber ?? 0) + 1;
+    await db.insert(pageVersions).values({ pageId: page.id, businessId: business.id, versionNumber, designConfig: input.designConfig, status: "draft", createdById: ctx.user.id });
+    await db.update(businessPages).set({ seoTitle: input.seoTitle, metaDescription: input.metaDescription, status: page.status === "published" ? "pending_review" : "draft" }).where(eq(businessPages.id, page.id));
+    return { success: true, versionNumber };
+  }),
+  publish: protectedProcedure.input(z.object({ businessId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    const { db, business, page } = await ownedPage(input.businessId, ctx.user.id, ctx.user.role);
+    if (!["approved", "published"].includes(business.status)) throw new TRPCError({ code: "FORBIDDEN", message: "The business profile must be approved before its website can be published." });
+    const sections = await db.select().from(pageSections).where(and(eq(pageSections.pageId, page.id), eq(pageSections.enabled, true)));
+    if (!sections.some(section => section.sectionType === "hero")) throw new TRPCError({ code: "BAD_REQUEST", message: "Add a hero section before publishing." });
+    const versions = await db.select().from(pageVersions).where(eq(pageVersions.pageId, page.id)).orderBy(asc(pageVersions.versionNumber));
+    const draft = versions.at(-1);
+    if (!draft) throw new TRPCError({ code: "BAD_REQUEST", message: "Save a design draft before publishing." });
+    await db.update(pageVersions).set({ status: "published" }).where(eq(pageVersions.id, draft.id));
+    await db.update(businessPages).set({ status: "published", publishedAt: new Date() }).where(eq(businessPages.id, page.id));
+    await db.insert(pagePublishHistory).values({ pageId: page.id, businessId: business.id, versionId: draft.id, action: "publish", performedById: ctx.user.id });
+    return { success: true, slug: page.slug };
+  }),
+  unpublish: protectedProcedure.input(z.object({ businessId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    const { db, page } = await ownedPage(input.businessId, ctx.user.id, ctx.user.role);
+    const versions = await db.select().from(pageVersions).where(eq(pageVersions.pageId, page.id)).orderBy(asc(pageVersions.versionNumber));
+    const latest = versions.at(-1);
+    if (!latest) throw new TRPCError({ code: "BAD_REQUEST", message: "Create a page version before unpublishing." });
+    await db.update(businessPages).set({ status: "draft", publishedAt: null }).where(eq(businessPages.id, page.id));
+    await db.insert(pagePublishHistory).values({ pageId: page.id, businessId: input.businessId, versionId: latest.id, action: "unpublish", performedById: ctx.user.id });
+    return { success: true };
+  }),
+  restore: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), versionId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    const { db, page } = await ownedPage(input.businessId, ctx.user.id, ctx.user.role);
+    const rows = await db.select().from(pageVersions).where(and(eq(pageVersions.id, input.versionId), eq(pageVersions.pageId, page.id))).limit(1);
+    const version = rows[0];
+    if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "Version not found." });
+    await db.update(pageVersions).set({ status: "published" }).where(eq(pageVersions.id, version.id));
+    await db.update(businessPages).set({ status: "published", publishedAt: new Date() }).where(eq(businessPages.id, page.id));
+    await db.insert(pagePublishHistory).values({ pageId: page.id, businessId: input.businessId, versionId: version.id, action: "restore", performedById: ctx.user.id });
+    return { success: true };
+  }),
+  duplicateOwnDesign: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), sourceBusinessId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    const { db, page: targetPage } = await ownedPage(input.businessId, ctx.user.id, ctx.user.role);
+    const { page: sourcePage } = await ownedPage(input.sourceBusinessId, ctx.user.id, ctx.user.role);
+    const [sections, versions] = await Promise.all([
+      db.select().from(pageSections).where(eq(pageSections.pageId, sourcePage.id)).orderBy(asc(pageSections.displayOrder)),
+      db.select().from(pageVersions).where(eq(pageVersions.pageId, sourcePage.id)).orderBy(asc(pageVersions.versionNumber)),
+    ]);
+    const design = versions.at(-1)?.designConfig ?? defaultDesignConfig;
+    await db.delete(pageSections).where(eq(pageSections.pageId, targetPage.id));
+    if (sections.length) await db.insert(pageSections).values(sections.map(s => ({ pageId: targetPage.id, sectionType: s.sectionType, displayOrder: s.displayOrder, enabled: s.enabled, config: s.config ?? {} })));
+    const latest = await db.select().from(pageVersions).where(eq(pageVersions.pageId, targetPage.id)).orderBy(asc(pageVersions.versionNumber));
+    await db.insert(pageVersions).values({ pageId: targetPage.id, businessId: input.businessId, versionNumber: (latest.at(-1)?.versionNumber ?? 0) + 1, designConfig: design, status: "draft", createdById: ctx.user.id });
+    return { success: true };
+  }),
+  publicPage: publicProcedure.input(z.object({ slug: z.string().min(2).max(240) })).query(async ({ input }) => {
+    const db = await dbOrThrow();
+    const rows = await db.select({ page: businessPages, business: businesses, category: categories.name, city: cities.name }).from(businessPages).innerJoin(businesses, eq(businessPages.businessId, businesses.id)).leftJoin(categories, eq(businesses.categoryId, categories.id)).leftJoin(cities, eq(businesses.cityId, cities.id)).where(and(eq(businessPages.slug, input.slug), eq(businessPages.status, "published"))).limit(1);
+    const row = rows[0];
+    if (!row || !["approved", "published"].includes(row.business.status)) throw new TRPCError({ code: "NOT_FOUND", message: "Published website not found." });
+    const [sections, services, images, reviews] = await Promise.all([
+      db.select().from(pageSections).where(and(eq(pageSections.pageId, row.page.id), eq(pageSections.enabled, true))).orderBy(asc(pageSections.displayOrder)),
+      db.select().from(businessServices).where(and(eq(businessServices.businessId, row.business.id), eq(businessServices.isEnabled, true))).orderBy(asc(businessServices.sortOrder)),
+      db.select().from(businessImages).where(eq(businessImages.businessId, row.business.id)).orderBy(asc(businessImages.sortOrder)),
+      db.select().from(businessReviews).where(and(eq(businessReviews.businessId, row.business.id), eq(businessReviews.status, "published"))),
+    ]);
+    return { ...row, sections, services, images, reviews };
+  }),
+  track: publicProcedure.input(z.object({ pageId: z.number().int().positive(), businessId: z.number().int().positive(), eventType: z.enum(["page_view", "cta_click", "lead_start", "lead_submit", "call_click", "whatsapp_click", "website_click", "directions", "scroll_depth", "section_interaction"]), sectionId: z.number().int().positive().optional(), source: z.string().max(100).optional(), campaign: z.string().max(120).optional(), metadata: z.record(z.string(), z.unknown()).optional() })).mutation(async ({ input }) => {
+    const db = await dbOrThrow();
+    const page = await db.select({ id: businessPages.id, businessId: businessPages.businessId }).from(businessPages).where(and(eq(businessPages.id, input.pageId), eq(businessPages.businessId, input.businessId))).limit(1);
+    if (!page[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Website page not found." });
+    await db.insert(pageAnalytics).values(input);
+    return { success: true };
+  }),
+});

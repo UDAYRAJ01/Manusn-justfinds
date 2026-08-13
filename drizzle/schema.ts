@@ -27,6 +27,9 @@ export const aiContentTypeValues = [
   "cta_copy",
 ] as const;
 export const aiContentStatusValues = ["draft", "pending_review", "approved", "published", "rejected"] as const;
+export const pageStatusValues = ["draft", "pending_review", "published", "unpublished"] as const;
+export const pageVersionStatusValues = ["draft", "published", "archived"] as const;
+export const pageAnalyticsEventValues = ["page_view", "cta_click", "lead_start", "lead_submit", "call_click", "whatsapp_click", "website_click", "directions", "scroll_depth", "section_interaction"] as const;
 export const aiJobStatusValues = ["queued", "processing", "completed", "failed", "retrying", "cancelled"] as const;
 export const aiAuthorshipValues = ["ai_generated", "owner_edited", "admin_edited"] as const;
 export const knowledgeSourceValues = [
@@ -656,3 +659,64 @@ export const businessRecommendationSignals = mysqlTable("business_recommendation
 export type AiContentVersion = typeof aiContentVersions.$inferSelect;
 export type AiGenerationJob = typeof aiGenerationJobs.$inferSelect;
 export type BusinessKnowledgeItem = typeof businessKnowledgeItems.$inferSelect;
+
+export const businessPages = mysqlTable("business_pages", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  slug: varchar("slug", { length: 240 }).notNull(),
+  status: mysqlEnum("status", pageStatusValues).default("draft").notNull(),
+  seoTitle: varchar("seoTitle", { length: 180 }),
+  metaDescription: varchar("metaDescription", { length: 300 }),
+  canonicalUrl: varchar("canonicalUrl", { length: 500 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  publishedAt: timestamp("publishedAt"),
+}, table => [uniqueIndex("business_page_business_uidx").on(table.businessId), uniqueIndex("business_page_slug_uidx").on(table.slug), index("business_page_status_idx").on(table.status)]);
+
+export const pageSections = mysqlTable("page_sections", {
+  id: int("id").autoincrement().primaryKey(),
+  pageId: int("pageId").notNull().references(() => businessPages.id),
+  sectionType: varchar("sectionType", { length: 60 }).notNull(),
+  displayOrder: int("displayOrder").default(0).notNull(),
+  enabled: boolean("enabled").default(true).notNull(),
+  config: json("config"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [index("page_section_order_idx").on(table.pageId, table.displayOrder), index("page_section_type_idx").on(table.pageId, table.sectionType)]);
+
+export const pageVersions = mysqlTable("page_versions", {
+  id: int("id").autoincrement().primaryKey(),
+  pageId: int("pageId").notNull().references(() => businessPages.id),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  versionNumber: int("versionNumber").notNull(),
+  designConfig: json("designConfig").notNull(),
+  status: mysqlEnum("status", pageVersionStatusValues).default("draft").notNull(),
+  createdById: int("createdById").notNull().references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [uniqueIndex("page_version_number_uidx").on(table.pageId, table.versionNumber), index("page_version_business_idx").on(table.businessId, table.createdAt)]);
+
+export const pagePublishHistory = mysqlTable("page_publish_history", {
+  id: int("id").autoincrement().primaryKey(),
+  pageId: int("pageId").notNull().references(() => businessPages.id),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  versionId: int("versionId").notNull().references(() => pageVersions.id),
+  action: mysqlEnum("action", ["publish", "unpublish", "restore"]).notNull(),
+  performedById: int("performedById").notNull().references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [index("page_publish_business_idx").on(table.businessId, table.createdAt)]);
+
+export const pageAnalytics = mysqlTable("page_analytics", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  pageId: int("pageId").notNull().references(() => businessPages.id),
+  sectionId: int("sectionId").references(() => pageSections.id),
+  eventType: mysqlEnum("eventType", pageAnalyticsEventValues).notNull(),
+  source: varchar("source", { length: 100 }),
+  campaign: varchar("campaign", { length: 120 }),
+  metadata: json("metadata"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [index("page_analytics_scope_idx").on(table.businessId, table.pageId, table.eventType, table.createdAt)]);
+
+export type BusinessPage = typeof businessPages.$inferSelect;
+export type PageSection = typeof pageSections.$inferSelect;
+export type PageVersion = typeof pageVersions.$inferSelect;

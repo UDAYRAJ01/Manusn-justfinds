@@ -2,7 +2,7 @@
   "version": "5",
   "dialect": "mysql",
   "id": "c8a4e332-838a-4eea-b475-1c6db052454e",
-  "prevId": "9be6c6b4-7211-467b-bb31-dac303bda089",
+  "prevId": "d834b620-78bc-49e7-8f4c-f6390b34805c",
   "tables": {
     "approval_queue": {
       "name": "approval_queue",

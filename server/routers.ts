@@ -8,6 +8,7 @@ import { aiContentRouter } from "./routers/aiContent";
 import { discoveryRouter } from "./routers/discovery";
 import { jobsRouter } from "./routers/jobs";
 import { workspaceRouter } from "./routers/workspaces";
+import { websiteRouter } from "./routers/website";
 
 export const appRouter = router({
   system: systemRouter,
@@ -25,6 +26,7 @@ export const appRouter = router({
   business: businessRouter,
   ai: aiRouter,
   aiContent: aiContentRouter,
+  website: websiteRouter,
 });
 
 export type AppRouter = typeof appRouter;

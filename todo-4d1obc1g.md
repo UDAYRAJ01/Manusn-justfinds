@@ -79,3 +79,16 @@
 - [x] Extend weekly hours UI to create, edit, and remove multiple daily intervals
 - [x] Add explicit desktop/mobile owner preview states and verify mobile dashboard polish
 - [x] Add focused Vitest coverage for claim workflow states, hours validation edge cases, and offer auto-expiry behavior
+
+
+## Phase 7 — AI Business Website Builder
+- [x] Add owner-scoped business_pages, page_sections (with inline config JSON), page_versions, page_publish_history, and page_analytics schema with migration
+- [x] Add reusable category-aware section registry and default page configurations for restaurant, hospital, hotel, and doctor businesses
+- [x] Add owner-scoped page-builder router for create, read, reorder, enable/disable, duplicate-own-design, save draft, publish/unpublish, version history, restore, and analytics, with explicit procedure contracts
+- [x] Add explicit /business/:businessSlug/website route using the same isolated renderer as owner preview
+- [x] Add responsive owner page-builder workspace with section library, live canvas, properties, desktop/tablet/mobile previews, controlled themes, and unsaved-change handling
+- [ ] Add business-data-safe AI redesign draft/preview/apply/reject flow that changes design configuration only
+- [x] Add lead CTA rendering and page-attributed lead/CTA analytics without fabricating business facts, reviews, ratings, testimonials, or images
+- [ ] Add admin moderation/template foundation without permitting business-data mutation
+- [x] Add Phase 7 section-registry, router-surface, design-safety, publishing-contract, and WebsiteBuilder interaction tests
+- [ ] Validate published website and owner-builder desktop/mobile flows against authenticated/seeded data, then save a published checkpoint
