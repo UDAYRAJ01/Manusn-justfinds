@@ -12,6 +12,15 @@
 - [x] Add realistic seed records that never fabricate customer reviews, ratings, testimonials, or third-party business data.
 - [x] Write and run Vitest coverage for search ranking, permission boundaries, business data isolation, bulk-import statuses, and public API behavior.
 - [ ] Connect production providers for live map tiles, voice audio synthesis, custom-domain DNS verification, and managed import workers when their credentials and run-time services are selected.
+- [x] Replace the business-detail map preview with the managed Google Maps component, preserving a graceful fallback and native directions link.
+- [ ] Verify the managed Google Maps component loads on a live business-detail route without requesting a user API key.
+- [ ] Obtain concrete provider choices and credential or account-access details for voice synthesis, custom-domain DNS verification, and managed import workers before connecting them.
+- [x] Enable the approved ElevenLabs connector for business voice-introduction generation.
+- [ ] Enable the approved Cloudflare connector for custom-domain DNS verification and managed import-worker infrastructure.
+- [x] Implement the approved ElevenLabs workflow: generate a factual business-scoped MP3 from approved data, store it securely, and expose playback only when public profile data includes the stored URL.
+- [ ] Validate voice generation end to end with an authenticated owner and an approved real business profile, then confirm the resulting stored audio appears on the published profile.
+- [ ] Implement and validate custom-domain DNS verification and managed-import workflows once Cloudflare has been enabled.
+- [ ] Deferred by user: authorize Cloudflare before enabling custom-domain DNS verification, Cloudflare Worker import processing, or any related worker bindings.
 - [x] Verify desktop and mobile presentation, inspect application logs, and save a release checkpoint.
 - [x] Compare the complete new Phase 1 specification with the current Just Finds implementation and document conflicts, including its no-demo-data constraint.
 - [x] Reconcile the requested route inventory and protected-route architecture with the current public, owner, and admin navigation.

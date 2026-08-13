@@ -3,7 +3,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { WorkspaceShell } from "@/components/WorkspaceShell";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { AlertCircle, Bot, Building2, ClipboardList, FileText, Globe2, LayoutDashboard, Plus, Send, Settings2, Sparkles, UsersRound } from "lucide-react";
+import { AlertCircle, Bot, Building2, ClipboardList, FileText, Globe2, LayoutDashboard, Plus, Radio, Send, Settings2, Sparkles, UsersRound } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 
@@ -33,17 +33,26 @@ export default function OwnerWorkspace() {
   </WorkspaceShell>;
 }
 
-function OwnerContent({ path, businesses }: { path: string; businesses: Array<{ id: number; name: string; status: string; shortDescription: string | null; phone: string | null; email: string | null }> }) {
+function OwnerContent({ path, businesses }: { path: string; businesses: Array<{ id: number; name: string; status: string; shortDescription: string | null; approvedDescription: string | null; phone: string | null; email: string | null; voiceIntroductionUrl: string | null }> }) {
   if (path === "/owner/profile" || path === "/business" || path === "/business/profile") return <ProfileManager businesses={businesses} />;
   if (path === "/owner/leads") return <InfoPanel icon={UsersRound} title="Private lead inbox" detail="When a published business receives an enquiry, it is recorded against that business only. There are no cross-owner lead feeds." action="Published lead forms can be enabled once a business has been approved." />;
-  if (path === "/owner/content") return <InfoPanel icon={Bot} title="AI content studio" detail="Draft SEO, FAQs, chatbot context, and voice scripts from approved business facts. Public content stays unchanged until an owner reviews it." action="AI generation is ready for an approved provider connection; no content is fabricated or published automatically." />;
+  if (path === "/owner/content") return <VoiceIntroductionStudio businesses={businesses} />;
   if (path === "/owner/jobs") return <InfoPanel icon={ClipboardList} title="Employer job workflow" detail="Create a draft, submit it for Just Finds review, then manage applications privately once the role is published." action="No job records exist for this owner yet." />;
   if (path === "/owner/settings") return <InfoPanel icon={Globe2} title="Custom domain and landing settings" detail="Domain requests, DNS verification, and landing page settings are held separately from business approval." action="Domain verification requires a DNS provider connection before a custom domain can be activated." />;
   return <><div className="mt-8 grid gap-4 sm:grid-cols-3"><Stat label="Managed profiles" value={String(businesses.length)} helper="Owned by this account" /><Stat label="Submitted for review" value={String(businesses.filter(item => item.status === "submitted").length)} helper="Awaiting moderation" /><Stat label="Published profiles" value={String(businesses.filter(item => item.status === "published").length)} helper="Visible publicly" /></div><section className="mt-6 rounded-[24px] border border-slate-200 bg-white p-5"><div className="flex items-center justify-between"><div><h2 className="font-semibold text-slate-900">Business profiles</h2><p className="mt-1 text-xs text-slate-500">Create a database-backed draft and submit it through the review workflow.</p></div><Link href="/owner/profile" className="rounded-xl bg-[#173d9c] px-3.5 py-2.5 text-xs font-semibold text-white">Manage profiles</Link></div><div className="mt-5 grid gap-3">{businesses.length ? businesses.map(business => <BusinessRow key={business.id} business={business} />) : <Empty icon={Building2} label="No business profile yet. Create your first draft from a category and city managed by Just Finds administrators." />}</div></section></>;
 }
 
-function ProfileManager({ businesses }: { businesses: Array<{ id: number; name: string; status: string; shortDescription: string | null; phone: string | null; email: string | null }> }) {
+function ProfileManager({ businesses }: { businesses: Array<{ id: number; name: string; status: string; shortDescription: string | null; approvedDescription: string | null; phone: string | null; email: string | null; voiceIntroductionUrl: string | null }> }) {
   return <div className="mt-8 grid gap-6 lg:grid-cols-[1.15fr_.85fr]"><ProfileForm /><section className="rounded-[24px] border border-slate-200 bg-white p-5"><h2 className="font-semibold text-slate-900">Your profiles</h2><p className="mt-1 text-xs text-slate-500">Only profiles owned by this account appear here.</p><div className="mt-5 grid gap-3">{businesses.length ? businesses.map(business => <BusinessRow key={business.id} business={business} />) : <Empty icon={Building2} label="Create a draft on the left. It will remain private until you submit and an administrator publishes it." />}</div></section></div>;
+}
+
+function VoiceIntroductionStudio({ businesses }: { businesses: Array<{ id: number; name: string; status: string; approvedDescription: string | null; voiceIntroductionUrl: string | null }> }) {
+  const utils = trpc.useUtils();
+  const [businessId, setBusinessId] = useState("");
+  const generate = trpc.workspace.generateVoiceIntroduction.useMutation({ onSuccess: () => void utils.workspace.ownerOverview.invalidate() });
+  const approved = businesses.filter(business => ["approved", "published"].includes(business.status) && Boolean(business.approvedDescription));
+  const selected = approved.find(business => business.id === Number(businessId));
+  return <section className="mt-8 max-w-3xl rounded-[24px] border border-slate-200 bg-white p-6"><span className="grid size-11 place-items-center rounded-2xl bg-blue-50 text-[#1f51c8]"><Radio className="size-5" /></span><h2 className="mt-5 text-xl font-semibold tracking-[-.035em] text-slate-900">Business voice introduction</h2><p className="mt-3 text-sm leading-7 text-slate-600">Generate a short audio introduction only from an administrator-approved business description. The script is stored with the generated audio for review; no unapproved facts are added.</p>{approved.length ? <><label className="mt-6 grid gap-1.5 text-xs font-medium text-slate-700"><span>Approved business</span><select value={businessId} onChange={event => setBusinessId(event.target.value)} className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"><option value="">Choose a business</option>{approved.map(business => <option key={business.id} value={business.id}>{business.name}</option>)}</select></label><Button disabled={!selected || generate.isPending} onClick={() => selected && generate.mutate({ businessId: selected.id })} className="mt-4 h-11 rounded-xl bg-[#173d9c]">{generate.isPending ? "Generating voice introduction…" : "Generate voice introduction"}<Bot className="ml-2 size-4" /></Button>{generate.error && <p className="mt-3 text-xs text-rose-600">{generate.error.message}</p>}{generate.data && <p className="mt-4 rounded-xl bg-emerald-50 p-3 text-xs leading-5 text-emerald-700">Voice introduction created and stored securely. It will be available on the published business profile.</p>}{selected?.voiceIntroductionUrl && <audio className="mt-4 w-full" controls preload="metadata" src={selected.voiceIntroductionUrl}>Your browser does not support audio playback.</audio>}</> : <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">An administrator-approved description is required before a voice introduction can be generated. This keeps every spoken claim grounded in approved business data.</div>}</section>;
 }
 
 function ProfileForm() {

@@ -1,9 +1,11 @@
-import { TRPCError } from "@trpc/server";
 import { and, eq } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { approvalQueue, businesses, businessFieldValues, categories, categoryFields, cities } from "../../drizzle/schema";
 import { getAdminCounts, getCategorySchemas, getDb, getOwnerBusinesses, getPendingBusinesses } from "../db";
 import { canManageAdmins, canManageBusiness, canModerate } from "../domain/permissions";
+import { buildVoiceIntroductionScript } from "../domain/voiceScript";
+import { storagePut } from "../storage";
 import { protectedProcedure, router } from "../_core/trpc";
 
 type JustFindsRole = "user" | "business_owner" | "admin" | "super_admin";
@@ -37,7 +39,7 @@ const businessInput = z.object({
 async function ownedBusinessOrThrow(businessId: number, userId: number, role: JustFindsRole) {
   const db = await getDb();
   if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The business workspace is temporarily unavailable." });
-  const records = await db.select({ id: businesses.id, ownerId: businesses.ownerId, status: businesses.status }).from(businesses).where(eq(businesses.id, businessId)).limit(1);
+  const records = await db.select({ id: businesses.id, ownerId: businesses.ownerId, status: businesses.status, name: businesses.name, approvedDescription: businesses.approvedDescription }).from(businesses).where(eq(businesses.id, businessId)).limit(1);
   const business = records[0];
   if (!business) throw new TRPCError({ code: "NOT_FOUND", message: "Business not found." });
   if (!canManageBusiness(role, userId, business.ownerId)) throw new TRPCError({ code: "FORBIDDEN", message: "You cannot manage this business." });
@@ -116,6 +118,30 @@ export const workspaceRouter = router({
     await db.update(businesses).set({ status: "submitted" }).where(eq(businesses.id, input.businessId));
     await db.insert(approvalQueue).values({ entityType: "business", businessId: input.businessId, submittedById: ctx.user.id, status: "pending" });
     return { status: "submitted" as const };
+  }),
+  generateVoiceIntroduction: protectedProcedure.input(z.object({ businessId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    const { db, business } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
+    if (!['approved', 'published'].includes(business.status)) throw new TRPCError({ code: "BAD_REQUEST", message: "Voice introductions can be generated only after the business is approved." });
+    const apiKey = process.env.ELEVENLABS_API_KEY;
+    if (!apiKey) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The voice provider is not configured." });
+    const script = buildVoiceIntroductionScript(business);
+
+    const voicesResponse = await fetch("https://api.elevenlabs.io/v1/voices", { headers: { "xi-api-key": apiKey } });
+    if (!voicesResponse.ok) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The voice provider could not load an approved voice." });
+    const voicesPayload = await voicesResponse.json() as { voices?: Array<{ voice_id?: string }> };
+    const voiceId = process.env.ELEVENLABS_VOICE_ID ?? voicesPayload.voices?.find(voice => voice.voice_id)?.voice_id;
+    if (!voiceId) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "No approved voice is available for this workspace." });
+
+    const synthesisResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      method: "POST",
+      headers: { "xi-api-key": apiKey, "Content-Type": "application/json", Accept: "audio/mpeg" },
+      body: JSON.stringify({ text: script, model_id: "eleven_multilingual_v2", voice_settings: { stability: 0.55, similarity_boost: 0.7, style: 0.2, use_speaker_boost: true } }),
+    });
+    if (!synthesisResponse.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The voice introduction could not be generated. Please try again." });
+    const audio = Buffer.from(await synthesisResponse.arrayBuffer());
+    const { url } = await storagePut(`businesses/${input.businessId}/voice-introduction.mp3`, audio, "audio/mpeg");
+    await db.update(businesses).set({ voiceIntroductionUrl: url, voiceIntroductionScript: script, voiceIntroductionUpdatedAt: new Date() }).where(eq(businesses.id, input.businessId));
+    return { url, script };
   }),
   reviewBusiness: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), decision: z.enum(["approved", "rejected", "published", "suspended"]), reviewerNote: z.string().max(2000).optional() })).mutation(async ({ ctx, input }) => {
     requireModerator(ctx.user.role);
