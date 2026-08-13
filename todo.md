@@ -56,3 +56,6 @@
 - [x] Record search and listing interactions through the existing telemetry foundation, including search context, result count, and privacy-safe session context; add automated coverage for the search contracts.
 - [x] Complete bidirectional search-results map/list synchronization so list selection highlights its map marker and selected-marker state updates after initial map load; add focused validation coverage.
 - [x] Add interaction-level automated validation that exercises both list-originated and map-originated selection against the shared search-result selection state.
+- [x] Reconcile the deployed businesses table with the approved voice-generation workflow by adding the missing voice-audio URL metadata column through a reviewed additive migration, then validate the persistence contract.
+- [x] Verify and preserve an explicit additive migration artifact for the voice-audio URL column so local migration history documents the deployed reconciliation.
+- [x] Add and run a focused contract test that proves voice-introduction persistence writes and returns the stored voice-audio URL without requiring live provider synthesis.
