@@ -26,6 +26,7 @@ import {
 import { canManageBusiness, canModerate } from "../domain/permissions";
 import { getDb } from "../db";
 import { protectedProcedure, router } from "../_core/trpc";
+import { storagePut } from "../storage";
 
 const roleSchema = z.enum(["user", "business_owner", "admin", "super_admin"]);
 const businessIdInput = z.object({ businessId: z.number().int().positive() });
@@ -245,16 +246,24 @@ export const businessRouter = router({
     if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Lead not found." });
     return rows[0];
   }),
-  savePhoto: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), imageId: z.number().int().positive().optional(), url: z.string().url().max(1000), imageType: z.enum(["logo", "cover", "gallery"]).default("gallery"), alt: z.string().max(240).optional(), sortOrder: z.number().int().min(0).default(0) })).mutation(async ({ ctx, input }) => {
+  savePhoto: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), imageId: z.number().int().positive().optional(), url: z.string().url().max(1000).optional(), dataBase64: z.string().max(7_000_000).optional(), mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif"]).default("image/jpeg"), imageType: z.enum(["logo", "cover", "gallery"]).default("gallery"), alt: z.string().max(240).optional(), sortOrder: z.number().int().min(0).default(0) }).refine(input => Boolean(input.url) !== Boolean(input.dataBase64), "Provide either an image URL or an uploaded image." )).mutation(async ({ ctx, input }) => {
     const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
-    const { imageId, ...values } = input;
-    if (imageId) { await db.update(businessImages).set(values).where(and(eq(businessImages.id, imageId), eq(businessImages.businessId, input.businessId))); return { imageId }; }
+    const { imageId, dataBase64, mimeType, url, ...rest } = input;
+    const resolvedUrl = dataBase64 ? (await storagePut(`business-images/${input.businessId}/${crypto.randomUUID()}`, Buffer.from(dataBase64, "base64"), mimeType)).url : url!;
+    const values = { ...rest, url: resolvedUrl };
+    if (imageId) { await db.update(businessImages).set(values).where(and(eq(businessImages.id, imageId), eq(businessImages.businessId, input.businessId))); return { imageId, url: resolvedUrl }; }
     const created = await db.insert(businessImages).values(values);
-    return { imageId: Number(created[0].insertId) };
+    return { imageId: Number(created[0].insertId), url: resolvedUrl };
   }),
   deletePhoto: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), imageId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
     await db.delete(businessImages).where(and(eq(businessImages.id, input.imageId), eq(businessImages.businessId, input.businessId)));
+    return { success: true };
+  }),
+  setLogo: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), imageId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
+    await db.update(businessImages).set({ imageType: "gallery" }).where(and(eq(businessImages.businessId, input.businessId), eq(businessImages.imageType, "logo")));
+    await db.update(businessImages).set({ imageType: "logo" }).where(and(eq(businessImages.id, input.imageId), eq(businessImages.businessId, input.businessId)));
     return { success: true };
   }),
   setCover: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), imageId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {

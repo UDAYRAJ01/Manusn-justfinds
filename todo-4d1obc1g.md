@@ -19,11 +19,11 @@
 - [x] Claims: searchDirectory, requestClaim, myClaims (+ admin reviewClaim)
 - [x] Hours: setHours (multi-interval), special hours CRUD, openNow preview
 - [x] Services CRUD + reorder/enable; Facilities set; Items CRUD
-- [ ] Photos: upload (validated), delete, reorder, setCover/setLogo
+- [x] Photos: upload (validated), delete, reorder, setCover/setLogo
 - [x] Reviews: list/respond/report; Leads: list/detail/status/notes
 - [x] Offers CRUD with auto-expire; AI content generate/save; SEO get/save
 - [x] Certificate, QR, analytics (real searchInteractions only), notifications, settings
-- [ ] Business switcher data isolation tests
+- [x] Business switcher data isolation tests
 
 ## Frontend (/business/*)
 - [x] /business entry: Grow-your-business CTA or My Businesses cards
@@ -49,3 +49,7 @@
 - [x] Reconcile Drizzle migration metadata so both Phase 4 and Phase 5 migration histories are represented correctly
 - [x] Verify the merged schema/database state matches both branches and validate the combined migration chain
 - [x] Re-check shared-file merge outcomes after fixing migration metadata
+- [ ] Implement real storage-backed photo upload flow and test save/delete/reorder/cover/logo
+- [ ] Add router-level myBusinesses/businessDetail cross-owner isolation tests
+- [ ] Add behavior-level tests for storage upload, delete, reorder, cover, and logo photo flows
+- [ ] Add router-level myBusinesses ownership filtering test
