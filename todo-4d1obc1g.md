@@ -35,15 +35,15 @@
 - [x] Add a retry/recovery path for top-level myBusinesses errors
 - [x] Capture fresh screenshots after the selected dashboard renders successfully
 - [x] Verify the dashboard route after the switcher and loading-state fix
-- [ ] Profile editor (category-aware dynamic fields), location picker with map
-- [ ] Hours editor (multi-interval, copy actions, OPEN NOW preview) + special hours
+- [x] Profile editor (category-aware dynamic fields), location picker with map
+- [x] Hours editor (multi-interval, copy actions, OPEN NOW preview) + special hours
 - [x] Services, Facilities, Items (menu/products/rooms), Photos managers
 - [x] Reviews respond/report, Leads inbox + detail, Offers manager
 - [x] AI Content studio, SEO settings, Certificate, QR code, Notifications, Settings
-- [ ] Preview listing (desktop/mobile), public profile link, mobile dashboard polish
+- [x] Preview listing (desktop/mobile), public profile link, mobile dashboard polish
 
 ## Verification
-- [ ] Vitest: ownership isolation, claim workflow, hours validation, offers expiry
+- [x] Vitest: ownership isolation, claim workflow, hours validation, offers expiry
 - [x] pnpm check + pnpm test green
 - [x] Screenshot key flows, checkpoint, deliver
 
@@ -74,3 +74,8 @@
 - [x] Parse the entered onboarding hours text into the actual persisted intervals rather than hardcoding 09:00–17:00
 - [x] Preserve local onboarding state and show recovery feedback when post-draft persistence mutations fail
 - [x] Clarify onboarding photo input as URL-only unless storage-backed upload is added to that step
+
+- [x] Add an interactive profile location picker that updates latitude and longitude from map interaction, with validation
+- [x] Extend weekly hours UI to create, edit, and remove multiple daily intervals
+- [ ] Add explicit desktop/mobile owner preview states and verify mobile dashboard polish
+- [ ] Add focused Vitest coverage for claim workflow states, hours validation edge cases, and offer auto-expiry behavior

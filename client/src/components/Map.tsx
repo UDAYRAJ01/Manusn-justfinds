@@ -123,6 +123,7 @@ interface MapViewProps {
   initialCenter?: google.maps.LatLngLiteral;
   initialZoom?: number;
   onMapReady?: (map: google.maps.Map) => void;
+  onMapClick?: (position: google.maps.LatLngLiteral) => void;
   onLoadError?: () => void;
 }
 
@@ -131,6 +132,7 @@ export function MapView({
   initialCenter = { lat: 37.7749, lng: -122.4194 },
   initialZoom = 12,
   onMapReady,
+  onMapClick,
   onLoadError,
 }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -152,6 +154,13 @@ export function MapView({
         mapId: "DEMO_MAP_ID",
       });
       onMapReady?.(map.current);
+      if (onMapClick) {
+        map.current.addListener("click", (event: google.maps.MapMouseEvent) => {
+          const lat = event.latLng?.lat();
+          const lng = event.latLng?.lng();
+          if (lat !== undefined && lng !== undefined) onMapClick({ lat, lng });
+        });
+      }
     } catch (error) {
       console.error("Failed to initialize Google Maps", error);
       onLoadError?.();

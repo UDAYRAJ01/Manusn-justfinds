@@ -6,6 +6,7 @@ import {
   businessCertificates,
   businessClaims,
   businessFieldValues,
+  categoryFields,
   businessFacilities,
   businessHours,
   businessImages,
@@ -78,6 +79,10 @@ export const businessRouter = router({
       .leftJoin(cities, eq(businesses.cityId, cities.id))
       .where(eq(businesses.ownerId, ctx.user.id))
       .orderBy(desc(businesses.updatedAt));
+  }),
+  categoryFields: protectedProcedure.input(z.object({ categoryId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+    const db = await dbOrThrow();
+    return db.select().from(categoryFields).where(eq(categoryFields.categoryId, input.categoryId)).orderBy(categoryFields.sortOrder);
   }),
 
   businessDetail: protectedProcedure.input(businessIdInput).query(async ({ ctx, input }) => {
