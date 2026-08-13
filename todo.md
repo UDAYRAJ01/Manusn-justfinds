@@ -59,3 +59,4 @@
 - [x] Reconcile the deployed businesses table with the approved voice-generation workflow by adding the missing voice-audio URL metadata column through a reviewed additive migration, then validate the persistence contract.
 - [x] Verify and preserve an explicit additive migration artifact for the voice-audio URL column so local migration history documents the deployed reconciliation.
 - [x] Add and run a focused contract test that proves voice-introduction persistence writes and returns the stored voice-audio URL without requiring live provider synthesis.
+- [x] Reconcile the managed Drizzle migration ledger with the already-applied local migrations and verify the standard migrator no longer replays baseline schema creation.
