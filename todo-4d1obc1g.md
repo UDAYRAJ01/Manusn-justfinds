@@ -26,10 +26,10 @@
 - [ ] Business switcher data isolation tests
 
 ## Frontend (/business/*)
-- [x] /business entry: Grow-your-business CTA or My Businesses cards
+- [ ] /business entry: Grow-your-business CTA or My Businesses cards
 - [ ] Guided 10-step onboarding with progress, autosave, resume
 - [ ] Find/claim existing business flow
-- [x] Dashboard overview: business switcher, status banner, completeness, real analytics
+- [ ] Dashboard overview: business switcher, status banner, completeness, real analytics
 - [ ] Profile editor (category-aware dynamic fields), location picker with map
 - [ ] Hours editor (multi-interval, copy actions, OPEN NOW preview) + special hours
 - [ ] Services, Facilities, Items (menu/products/rooms), Photos managers

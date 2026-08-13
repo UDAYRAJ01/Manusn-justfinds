@@ -1,6 +1,7 @@
 import { startLogin } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { WorkspaceShell } from "@/components/WorkspaceShell";
+import { AiContentWorkspace } from "@/components/AiContentWorkspace";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { hasValidCoordinates, isApprovalReadyDescription } from "@/lib/onboarding";
@@ -38,7 +39,7 @@ export default function OwnerWorkspace() {
 function OwnerContent({ path, businesses }: { path: string; businesses: Array<{ id: number; name: string; status: string; shortDescription: string | null; approvedDescription: string | null; phone: string | null; email: string | null; voiceIntroductionUrl: string | null }> }) {
   if (path === "/owner/profile" || path === "/business" || path === "/business/profile") return <ProfileManager businesses={businesses} />;
   if (path === "/owner/leads") return <InfoPanel icon={UsersRound} title="Private lead inbox" detail="When a published business receives an enquiry, it is recorded against that business only. There are no cross-owner lead feeds." action="Published lead forms can be enabled once a business has been approved." />;
-  if (path === "/owner/content") return <VoiceIntroductionStudio businesses={businesses} />;
+  if (path === "/owner/content") return <div className="grid gap-8"><AiContentWorkspace businesses={businesses.map(({ id, name, status }) => ({ id, name, status }))} /><VoiceIntroductionStudio businesses={businesses} /></div>;
   if (path === "/owner/jobs") return <InfoPanel icon={ClipboardList} title="Employer job workflow" detail="Create a draft, submit it for Just Finds review, then manage applications privately once the role is published." action="No job records exist for this owner yet." />;
   if (path === "/owner/settings") return <InfoPanel icon={Globe2} title="Custom domain and landing settings" detail="Domain requests, DNS verification, and landing page settings are held separately from business approval." action="Domain verification requires a DNS provider connection before a custom domain can be activated." />;
   return <><div className="mt-8 grid gap-4 sm:grid-cols-3"><Stat label="Managed profiles" value={String(businesses.length)} helper="Owned by this account" /><Stat label="Submitted for review" value={String(businesses.filter(item => item.status === "submitted").length)} helper="Awaiting moderation" /><Stat label="Published profiles" value={String(businesses.filter(item => item.status === "published").length)} helper="Visible publicly" /></div><section className="mt-6 rounded-[24px] border border-slate-200 bg-white p-5"><div className="flex items-center justify-between"><div><h2 className="font-semibold text-slate-900">Business profiles</h2><p className="mt-1 text-xs text-slate-500">Create a database-backed draft and submit it through the review workflow.</p></div><Link href="/owner/profile" className="rounded-xl bg-[#173d9c] px-3.5 py-2.5 text-xs font-semibold text-white">Manage profiles</Link></div><div className="mt-5 grid gap-3">{businesses.length ? businesses.map(business => <BusinessRow key={business.id} business={business} />) : <Empty icon={Building2} label="No business profile yet. Create your first draft from a category and city managed by Just Finds administrators." />}</div></section></>;

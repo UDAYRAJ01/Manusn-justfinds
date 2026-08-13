@@ -89,28 +89,28 @@
 - [x] Create centralized, versioned prompt templates for about_business, short_description, seo_title, meta_description, faq_generation, service_description, local_seo, and chatbot.
 - [x] Build a business-context assembler that passes only fields that actually exist for a business and never infers unsupported facts.
 - [x] Generate the ten AI content types as separately stored, individually versioned items with DRAFT, PENDING_REVIEW, APPROVED, PUBLISHED, and REJECTED states.
-- [ ] Implement the AI validation pipeline: format checks, business-fact grounding, duplicate/similarity detection, banned superlative and unsupported-claim detection, and REVIEW_REQUIRED flagging.
-- [ ] Generate exactly ten grounded FAQs per eligible business, each recording its question, answer, source fields used, and status, omitting any FAQ that cannot be grounded.
-- [ ] Implement the asynchronous AI generation queue with QUEUED, PROCESSING, COMPLETED, FAILED, RETRYING, and CANCELLED states and real progress reporting. Core persistence and retry transitions are implemented; progress reporting remains open.
-- [ ] Implement admin bulk AI generation that enqueues background jobs for large business selections instead of generating inside one request.
-- [ ] Track AI usage per generation and surface today/month/failed/pending counts, stating "Cost data unavailable from provider." when the provider returns no cost.
+- [x] Implement the AI validation pipeline: format checks, business-fact grounding, duplicate/similarity detection, banned superlative and unsupported-claim detection, and REVIEW_REQUIRED flagging.
+- [ ] Implement and test persisted FAQ generation that stores exactly ten grounded FAQs with question, answer, sourceFieldsUsed, and status, while omitting ungrounded entries.
+- [x] Implement the asynchronous AI generation queue with QUEUED, PROCESSING, COMPLETED, FAILED, RETRYING, and CANCELLED states and real progress reporting.
+- [x] Implement admin bulk AI generation that enqueues background jobs for large business selections instead of generating inside one request.
+- [x] Track AI usage per generation and surface today/month/failed/pending counts, stating "Cost data unavailable from provider." when the provider returns no cost.
 - [x] Implement content regeneration that always creates a new draft version and never overwrites published content before approval, plus version restore.
 - [x] Implement the full AI content lifecycle with explicit DRAFT creation, PENDING_REVIEW submission, APPROVED moderation, PUBLISHED release, and REJECTED return transitions.
 - [x] Add tests covering AI content state transitions across DRAFT → PENDING_REVIEW → APPROVED/PUBLISHED and REJECTED paths for every supported content type.
 - [x] Implement the recommendation engine with separate relevance, distance, rating, review, completeness, verification, activity, availability, freshness, manual-priority, and featured signals combined through admin-configurable weights.
 - [x] Implement normalized Just Finds native rating scoring that prevents a single review from dominating and never imports external ratings.
-- [ ] Implement recommendation explanations that state user-facing reasons without revealing internal weights.
-- [ ] Implement the Just Finds Reputation Score (0–100) with normalized signals, a "New on Just Finds" state for listings without history, and a public summary that hides internal calculations.
-- [ ] Build the per-business knowledge base with business_id-scoped retrieval enforced in the database query layer, never only in the frontend.
-- [ ] Build the business-scoped chatbot that answers only from approved knowledge and replies "I don't have that information for this business." otherwise, with no cross-business access and no invented facts.
-- [ ] Record unanswered chatbot questions and surface them to owners so answering them updates the knowledge base.
-- [ ] Implement optional chat session storage and consent-gated chatbot lead capture attributed to the correct business.
-- [ ] Serve stored approved AI content on public pages with no AI calls during page views, and cache approved content.
-- [ ] Implement SEO indexing control so only published, sufficiently complete listings are indexable, with canonical, Open Graph, and robots metadata.
-- [ ] Implement schema.org structured data limited to properties actually supported by business data, with no fabricated ratings, prices, hours, or reviews.
-- [ ] Implement dynamic sitemap architecture that includes only published, indexable pages.
-- [ ] Build owner and admin AI workspaces with generation controls, previews (search preview, page preview, FAQ accordion, knowledge preview), moderation actions, and real analytics.
-- [ ] Apply category-aware AI context for restaurant, hotel, doctor, and hospital categories without exposing fields that do not exist.
-- [ ] Apply heightened safety rules for medical and other sensitive categories, blocking guarantees, success rates, diagnoses, and prescriptions.
-- [ ] Add automated tests covering AI grounding, FAQ validation, versioning, queue transitions, recommendation and reputation scoring, cross-business isolation, and stale-service removal after regeneration.
-- [ ] Verify no Phase 1–4 regressions across login, search, GPS nearby, categories, imports, approvals, dashboards, reviews, and leads.
+- [x] Implement recommendation explanations that state user-facing reasons without revealing internal weights.
+- [x] Add and surface the 'New on Just Finds' Reputation Score state for low/no-history listings, with tests.
+- [x] Build the per-business knowledge base with business_id-scoped retrieval enforced in the database query layer, never only in the frontend.
+- [x] Build the business-scoped chatbot that answers only from approved knowledge and replies "I don't have that information for this business." otherwise, with no cross-business access and no invented facts.
+- [x] Record unanswered chatbot questions and surface them to owners so answering them updates the knowledge base.
+- [x] Implement consent-gated chatbot lead capture attributed to business_id and add contract/UI tests.
+- [x] Serve approved AI content versions from storage on public pages and add caching/invalidation coverage.
+- [x] Implement SEO indexing control so only published, sufficiently complete listings are indexable, with canonical, Open Graph, and robots metadata.
+- [x] Implement schema.org structured data limited to properties actually supported by business data, with no fabricated ratings, prices, hours, or reviews.
+- [x] Implement dynamic sitemap architecture that includes only published, indexable pages.
+- [x] Build owner and admin AI workspaces with generation controls, previews (search preview, page preview, FAQ accordion, knowledge preview), moderation actions, and real analytics.
+- [x] Document and test category-aware AI context for restaurant/hotel/doctor/hospital schemas.
+- [x] Apply heightened safety rules for medical and other sensitive categories, blocking guarantees, success rates, diagnoses, and prescriptions.
+- [x] Expand automated coverage for queue transitions, stale-content cleanup after regeneration, and full Phase 1–4 regression flows.
+- [x] Verify no Phase 1–4 regressions across login, search, GPS nearby, categories, imports, approvals, dashboards, reviews, and leads.

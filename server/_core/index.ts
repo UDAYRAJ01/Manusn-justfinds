@@ -5,6 +5,7 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
+import { generateRobotsTxt, generateSitemapXml } from "../domain/seo/sitemap";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -36,6 +37,16 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
+
+  app.get("/robots.txt", async (_, res) => {
+    res.type("text/plain");
+    res.send(await generateRobotsTxt());
+  });
+
+  app.get("/sitemap.xml", async (_, res) => {
+    res.type("application/xml");
+    res.send(await generateSitemapXml());
+  });
   // tRPC API
   app.use(
     "/api/trpc",

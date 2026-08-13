@@ -28,25 +28,57 @@ function setMeta(doc: Document, selector: string, attribute: "name" | "property"
   node.content = value;
 }
 
-export function applyPageMeta(doc: Document, origin: string, location: string) {
+export function applyPageMeta(doc: Document, origin: string, location: string, business?: { name: string; category?: string; address: string; phone?: string | null; website?: string | null; latitude?: string | number; longitude?: string | number }) {
   const meta = getMeta(location);
   const canonical = resolveCanonical(origin, location);
+  const isPrivateOrAdmin = location.startsWith("/admin") || location.startsWith("/owner") || location.startsWith("/dashboard") || location.startsWith("/business/onboarding");
+  
   doc.title = meta.title;
   setMeta(doc, 'meta[name="description"]', "name", "description", meta.description);
+  setMeta(doc, 'meta[name="robots"]', "name", "robots", isPrivateOrAdmin ? "noindex, nofollow" : "index, follow");
   setMeta(doc, 'meta[property="og:title"]', "property", "og:title", meta.title);
   setMeta(doc, 'meta[property="og:description"]', "property", "og:description", meta.description);
   setMeta(doc, 'meta[property="og:url"]', "property", "og:url", canonical);
+  setMeta(doc, 'meta[property="og:type"]', "property", "og:type", business ? "business.business" : "website");
   setMeta(doc, 'meta[name="twitter:title"]', "name", "twitter:title", meta.title);
   setMeta(doc, 'meta[name="twitter:description"]', "name", "twitter:description", meta.description);
+
   let link = doc.querySelector<HTMLLinkElement>('link[rel="canonical"]');
   if (!link) { link = doc.createElement("link"); link.rel = "canonical"; doc.head.appendChild(link); }
   link.href = canonical;
+
+  let ldScript = doc.querySelector<HTMLScriptElement>('script[type="application/ld+json"]');
+  if (business) {
+    const jsonLd = {
+      "@context": "https://schema.org",
+      "@type": "LocalBusiness",
+      "name": business.name,
+      "description": meta.description,
+      "address": business.address,
+      "telephone": business.phone ?? undefined,
+      "url": canonical,
+      "sameAs": business.website ?? undefined,
+      "geo": business.latitude && business.longitude ? {
+        "@type": "GeoCoordinates",
+        "latitude": Number(business.latitude),
+        "longitude": Number(business.longitude),
+      } : undefined
+    };
+    if (!ldScript) {
+      ldScript = doc.createElement("script");
+      ldScript.type = "application/ld+json";
+      doc.head.appendChild(ldScript);
+    }
+    ldScript.textContent = JSON.stringify(jsonLd);
+  } else if (ldScript) {
+    ldScript.remove();
+  }
 }
 
-export function PageMeta() {
+export function PageMeta({ business }: { business?: { name: string; category?: string; address: string; phone?: string | null; website?: string | null; latitude?: string | number; longitude?: string | number } }) {
   const [location] = useLocation();
   useEffect(() => {
-    applyPageMeta(document, window.location.origin, location);
-  }, [location]);
+    applyPageMeta(document, window.location.origin, location, business);
+  }, [location, business]);
   return null;
 }
