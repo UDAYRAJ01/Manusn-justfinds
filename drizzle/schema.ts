@@ -700,8 +700,10 @@ export const pagePublishHistory = mysqlTable("page_publish_history", {
   pageId: int("pageId").notNull().references(() => businessPages.id),
   businessId: int("businessId").notNull().references(() => businesses.id),
   versionId: int("versionId").notNull().references(() => pageVersions.id),
-  action: mysqlEnum("action", ["publish", "unpublish", "restore"]).notNull(),
+  action: mysqlEnum("action", ["publish", "unpublish", "restore", "submit_review", "approve", "reject"]).notNull(),
   performedById: int("performedById").notNull().references(() => users.id),
+  reviewNote: text("reviewNote"),
+  reviewedById: int("reviewedById").references(() => users.id),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, table => [index("page_publish_business_idx").on(table.businessId, table.createdAt)]);
 

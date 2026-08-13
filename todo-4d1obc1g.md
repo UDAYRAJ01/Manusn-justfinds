@@ -87,8 +87,20 @@
 - [x] Add owner-scoped page-builder router for create, read, reorder, enable/disable, duplicate-own-design, save draft, publish/unpublish, version history, restore, and analytics, with explicit procedure contracts
 - [x] Add explicit /business/:businessSlug/website route using the same isolated renderer as owner preview
 - [x] Add responsive owner page-builder workspace with section library, live canvas, properties, desktop/tablet/mobile previews, controlled themes, and unsaved-change handling
-- [ ] Add business-data-safe AI redesign draft/preview/apply/reject flow that changes design configuration only
+- [x] Add business-data-safe AI redesign draft/preview/apply/reject flow that changes design configuration only
 - [x] Add lead CTA rendering and page-attributed lead/CTA analytics without fabricating business facts, reviews, ratings, testimonials, or images
-- [ ] Add admin moderation/template foundation without permitting business-data mutation
+- [x] Add admin moderation/template foundation without permitting business-data mutation
 - [x] Add Phase 7 section-registry, router-surface, design-safety, publishing-contract, and WebsiteBuilder interaction tests
 - [ ] Validate published website and owner-builder desktop/mobile flows against authenticated/seeded data, then save a published checkpoint
+
+- [x] Fix AI redesign Preview → Reject so prior design is restored and dirty state is accurate
+- [x] Add focused AI redesign interaction coverage for preview/reject and safe design keys
+- [x] Add owner submit-for-review flow and persist admin moderation notes/action history
+
+- [x] Persist distinct approve/reject moderation action entries in page publish history
+- [x] Add focused submit-for-review to moderation queue approve/reject contract coverage
+
+- [x] Add a focused test that exercises submitForReview, moderationQueue, and approve/reject persistence with reviewer notes and distinct history actions
+
+- [x] Add focused AI redesign safety assertions proving forbidden business-data keys are rejected or omitted
+- [x] Extend moderation workflow coverage through the reject branch with durable reject history and reviewer metadata

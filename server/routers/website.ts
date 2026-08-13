@@ -1,10 +1,11 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { businessImages, businessServices, businessReviews, businesses, businessPages, pageAnalytics, pagePublishHistory, pageSections, pageVersions, categories, cities } from "../../drizzle/schema";
 import { canManageBusiness } from "../domain/permissions";
 import { getDb } from "../db";
-import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
+import { adminProcedure, protectedProcedure, publicProcedure, router } from "../_core/trpc";
+import { invokeLLM } from "../_core/llm";
 
 export const sectionRegistry = [
   { type: "hero", label: "Hero", allowedCategories: ["all"] },
@@ -49,6 +50,8 @@ const sectionInput = z.object({
   enabled: z.boolean(),
   config: z.record(z.string(), z.unknown()).optional(),
 });
+export const safeDesignKeys = ["theme", "typography", "buttonStyle", "cardStyle", "radius", "spacing", "sectionWidth", "primary", "secondary", "background", "surface", "text", "muted", "accent"] as const;
+export const safeDesignSchema = z.object({ theme: z.enum(["modern", "editorial", "minimal"]), typography: z.enum(["clean", "serif", "compact"]), buttonStyle: z.enum(["rounded", "square", "pill"]), cardStyle: z.enum(["soft", "outlined", "flat"]), radius: z.enum(["sm", "lg", "xl"]), spacing: z.enum(["compact", "comfortable", "airy"]), sectionWidth: z.enum(["contained", "wide", "full"]), primary: z.string().regex(/^#[0-9a-fA-F]{6}$/), secondary: z.string().regex(/^#[0-9a-fA-F]{6}$/), background: z.string().regex(/^#[0-9a-fA-F]{6}$/), surface: z.string().regex(/^#[0-9a-fA-F]{6}$/), text: z.string().regex(/^#[0-9a-fA-F]{6}$/), muted: z.string().regex(/^#[0-9a-fA-F]{6}$/), accent: z.string().regex(/^#[0-9a-fA-F]{6}$/) });
 const designInput = z.object({
   businessId: z.number().int().positive(),
   sections: z.array(sectionInput).min(1).max(30),
@@ -88,6 +91,9 @@ function defaultSections(categoryName?: string | null) {
 
 export const websiteRouter = router({
   registry: publicProcedure.query(() => sectionRegistry),
+  moderationQueue: adminProcedure.query(async () => { const db = await dbOrThrow(); return db.select({ page: businessPages, business: businesses }).from(businessPages).innerJoin(businesses, eq(businessPages.businessId, businesses.id)).where(eq(businessPages.status, "pending_review")); }),
+  moderate: adminProcedure.input(z.object({ businessId: z.number().int().positive(), decision: z.enum(["approve", "reject"]), note: z.string().max(500).optional() })).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const pages = await db.select().from(businessPages).where(eq(businessPages.businessId, input.businessId)).limit(1); const page = pages[0]; if (!page) throw new TRPCError({ code: "NOT_FOUND", message: "Website page not found." }); const history = await db.select().from(pagePublishHistory).where(and(eq(pagePublishHistory.pageId, page.id), eq(pagePublishHistory.action, "submit_review"))).orderBy(desc(pagePublishHistory.createdAt)).limit(1); await db.update(businessPages).set({ status: input.decision === "approve" ? "published" : "draft", publishedAt: input.decision === "approve" ? new Date() : null }).where(eq(businessPages.id, page.id)); if (history[0]) { await db.update(pagePublishHistory).set({ reviewedById: ctx.user.id, reviewNote: input.note ?? null }).where(eq(pagePublishHistory.id, history[0].id)); await db.insert(pagePublishHistory).values({ pageId: page.id, businessId: input.businessId, versionId: history[0].versionId, action: input.decision === "approve" ? "approve" : "reject", performedById: ctx.user.id, reviewNote: input.note ?? null, reviewedById: ctx.user.id }); } return { success: true, businessId: input.businessId, decision: input.decision, note: input.note ?? null, reviewedById: ctx.user.id }; }),
+  templateLibrary: adminProcedure.query(() => ({ templates: [{ id: "modern-trust", label: "Modern trust", designConfig: defaultDesignConfig }, { id: "editorial-local", label: "Editorial local", designConfig: { ...defaultDesignConfig, theme: "editorial", typography: "serif" } }] })),
   create: protectedProcedure.input(z.object({ businessId: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const { page } = await ownedPage(input.businessId, ctx.user.id, ctx.user.role); return { id: page.id, slug: page.slug, status: page.status }; }),
   versions: protectedProcedure.input(z.object({ businessId: z.number().int().positive() })).query(async ({ ctx, input }) => { const { db, page } = await ownedPage(input.businessId, ctx.user.id, ctx.user.role); return db.select().from(pageVersions).where(eq(pageVersions.pageId, page.id)).orderBy(asc(pageVersions.versionNumber)); }),
   reorder: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), sectionIds: z.array(z.number().int().positive()).min(1).max(30) })).mutation(async ({ ctx, input }) => { const { db, page } = await ownedPage(input.businessId, ctx.user.id, ctx.user.role); const sections = await db.select().from(pageSections).where(eq(pageSections.pageId, page.id)); const ids = new Set(sections.map(section => section.id)); if (input.sectionIds.some(id => !ids.has(id)) || input.sectionIds.length !== sections.length) throw new TRPCError({ code: "BAD_REQUEST", message: "Section order does not match this page." }); for (let displayOrder = 0; displayOrder < input.sectionIds.length; displayOrder++) { const id = input.sectionIds[displayOrder]; await db.update(pageSections).set({ displayOrder }).where(and(eq(pageSections.id, id), eq(pageSections.pageId, page.id))); } return { success: true }; }),
@@ -104,6 +110,24 @@ export const websiteRouter = router({
     const versions = await db.select().from(pageVersions).where(and(eq(pageVersions.pageId, page.id), eq(pageVersions.businessId, input.businessId))).orderBy(asc(pageVersions.versionNumber));
     return { page, business, sections, versions, designConfig: versions.at(-1)?.designConfig ?? defaultDesignConfig, registry: sectionRegistry };
   }),
+  suggestRedesign: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), direction: z.string().trim().min(3).max(240).default("Make the presentation feel more distinctive while staying trustworthy.") })).mutation(async ({ ctx, input }) => {
+    const { db, business, page } = await ownedPage(input.businessId, ctx.user.id, ctx.user.role);
+    const latest = await db.select().from(pageVersions).where(eq(pageVersions.pageId, page.id)).orderBy(asc(pageVersions.versionNumber));
+    const current = latest.at(-1)?.designConfig ?? defaultDesignConfig;
+    const response = await invokeLLM({ messages: [{ role: "system", content: `You are a restrained website art director. Return only a presentation design configuration. Never invent or edit business facts, names, addresses, services, images, reviews, ratings, testimonials, prices, or claims. Allowed keys: ${safeDesignKeys.join(", ")}.` }, { role: "user", content: JSON.stringify({ category: business.categoryId, direction: input.direction, current }) }], response_format: { type: "json_schema", json_schema: { name: "safe_design_config", strict: true, schema: { type: "object", properties: Object.fromEntries(safeDesignKeys.map(key => [key, { type: "string" }])), required: [...safeDesignKeys], additionalProperties: false } } } });
+    const raw = response.choices?.[0]?.message?.content;
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : current;
+    const proposal = safeDesignSchema.parse({ ...defaultDesignConfig, ...parsed });
+    return { proposal, source: "ai_design_only", businessId: input.businessId };
+  }),
+  applyRedesign: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), designConfig: safeDesignSchema })).mutation(async ({ ctx, input }) => {
+    const { db, business, page } = await ownedPage(input.businessId, ctx.user.id, ctx.user.role);
+    const latest = await db.select().from(pageVersions).where(eq(pageVersions.pageId, page.id)).orderBy(asc(pageVersions.versionNumber));
+    await db.insert(pageVersions).values({ pageId: page.id, businessId: business.id, versionNumber: (latest.at(-1)?.versionNumber ?? 0) + 1, designConfig: input.designConfig, status: "draft", createdById: ctx.user.id });
+    return { success: true, businessId: input.businessId };
+  }),
+  rejectRedesign: protectedProcedure.input(z.object({ businessId: z.number().int().positive() })).mutation(async ({ ctx, input }) => { await ownedPage(input.businessId, ctx.user.id, ctx.user.role); return { success: true, rejected: true }; }),
+  submitForReview: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), note: z.string().max(500).optional() })).mutation(async ({ ctx, input }) => { const { db, business, page } = await ownedPage(input.businessId, ctx.user.id, ctx.user.role); const latest = await db.select().from(pageVersions).where(eq(pageVersions.pageId, page.id)).orderBy(asc(pageVersions.versionNumber)); const version = latest.at(-1); if (!version) throw new TRPCError({ code: "BAD_REQUEST", message: "Save a draft version before submitting for review." }); await db.update(businessPages).set({ status: "pending_review", publishedAt: null }).where(eq(businessPages.id, page.id)); await db.insert(pagePublishHistory).values({ pageId: page.id, businessId: business.id, versionId: version.id, action: "submit_review", performedById: ctx.user.id, reviewNote: input.note ?? null }); return { success: true, businessId: input.businessId, status: "pending_review" as const }; }),
   saveDraft: protectedProcedure.input(designInput).mutation(async ({ ctx, input }) => {
     const { db, business, page } = await ownedPage(input.businessId, ctx.user.id, ctx.user.role);
     const invalid = input.sections.some(section => !sectionRegistry.some(item => item.type === section.sectionType));

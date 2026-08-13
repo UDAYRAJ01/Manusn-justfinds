@@ -1,0 +1,1 @@
+ALTER TABLE `page_publish_history` MODIFY COLUMN `action` enum('publish','unpublish','restore','submit_review','approve','reject') NOT NULL;

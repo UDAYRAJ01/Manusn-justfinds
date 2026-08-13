@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultDesignConfig, sectionRegistry, websiteRouter } from "./website";
+import { defaultDesignConfig, safeDesignKeys, safeDesignSchema, sectionRegistry, websiteRouter } from "./website";
 
 describe("Phase 7 website builder contracts", () => {
   it("exposes the shared section registry without fabricated business content", () => {
@@ -19,8 +19,22 @@ describe("Phase 7 website builder contracts", () => {
     expect(Object.keys(defaultDesignConfig)).not.toContain("rating");
   });
 
-  it("exposes the owner-scoped draft and publishing procedure surface", () => {
-    expect(Object.keys(websiteRouter._def.procedures)).toEqual(expect.arrayContaining(["builder", "saveDraft", "publish", "unpublish", "restore", "duplicateOwnDesign", "track", "publicPage"]));
+  it("exposes the owner-scoped draft, publishing, and section-management procedure surface", () => {
+    expect(Object.keys(websiteRouter._def.procedures)).toEqual(expect.arrayContaining(["create", "builder", "versions", "reorder", "setSectionEnabled", "saveDraft", "submitForReview", "publish", "unpublish", "restore", "duplicateOwnDesign", "track", "publicPage"]));
+  });
+
+  it("exposes presentation-only AI and admin moderation contracts", () => {
+    expect(Object.keys(websiteRouter._def.procedures)).toEqual(expect.arrayContaining(["suggestRedesign", "applyRedesign", "rejectRedesign", "moderationQueue", "moderate", "templateLibrary"]));
+    expect(Object.keys(defaultDesignConfig)).not.toEqual(expect.arrayContaining(["businessName", "address", "serviceDescription", "reviewText", "rating", "testimonial"]));
+  });
+
+  it("accepts only presentation keys and rejects business facts", () => {
+    expect(safeDesignKeys).not.toContain("businessName");
+    expect(safeDesignKeys).not.toContain("address");
+    expect(safeDesignKeys).not.toContain("rating");
+    const result = safeDesignSchema.safeParse({ ...defaultDesignConfig, businessName: "Invented" });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data).not.toHaveProperty("businessName");
   });
 
   it("supports category-specific sections while retaining universal sections", () => {
