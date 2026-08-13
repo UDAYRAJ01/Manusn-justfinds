@@ -52,7 +52,14 @@ function faqSourceFields(item: { question: string; answer: string }, facts: Busi
 
 function normalizeGeneratedContent(type: AiContentType, data: GeneratedContent, facts: BusinessAiFacts): GeneratedContent {
   if (type !== "faq" || !data.faqs) return data;
-  return { ...data, faqs: data.faqs.map(item => ({ ...item, sourceFields: item.sourceFields?.length ? item.sourceFields : faqSourceFields(item, facts) })) };
+  const grounded = data.faqs
+    .map(item => ({
+      ...item,
+      sourceFields: item.sourceFields?.length ? item.sourceFields : faqSourceFields(item, facts),
+      status: "grounded" as const,
+    }))
+    .filter(item => item.question.trim().length > 0 && item.answer.trim().length > 0 && item.sourceFields.length > 0);
+  return { ...data, faqs: grounded.slice(0, 10) };
 }
 
 function similarity(left: string, right: string) {

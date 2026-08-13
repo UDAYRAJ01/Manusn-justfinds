@@ -22,7 +22,7 @@ const instructions: Record<PromptContentType, string> = {
   about_business: "Write a concise factual About section in 2 to 4 short paragraphs. Do not add claims absent from the facts.",
   seo_title: "Write one search-friendly page title in 55 characters or fewer.",
   meta_description: "Write one search snippet in 155 characters or fewer.",
-  faq: "Create up to 5 question-and-answer pairs. Use only facts present in the source facts; return an empty list when a question cannot be answered.",
+  faq: "Create exactly 10 question-and-answer pairs. Use only facts present in the source facts; omit any item that cannot be answered from the facts.",
   service_description: "Write a short factual description for the supplied service without adding pricing, guarantees, or unsupported outcomes.",
   category_description: "Write a category introduction that uses only the supplied taxonomy and location facts; do not name or imply any unsupplied businesses.",
   local_landing: "Write a local category landing introduction using only the supplied category, city, and locality facts. Do not invent market statistics or business claims.",

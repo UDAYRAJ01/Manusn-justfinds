@@ -90,7 +90,7 @@
 - [x] Build a business-context assembler that passes only fields that actually exist for a business and never infers unsupported facts.
 - [x] Generate the ten AI content types as separately stored, individually versioned items with DRAFT, PENDING_REVIEW, APPROVED, PUBLISHED, and REJECTED states.
 - [x] Implement the AI validation pipeline: format checks, business-fact grounding, duplicate/similarity detection, banned superlative and unsupported-claim detection, and REVIEW_REQUIRED flagging.
-- [ ] Implement and test persisted FAQ generation that stores exactly ten grounded FAQs with question, answer, sourceFieldsUsed, and status, while omitting ungrounded entries.
+- [x] Implement and test persisted FAQ generation that stores exactly ten grounded FAQs with question, answer, sourceFieldsUsed, and status, while omitting ungrounded entries.
 - [x] Implement the asynchronous AI generation queue with QUEUED, PROCESSING, COMPLETED, FAILED, RETRYING, and CANCELLED states and real progress reporting.
 - [x] Implement admin bulk AI generation that enqueues background jobs for large business selections instead of generating inside one request.
 - [x] Track AI usage per generation and surface today/month/failed/pending counts, stating "Cost data unavailable from provider." when the provider returns no cost.
