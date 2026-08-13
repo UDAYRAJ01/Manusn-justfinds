@@ -26,30 +26,38 @@
 - [x] Business switcher data isolation tests
 
 ## Frontend (/business/*)
-- [ ] /business entry: Grow-your-business CTA or My Businesses cards
+- [x] /business entry: Grow-your-business CTA or My Businesses cards
 - [ ] Guided 10-step onboarding with progress, autosave, resume
 - [ ] Find/claim existing business flow
 - [ ] Dashboard overview: business switcher, status banner, completeness, real analytics
 - [ ] Profile editor (category-aware dynamic fields), location picker with map
 - [ ] Hours editor (multi-interval, copy actions, OPEN NOW preview) + special hours
-- [ ] Services, Facilities, Items (menu/products/rooms), Photos managers
-- [ ] Reviews respond/report, Leads inbox + detail, Offers manager
+- [x] Services, Facilities, Items (menu/products/rooms), Photos managers
+- [x] Reviews respond/report, Leads inbox + detail, Offers manager
 - [ ] AI Content studio, SEO settings, Certificate, QR code, Notifications, Settings
 - [ ] Preview listing (desktop/mobile), public profile link, mobile dashboard polish
 
 ## Verification
 - [ ] Vitest: ownership isolation, claim workflow, hours validation, offers expiry
 - [x] pnpm check + pnpm test green
-- [ ] Screenshot key flows, checkpoint, deliver
+- [x] Screenshot key flows, checkpoint, deliver
 
 - [x] Preserve concurrent Phase 5 AI/content work while merging Phase 4 business-owner changes
 - [x] Resolve shared schema, migration metadata, router, and todo conflicts while preserving both branches
 - [x] Re-run checks and tests after the combined merge
-- [ ] Save a checkpoint containing the combined Phase 4 + Phase 5 project
+- [x] Save a checkpoint containing the combined Phase 4 + Phase 5 project
 - [x] Reconcile Drizzle migration metadata so both Phase 4 and Phase 5 migration histories are represented correctly
 - [x] Verify the merged schema/database state matches both branches and validate the combined migration chain
 - [x] Re-check shared-file merge outcomes after fixing migration metadata
-- [ ] Implement real storage-backed photo upload flow and test save/delete/reorder/cover/logo
-- [ ] Add router-level myBusinesses/businessDetail cross-owner isolation tests
-- [ ] Add behavior-level tests for storage upload, delete, reorder, cover, and logo photo flows
-- [ ] Add router-level myBusinesses ownership filtering test
+- [x] Implement real storage-backed photo upload flow and test save/delete/reorder/cover/logo
+- [x] Add router-level myBusinesses/businessDetail cross-owner isolation tests
+- [x] Add behavior-level tests for storage upload, delete, reorder, cover, and logo photo flows
+- [x] Add router-level myBusinesses ownership filtering test
+- [x] Strengthen myBusinesses isolation with mixed-owner mock data and an assertion that ctx.user.id is present in the Drizzle owner filter
+- [x] Replace the conditional canned myBusinesses mock with a faithful mixed-owner fake query that independently proves only ctx.user.id rows are returned
+- [x] Assert the captured where condition is specifically built from eq(businesses.ownerId, ctx.user.id), not merely checking that 901 appears in serialized SQL
+- [x] Register /business/:businessId/:tool routes so the implemented owner tool panels are reachable from the workspace
+- [x] Expose facilities, items, and photos in BusinessTools navigation and dashboard links
+- [x] Add frontend lead detail, status, and notes controls using existing owner-scoped procedures
+- [x] Add photo reorder controls matching the server reorder mutation
+- [x] Fresh checkpoint after final full-suite validation and expanded owner-flow screenshots
