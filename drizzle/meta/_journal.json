@@ -43,6 +43,13 @@
       "when": 1786631273298,
       "tag": "0005_add_missing_voice_audio_url",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1786641619418,
+      "tag": "0006_aspiring_whizzer",
+      "breakpoints": true
     }
   ]
 }

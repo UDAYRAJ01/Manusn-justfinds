@@ -3,6 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { aiRouter } from "./routers/ai";
+import { aiContentRouter } from "./routers/aiContent";
 import { discoveryRouter } from "./routers/discovery";
 import { jobsRouter } from "./routers/jobs";
 import { workspaceRouter } from "./routers/workspaces";
@@ -21,6 +22,7 @@ export const appRouter = router({
   jobs: jobsRouter,
   workspace: workspaceRouter,
   ai: aiRouter,
+  aiContent: aiContentRouter,
 });
 
 export type AppRouter = typeof appRouter;
