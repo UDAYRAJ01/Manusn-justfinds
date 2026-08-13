@@ -532,6 +532,7 @@ export const aiGenerationJobs = mysqlTable("ai_generation_jobs", {
   batchId: varchar("batchId", { length: 64 }),
   requestedById: int("requestedById").notNull().references(() => users.id),
   attempts: int("attempts").default(0).notNull(),
+  progressPercent: int("progressPercent").default(0).notNull(),
   maxAttempts: int("maxAttempts").default(3).notNull(),
   errorCategory: varchar("errorCategory", { length: 80 }),
   resultVersionId: int("resultVersionId").references(() => aiContentVersions.id),

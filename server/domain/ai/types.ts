@@ -13,7 +13,7 @@ export const aiContentTypes = [
 
 export type AiContentType = (typeof aiContentTypes)[number];
 
-export type FaqItem = { question: string; answer: string };
+export type FaqItem = { question: string; answer: string; sourceFields?: string[] };
 
 export type GeneratedContent = {
   text?: string;

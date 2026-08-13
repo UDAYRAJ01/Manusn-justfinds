@@ -17,15 +17,24 @@ export function calculateRecommendationScore(signals: RecommendationSignals, wei
   return clamp(weighted / totalWeight);
 }
 
-export function calculateReputationScore(input: { averageRating: number | null; reviewCount: number; isVerified: boolean; profileCompleteness: number; freshnessDays: number; legitimateInteractionCount: number }) {
+export function calculateReputationScore(input: { averageRating: number | null; reviewCount: number; isVerified: boolean; profileCompleteness: number; freshnessDays: number; legitimateInteractionCount: number; createdAt?: Date | string | null }) {
   const ratingScore = input.averageRating === null ? 0 : clamp((input.averageRating / 5) * 55);
   const reviewDepthScore = clamp(Math.min(15, input.reviewCount * 3));
   const verificationScore = input.isVerified ? 15 : 0;
   const completenessScore = clamp(input.profileCompleteness * 0.1);
   const freshnessScore = input.freshnessDays <= 30 ? 10 : input.freshnessDays <= 90 ? 6 : input.freshnessDays <= 180 ? 3 : 0;
   const activityConfidence = input.legitimateInteractionCount > 0 ? 5 : 0;
+  
+  const createdTime = input.createdAt ? new Date(input.createdAt).getTime() : Date.now();
+  const ageDays = (Date.now() - createdTime) / (1000 * 60 * 60 * 24);
+  const isNew = ageDays < 30 && input.reviewCount === 0;
+
+  const score = clamp(ratingScore + reviewDepthScore + verificationScore + completenessScore + freshnessScore + activityConfidence);
+
   return {
-    score: clamp(ratingScore + reviewDepthScore + verificationScore + completenessScore + freshnessScore + activityConfidence),
+    score,
+    label: isNew ? "New on Just Finds" : `${score} / 100`,
+    isNew,
     factors: { ratingScore, reviewDepthScore, verificationScore, completenessScore, freshnessScore, activityConfidence },
   };
 }
@@ -45,7 +54,7 @@ function daysSince(date: Date | null | undefined) {
 export async function refreshBusinessScores(businessId: number, context?: { relevanceScore?: number; distanceScore?: number; availabilityScore?: number }) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
-  const businessRows = await db.select({ id: businesses.id, isVerified: businesses.isVerified, profileCompleteness: businesses.profileCompleteness, updatedAt: businesses.updatedAt, manualPriority: businesses.manualPriority, isFeatured: businesses.isFeatured }).from(businesses).where(eq(businesses.id, businessId)).limit(1);
+  const businessRows = await db.select({ id: businesses.id, isVerified: businesses.isVerified, profileCompleteness: businesses.profileCompleteness, createdAt: businesses.createdAt, updatedAt: businesses.updatedAt, manualPriority: businesses.manualPriority, isFeatured: businesses.isFeatured }).from(businesses).where(eq(businesses.id, businessId)).limit(1);
   const business = businessRows[0];
   if (!business) return undefined;
   const [reviewSummary, interactionSummary] = await Promise.all([
@@ -55,7 +64,7 @@ export async function refreshBusinessScores(businessId: number, context?: { rele
   const averageRating = reviewSummary[0]?.averageRating === null || reviewSummary[0]?.averageRating === undefined ? null : Number(reviewSummary[0].averageRating);
   const reviewCount = Number(reviewSummary[0]?.reviewCount ?? 0);
   const legitimateInteractionCount = Number(interactionSummary[0]?.interactionCount ?? 0);
-  const reputation = calculateReputationScore({ averageRating, reviewCount, isVerified: business.isVerified, profileCompleteness: business.profileCompleteness, freshnessDays: daysSince(business.updatedAt), legitimateInteractionCount });
+  const reputation = calculateReputationScore({ averageRating, reviewCount, isVerified: business.isVerified, profileCompleteness: business.profileCompleteness, freshnessDays: daysSince(business.updatedAt), legitimateInteractionCount, createdAt: business.createdAt });
   const signals: RecommendationSignals = {
     relevance: clamp(context?.relevanceScore ?? 0),
     distance: clamp(context?.distanceScore ?? 0),

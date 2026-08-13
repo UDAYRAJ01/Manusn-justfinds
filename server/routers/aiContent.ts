@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { and, eq } from "drizzle-orm";
 import { aiContentVersions, aiGenerationJobs, businesses } from "../../drizzle/schema";
 import { getBusinessAiFacts, getDb } from "../db";
-import { approveAiContentVersion, createAiDraftFromVersion, enqueueAiGenerationJob, getLatestAiContent, processAiGenerationJob, publishAiContentVersion, transitionAiContentVersion } from "../domain/ai/content";
+import { approveAiContentVersion, cancelAiGenerationJob, createAiDraftFromVersion, enqueueAiGenerationBatch, enqueueAiGenerationJob, getAiGenerationAnalytics, getAiGenerationProgress, getAiReviewQueue, getLatestAiContent, processAiGenerationJob, publishAiContentVersion, transitionAiContentVersion } from "../domain/ai/content";
 import { canManageBusiness, canModerate } from "../domain/permissions";
 import { protectedProcedure, router } from "../_core/trpc";
 import { z } from "zod";
@@ -29,6 +29,35 @@ export const aiContentRouter = router({
   preview: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), contentType: contentType.optional() })).query(async ({ ctx, input }) => {
     await getManagedBusiness(input.businessId, ctx.user.id, ctx.user.role);
     return getLatestAiContent(input.businessId, input.contentType);
+  }),
+  bulkGenerate: protectedProcedure.input(z.object({ businessIds: z.array(z.number().int().positive()).min(1).max(250), contentTypes: z.array(contentType).min(1).max(10) })).mutation(async ({ ctx, input }) => {
+    if (!canModerate(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "Administrator access is required for bulk AI generation." });
+    for (const businessId of input.businessIds) await getManagedBusiness(businessId, ctx.user.id, ctx.user.role);
+    const batchId = `bulk-${ctx.user.id}-${Date.now()}`;
+    return enqueueAiGenerationBatch({ ...input, requestedById: ctx.user.id, batchId });
+  }),
+  progress: protectedProcedure.input(z.object({ batchId: z.string().min(1).optional(), jobId: z.number().int().positive().optional() }).refine(input => Boolean(input.batchId) !== Boolean(input.jobId), "Provide exactly one batchId or jobId.")).query(async ({ ctx, input }) => {
+    const result = await getAiGenerationProgress(input);
+    for (const businessId of Array.from(new Set(result.jobs.map(job => job.businessId)))) await getManagedBusiness(businessId, ctx.user.id, ctx.user.role);
+    return result;
+  }),
+  cancelJob: protectedProcedure.input(z.object({ jobId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The AI workspace is temporarily unavailable." });
+    const rows = await db.select({ businessId: aiGenerationJobs.businessId, requestedById: aiGenerationJobs.requestedById }).from(aiGenerationJobs).where(eq(aiGenerationJobs.id, input.jobId)).limit(1);
+    const job = rows[0];
+    if (!job) throw new TRPCError({ code: "NOT_FOUND", message: "Generation job not found." });
+    if (job.requestedById !== ctx.user.id && !canModerate(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "You cannot cancel this generation job." });
+    await getManagedBusiness(job.businessId, ctx.user.id, ctx.user.role);
+    return { cancelled: await cancelAiGenerationJob(input.jobId) };
+  }),
+  analytics: protectedProcedure.query(async ({ ctx }) => {
+    if (!canModerate(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "Administrator access is required for AI analytics." });
+    return getAiGenerationAnalytics();
+  }),
+  reviewQueue: protectedProcedure.query(async ({ ctx }) => {
+    if (!canModerate(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "Administrator access is required for AI content review." });
+    return getAiReviewQueue();
   }),
   retryJob: protectedProcedure.input(z.object({ jobId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
