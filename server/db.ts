@@ -262,6 +262,59 @@ export async function getPublicBusinessByRoute(slug: string) {
   return { ...row, services, hours, fields, ai: ai[0] };
 }
 
+export async function getBusinessAiFacts(businessId: number, publicOnly = false) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const businessRows = await db
+    .select({
+      business: businesses,
+      category: { name: categories.name, slug: categories.slug },
+      city: { name: cities.name, slug: cities.slug },
+      locality: { name: localities.name },
+    })
+    .from(businesses)
+    .innerJoin(categories, eq(businesses.categoryId, categories.id))
+    .innerJoin(cities, eq(businesses.cityId, cities.id))
+    .leftJoin(localities, eq(businesses.localityId, localities.id))
+    .where(and(eq(businesses.id, businessId), ...(publicOnly ? [eq(businesses.status, "published")] : [])))
+    .limit(1);
+  const row = businessRows[0];
+  if (!row) return undefined;
+  const [services, hours, facilities, fields] = await Promise.all([
+    db.select({ name: businessServices.name, description: businessServices.description }).from(businessServices).where(eq(businessServices.businessId, businessId)).orderBy(businessServices.sortOrder),
+    db.select({ dayOfWeek: businessHours.dayOfWeek, opensAt: businessHours.opensAt, closesAt: businessHours.closesAt, isClosed: businessHours.isClosed, isTwentyFourHours: businessHours.isTwentyFourHours }).from(businessHours).where(eq(businessHours.businessId, businessId)).orderBy(businessHours.dayOfWeek),
+    db.select({ name: businessFacilities.name, details: businessFacilities.details }).from(businessFacilities).where(eq(businessFacilities.businessId, businessId)).orderBy(businessFacilities.sortOrder),
+    db.select({ label: categoryFields.label, value: businessFieldValues.value }).from(businessFieldValues).innerJoin(categoryFields, eq(businessFieldValues.categoryFieldId, categoryFields.id)).where(eq(businessFieldValues.businessId, businessId)).orderBy(categoryFields.sortOrder),
+  ]);
+  return {
+    business: {
+      id: row.business.id,
+      name: row.business.name,
+      address: row.business.address,
+      postcode: row.business.postcode,
+      phone: row.business.phone,
+      whatsapp: row.business.whatsapp,
+      email: row.business.email,
+      website: row.business.website,
+      shortDescription: row.business.shortDescription,
+      approvedDescription: row.business.approvedDescription,
+      latitude: row.business.latitude,
+      longitude: row.business.longitude,
+      isVerified: row.business.isVerified,
+      status: row.business.status,
+      category: row.category.name,
+      categorySlug: row.category.slug,
+      city: row.city.name,
+      citySlug: row.city.slug,
+      locality: row.locality?.name ?? null,
+    },
+    services,
+    hours,
+    facilities,
+    fields,
+  };
+}
+
 export async function getBusinessChatContext(businessId: number) {
   const db = await getDb();
   if (!db) return undefined;

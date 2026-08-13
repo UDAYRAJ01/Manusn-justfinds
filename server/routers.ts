@@ -4,6 +4,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { aiRouter } from "./routers/ai";
 import { businessRouter } from "./routers/business";
+import { aiContentRouter } from "./routers/aiContent";
 import { discoveryRouter } from "./routers/discovery";
 import { jobsRouter } from "./routers/jobs";
 import { workspaceRouter } from "./routers/workspaces";
@@ -23,6 +24,7 @@ export const appRouter = router({
   workspace: workspaceRouter,
   business: businessRouter,
   ai: aiRouter,
+  aiContent: aiContentRouter,
 });
 
 export type AppRouter = typeof appRouter;

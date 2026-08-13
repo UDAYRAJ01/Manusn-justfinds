@@ -14,6 +14,32 @@ import {
 export const userRoleValues = ["user", "business_owner", "admin", "super_admin"] as const;
 export const businessStatusValues = ["draft", "submitted", "under_review", "approved", "published", "rejected", "suspended"] as const;
 export const importStatusValues = ["pending", "processing", "completed", "failed"] as const;
+export const aiContentTypeValues = [
+  "short_description",
+  "about_business",
+  "seo_title",
+  "meta_description",
+  "faq",
+  "service_description",
+  "category_description",
+  "local_landing",
+  "business_highlights",
+  "cta_copy",
+] as const;
+export const aiContentStatusValues = ["draft", "pending_review", "approved", "published", "rejected"] as const;
+export const aiJobStatusValues = ["queued", "processing", "completed", "failed", "retrying", "cancelled"] as const;
+export const aiAuthorshipValues = ["ai_generated", "owner_edited", "admin_edited"] as const;
+export const knowledgeSourceValues = [
+  "profile",
+  "service",
+  "facility",
+  "hours",
+  "offer",
+  "faq",
+  "category_field",
+  "owner_content",
+  "ai_content",
+] as const;
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -467,3 +493,163 @@ export const ownerNotificationPrefs = mysqlTable("owner_notification_prefs", {
 }, table => [uniqueIndex("owner_notification_prefs_user_uidx").on(table.userId)]);
 
 export type Business = typeof businesses.$inferSelect;
+
+export const aiContentVersions = mysqlTable("ai_content_versions", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  contentType: mysqlEnum("contentType", aiContentTypeValues).notNull(),
+  version: int("version").default(1).notNull(),
+  content: text("content").notNull(),
+  structured: json("structured"),
+  sourceFields: json("sourceFields"),
+  validationFlags: json("validationFlags"),
+  reviewRequired: boolean("reviewRequired").default(false).notNull(),
+  status: mysqlEnum("status", aiContentStatusValues).default("draft").notNull(),
+  authorship: mysqlEnum("authorship", aiAuthorshipValues).default("ai_generated").notNull(),
+  provider: varchar("provider", { length: 80 }),
+  model: varchar("model", { length: 120 }),
+  promptTemplate: varchar("promptTemplate", { length: 80 }),
+  promptVersion: int("promptVersion").default(1).notNull(),
+  contentHash: varchar("contentHash", { length: 128 }),
+  generatedById: int("generatedById").references(() => users.id),
+  reviewedById: int("reviewedById").references(() => users.id),
+  reviewNote: text("reviewNote"),
+  generatedAt: timestamp("generatedAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  publishedAt: timestamp("publishedAt"),
+}, table => [
+  uniqueIndex("ai_content_version_uidx").on(table.businessId, table.contentType, table.version),
+  index("ai_content_business_type_status_idx").on(table.businessId, table.contentType, table.status),
+  index("ai_content_review_idx").on(table.status, table.reviewRequired),
+  index("ai_content_hash_idx").on(table.contentType, table.contentHash),
+]);
+
+export const aiGenerationJobs = mysqlTable("ai_generation_jobs", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  contentType: mysqlEnum("contentType", aiContentTypeValues).notNull(),
+  status: mysqlEnum("status", aiJobStatusValues).default("queued").notNull(),
+  batchId: varchar("batchId", { length: 64 }),
+  requestedById: int("requestedById").notNull().references(() => users.id),
+  attempts: int("attempts").default(0).notNull(),
+  maxAttempts: int("maxAttempts").default(3).notNull(),
+  errorCategory: varchar("errorCategory", { length: 80 }),
+  resultVersionId: int("resultVersionId").references(() => aiContentVersions.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  startedAt: timestamp("startedAt"),
+  finishedAt: timestamp("finishedAt"),
+}, table => [
+  index("ai_job_status_created_idx").on(table.status, table.createdAt),
+  index("ai_job_business_idx").on(table.businessId, table.status),
+  index("ai_job_batch_idx").on(table.batchId, table.status),
+]);
+
+export const aiUsageEvents = mysqlTable("ai_usage_events", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").references(() => businesses.id),
+  jobId: int("jobId").references(() => aiGenerationJobs.id),
+  generationType: varchar("generationType", { length: 80 }).notNull(),
+  provider: varchar("provider", { length: 80 }),
+  model: varchar("model", { length: 120 }),
+  promptTokens: int("promptTokens"),
+  completionTokens: int("completionTokens"),
+  totalTokens: int("totalTokens"),
+  estimatedCostMicros: int("estimatedCostMicros"),
+  costAvailable: boolean("costAvailable").default(false).notNull(),
+  succeeded: boolean("succeeded").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  index("ai_usage_created_idx").on(table.createdAt),
+  index("ai_usage_business_idx").on(table.businessId, table.createdAt),
+]);
+
+export const businessKnowledgeItems = mysqlTable("business_knowledge_items", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  sourceType: mysqlEnum("sourceType", knowledgeSourceValues).notNull(),
+  sourceId: int("sourceId"),
+  label: varchar("label", { length: 200 }).notNull(),
+  content: text("content").notNull(),
+  status: mysqlEnum("status", ["active", "stale", "disabled"]).default("active").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("knowledge_scope_uidx").on(table.businessId, table.sourceType, table.label),
+  index("knowledge_business_status_idx").on(table.businessId, table.status),
+]);
+
+export const businessChatSessions = mysqlTable("business_chat_sessions", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  sessionId: varchar("sessionId", { length: 64 }).notNull(),
+  userId: int("userId").references(() => users.id),
+  messageCount: int("messageCount").default(0).notNull(),
+  unansweredCount: int("unansweredCount").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  lastMessageAt: timestamp("lastMessageAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("chat_session_uidx").on(table.businessId, table.sessionId),
+  index("chat_session_business_idx").on(table.businessId, table.lastMessageAt),
+]);
+
+export const businessChatMessages = mysqlTable("business_chat_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  sessionId: varchar("sessionId", { length: 64 }).notNull(),
+  role: mysqlEnum("role", ["user", "assistant"]).notNull(),
+  message: text("message").notNull(),
+  answered: boolean("answered").default(true).notNull(),
+  knowledgeItemIds: json("knowledgeItemIds"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  index("chat_message_scope_idx").on(table.businessId, table.sessionId, table.createdAt),
+]);
+
+export const businessUnansweredQuestions = mysqlTable("business_unanswered_questions", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  question: varchar("question", { length: 400 }).notNull(),
+  questionHash: varchar("questionHash", { length: 128 }).notNull(),
+  askCount: int("askCount").default(1).notNull(),
+  status: mysqlEnum("status", ["open", "resolved", "dismissed"]).default("open").notNull(),
+  resolutionNote: text("resolutionNote"),
+  firstAskedAt: timestamp("firstAskedAt").defaultNow().notNull(),
+  lastAskedAt: timestamp("lastAskedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("unanswered_scope_uidx").on(table.businessId, table.questionHash),
+  index("unanswered_business_status_idx").on(table.businessId, table.status, table.askCount),
+]);
+
+export const recommendationWeights = mysqlTable("recommendation_weights", {
+  id: int("id").autoincrement().primaryKey(),
+  signalKey: varchar("signalKey", { length: 60 }).notNull().unique(),
+  label: varchar("label", { length: 120 }).notNull(),
+  weightPercent: int("weightPercent").default(0).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  updatedById: int("updatedById").references(() => users.id),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const businessRecommendationSignals = mysqlTable("business_recommendation_signals", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  relevanceScore: int("relevanceScore").default(0).notNull(),
+  distanceScore: int("distanceScore").default(0).notNull(),
+  ratingScore: int("ratingScore").default(0).notNull(),
+  reviewScore: int("reviewScore").default(0).notNull(),
+  completenessScore: int("completenessScore").default(0).notNull(),
+  verificationScore: int("verificationScore").default(0).notNull(),
+  activityScore: int("activityScore").default(0).notNull(),
+  availabilityScore: int("availabilityScore").default(0).notNull(),
+  freshnessScore: int("freshnessScore").default(0).notNull(),
+  manualPriorityScore: int("manualPriorityScore").default(0).notNull(),
+  featuredScore: int("featuredScore").default(0).notNull(),
+  recommendationScore: int("recommendationScore").default(0).notNull(),
+  calculatedAt: timestamp("calculatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("recommendation_signal_business_uidx").on(table.businessId),
+  index("recommendation_signal_score_idx").on(table.recommendationScore),
+]);
+
+export type AiContentVersion = typeof aiContentVersions.$inferSelect;
+export type AiGenerationJob = typeof aiGenerationJobs.$inferSelect;
+export type BusinessKnowledgeItem = typeof businessKnowledgeItems.$inferSelect;
