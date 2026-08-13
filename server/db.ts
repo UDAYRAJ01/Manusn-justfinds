@@ -1,4 +1,4 @@
-import { and, count, desc, eq, like, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNotNull, like, ne, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   businessAiContent,
@@ -13,6 +13,8 @@ import {
   InsertUser,
   jobs,
   localities,
+  searchInteractions,
+  searchLogs,
   subcategories,
   users,
 } from "../drizzle/schema";
@@ -68,6 +70,40 @@ export async function getActiveCities() {
   return db.select().from(cities).where(eq(cities.isActive, true)).orderBy(cities.name);
 }
 
+export async function getPublicCategoryBySlug(slug: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(categories).where(and(eq(categories.slug, slug), eq(categories.isActive, true))).limit(1);
+  return result[0];
+}
+
+export async function getPublicSubcategories(categorySlug: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({ id: subcategories.id, name: subcategories.name, slug: subcategories.slug, description: subcategories.description, icon: subcategories.icon })
+    .from(subcategories)
+    .innerJoin(categories, eq(subcategories.categoryId, categories.id))
+    .where(and(eq(categories.slug, categorySlug), eq(categories.isActive, true), eq(subcategories.isActive, true)))
+    .orderBy(subcategories.sortOrder, subcategories.name);
+}
+
+export async function getPublicCityBySlug(slug: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(cities).where(and(eq(cities.slug, slug), eq(cities.isActive, true))).limit(1);
+  return result[0];
+}
+
+export async function getPublicLocalities(citySlug: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({ id: localities.id, name: localities.name, slug: localities.slug, latitude: localities.latitude, longitude: localities.longitude })
+    .from(localities)
+    .innerJoin(cities, eq(localities.cityId, cities.id))
+    .where(and(eq(cities.slug, citySlug), eq(cities.isActive, true)))
+    .orderBy(localities.name);
+}
+
 export async function getPublicCategoryFields(categoryId: number) {
   const db = await getDb();
   if (!db) return [];
@@ -112,6 +148,79 @@ export async function getPublicBusinesses(query?: string, citySlug?: string) {
     .where(and(...conditions))
     .orderBy(desc(businesses.manualPriority), desc(businesses.recommendationScore))
     .limit(120);
+}
+
+export type PublicSearchInput = {
+  query?: string;
+  citySlug?: string;
+  localitySlug?: string;
+  categorySlug?: string;
+  subcategorySlug?: string;
+  verified?: boolean;
+  latitude?: number;
+  longitude?: number;
+  sort?: "nearby" | "rating" | "recommended";
+  offset: number;
+  limit: number;
+  includeTotal?: boolean;
+};
+
+export async function getPublicSearchPage(input: PublicSearchInput) {
+  const db = await getDb();
+  if (!db) return { items: [], nextOffset: null, total: input.includeTotal ? 0 : null };
+
+  const conditions = [eq(businesses.status, "published")];
+  const term = input.query?.trim();
+  if (term) {
+    const pattern = `%${term}%`;
+    conditions.push(or(like(businesses.name, pattern), like(businesses.shortDescription, pattern), like(categories.name, pattern), like(subcategories.name, pattern))!);
+  }
+  if (input.citySlug) conditions.push(eq(cities.slug, input.citySlug));
+  if (input.localitySlug) conditions.push(eq(localities.slug, input.localitySlug));
+  if (input.categorySlug) conditions.push(eq(categories.slug, input.categorySlug));
+  if (input.subcategorySlug) conditions.push(eq(subcategories.slug, input.subcategorySlug));
+  if (input.verified) conditions.push(eq(businesses.isVerified, true));
+
+  const hasCoordinates = input.latitude !== undefined && input.longitude !== undefined;
+  const validCoordinates = and(isNotNull(businesses.latitude), isNotNull(businesses.longitude), ne(businesses.latitude, ""), ne(businesses.longitude, ""));
+  if (hasCoordinates && input.sort === "nearby") conditions.push(validCoordinates!);
+
+  const distanceKm = hasCoordinates
+    ? sql<number>`6371 * acos(least(1, greatest(-1, cos(radians(${input.latitude})) * cos(radians(cast(${businesses.latitude} as decimal(10,7)))) * cos(radians(cast(${businesses.longitude} as decimal(10,7))) - radians(${input.longitude})) + sin(radians(${input.latitude})) * sin(radians(cast(${businesses.latitude} as decimal(10,7)))))))`
+    : sql<number | null>`null`;
+  const ordering = input.sort === "nearby" && hasCoordinates
+    ? [asc(distanceKm), desc(businesses.manualPriority), desc(businesses.recommendationScore)]
+    : input.sort === "rating"
+      ? [desc(businesses.reputationScore), desc(businesses.manualPriority), desc(businesses.recommendationScore)]
+      : [desc(businesses.manualPriority), desc(businesses.recommendationScore), desc(businesses.reputationScore)];
+
+  const [rows, countRows] = await Promise.all([
+    db.select({ id: businesses.id, name: businesses.name, slug: businesses.slug, shortDescription: businesses.shortDescription, address: businesses.address, phone: businesses.phone, whatsapp: businesses.whatsapp, website: businesses.website, latitude: businesses.latitude, longitude: businesses.longitude, isVerified: businesses.isVerified, profileCompleteness: businesses.profileCompleteness, recommendationScore: businesses.recommendationScore, reputationScore: businesses.reputationScore, category: categories.name, categorySlug: categories.slug, subcategory: subcategories.name, subcategorySlug: subcategories.slug, city: cities.name, citySlug: cities.slug, locality: localities.name, localitySlug: localities.slug, distanceKm }).from(businesses)
+      .innerJoin(categories, eq(businesses.categoryId, categories.id)).innerJoin(cities, eq(businesses.cityId, cities.id)).leftJoin(subcategories, eq(businesses.subcategoryId, subcategories.id)).leftJoin(localities, eq(businesses.localityId, localities.id))
+      .where(and(...conditions)).orderBy(...ordering).limit(input.limit + 1).offset(input.offset),
+    input.includeTotal
+      ? db.select({ value: count() }).from(businesses).innerJoin(categories, eq(businesses.categoryId, categories.id)).innerJoin(cities, eq(businesses.cityId, cities.id)).leftJoin(subcategories, eq(businesses.subcategoryId, subcategories.id)).leftJoin(localities, eq(businesses.localityId, localities.id)).where(and(...conditions))
+      : Promise.resolve([]),
+  ]);
+
+  const hasMore = rows.length > input.limit;
+  return { items: rows.slice(0, input.limit), nextOffset: hasMore ? input.offset + input.limit : null, total: input.includeTotal ? Number(countRows[0]?.value ?? 0) : null };
+}
+
+export async function logPublicSearch(input: { userId?: number; query: string; categoryId?: number; subcategoryId?: number; cityId?: number; localityId?: number; latitude?: number; longitude?: number; intent: "standard" | "nearby" | "recommended"; sessionId?: string; resultCount: number }) {
+  const db = await getDb();
+  if (!db) return;
+  const telemetry = { userId: input.userId, query: input.query.slice(0, 300), categoryId: input.categoryId, subcategoryId: input.subcategoryId, cityId: input.cityId, localityId: input.localityId, latitude: input.latitude?.toString(), longitude: input.longitude?.toString(), intent: input.intent, sessionId: input.sessionId?.slice(0, 64), resultCount: input.resultCount };
+  await Promise.all([
+    db.insert(searchLogs).values(telemetry),
+    db.insert(searchInteractions).values({ userId: input.userId, action: "search", query: telemetry.query, sessionId: telemetry.sessionId }),
+  ]);
+}
+
+export async function logPublicInteraction(input: { userId?: number; businessId: number; action: "click" | "call" | "whatsapp" | "directions" | "website" | "save" | "inquiry"; query?: string; sessionId?: string }) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(searchInteractions).values({ userId: input.userId, businessId: input.businessId, action: input.action, query: input.query?.slice(0, 300), sessionId: input.sessionId?.slice(0, 64) });
 }
 
 export async function getPublicBusinessByRoute(slug: string) {

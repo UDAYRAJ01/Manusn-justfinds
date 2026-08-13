@@ -234,8 +234,9 @@ export const searchInteractions = mysqlTable("search_interactions", {
   businessId: int("businessId").references(() => businesses.id),
   action: mysqlEnum("action", ["search", "impression", "click", "call", "whatsapp", "directions", "website", "save", "inquiry"]).notNull(),
   query: varchar("query", { length: 300 }),
+  sessionId: varchar("sessionId", { length: 64 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-}, table => [index("interaction_business_action_idx").on(table.businessId, table.action), index("interaction_user_idx").on(table.userId, table.createdAt)]);
+}, table => [index("interaction_business_action_idx").on(table.businessId, table.action), index("interaction_user_idx").on(table.userId, table.createdAt), index("interaction_session_idx").on(table.sessionId, table.createdAt)]);
 
 export const jobs = mysqlTable("jobs", {
   id: int("id").autoincrement().primaryKey(),
@@ -346,12 +347,17 @@ export const searchLogs = mysqlTable("search_logs", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").references(() => users.id),
   query: varchar("query", { length: 300 }).notNull(),
+  categoryId: int("categoryId").references(() => categories.id),
+  subcategoryId: int("subcategoryId").references(() => subcategories.id),
   cityId: int("cityId").references(() => cities.id),
+  localityId: int("localityId").references(() => localities.id),
   latitude: varchar("latitude", { length: 24 }),
   longitude: varchar("longitude", { length: 24 }),
+  intent: varchar("intent", { length: 32 }).notNull().default("standard"),
+  sessionId: varchar("sessionId", { length: 64 }),
   resultCount: int("resultCount").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-}, table => [index("search_log_query_idx").on(table.query, table.createdAt), index("search_log_user_idx").on(table.userId, table.createdAt)]);
+}, table => [index("search_log_query_idx").on(table.query, table.createdAt), index("search_log_user_idx").on(table.userId, table.createdAt), index("search_log_session_idx").on(table.sessionId, table.createdAt)]);
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;

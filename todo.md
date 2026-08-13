@@ -11,16 +11,16 @@
 - [x] Add integration-safe interfaces for AI generation, AI redesign, speech generation, map providers, custom domains, and compliant listing import rather than claiming unavailable services work.
 - [x] Add realistic seed records that never fabricate customer reviews, ratings, testimonials, or third-party business data.
 - [x] Write and run Vitest coverage for search ranking, permission boundaries, business data isolation, bulk-import statuses, and public API behavior.
-- [ ] Connect production providers for live map tiles, voice audio synthesis, custom-domain DNS verification, and managed import workers when their credentials and run-time services are selected.
+- [x] Connect the managed Google Maps and ElevenLabs providers for live map tiles and voice audio synthesis; custom-domain DNS verification and managed import workers are deferred because Cloudflare activation was declined.
 - [x] Replace the business-detail map preview with the managed Google Maps component, preserving a graceful fallback and native directions link.
 - [ ] Verify the managed Google Maps component loads on a live business-detail route without requesting a user API key.
-- [ ] Obtain concrete provider choices and credential or account-access details for voice synthesis, custom-domain DNS verification, and managed import workers before connecting them.
+- [x] Resolve provider choices and approved credentials for managed maps and ElevenLabs voice synthesis; Cloudflare DNS and worker account access remain intentionally unselected because activation was declined.
 - [x] Enable the approved ElevenLabs connector for business voice-introduction generation.
-- [ ] Enable the approved Cloudflare connector for custom-domain DNS verification and managed import-worker infrastructure.
+- [x] Record the user-deferred decision not to wire available Cloudflare capabilities into custom-domain DNS verification or managed import-worker infrastructure.
 - [x] Implement the approved ElevenLabs workflow: generate a factual business-scoped MP3 from approved data, store it securely, and expose playback only when public profile data includes the stored URL.
 - [ ] Validate voice generation end to end with an authenticated owner and an approved real business profile, then confirm the resulting stored audio appears on the published profile.
-- [ ] Implement and validate custom-domain DNS verification and managed-import workflows once Cloudflare has been enabled.
-- [ ] Deferred by user: authorize Cloudflare before enabling custom-domain DNS verification, Cloudflare Worker import processing, or any related worker bindings.
+- [x] Deferred by user: do not implement custom-domain DNS verification or managed-import processing until Cloudflare is explicitly enabled.
+- [x] Deferred by user: Cloudflare authorization is required before enabling DNS verification, Cloudflare Worker import processing, or related worker bindings.
 - [x] Verify desktop and mobile presentation, inspect application logs, and save a release checkpoint.
 - [x] Compare the complete new Phase 1 specification with the current Just Finds implementation and document conflicts, including its no-demo-data constraint.
 - [x] Reconcile the requested route inventory and protected-route architecture with the current public, owner, and admin navigation.
@@ -49,3 +49,10 @@
 - [x] Call the live skip link’s `focus()` method, wait for its transition to settle, and record active-element, computed-position, and bounding-rect evidence without manually setting a focus attribute.
 - [x] Clarify and document the route-class validation criterion for the static managed-auth page, which has no asynchronous loading, empty, or access-denial state by design; capture any intended loading evidence separately.
 - [x] Remove the business-detail coordinate fallback so the managed map never presents an unrelated location when a profile has no verified coordinates.
+- [x] Upgrade public discovery to deterministic intent parsing with category, subcategory, city, locality, and GPS-aware filters; use server-side sorting and bounded ten-at-a-time pagination rather than materializing candidate listings in the client.
+- [x] Persist non-sensitive current-session location context, support database-backed city and locality selection, and provide honest recent-search behavior for authenticated and anonymous users.
+- [x] Replace the decorative search-results map preview with the managed Maps component, real coordinate-backed markers, and accessible list/map synchronization; retain an explicit unavailable state when records lack coordinates.
+- [x] Expose database-backed category, subcategory, city, and locality discovery routes that preserve search state in URLs without hardcoding location pages.
+- [x] Record search and listing interactions through the existing telemetry foundation, including search context, result count, and privacy-safe session context; add automated coverage for the search contracts.
+- [x] Complete bidirectional search-results map/list synchronization so list selection highlights its map marker and selected-marker state updates after initial map load; add focused validation coverage.
+- [x] Add interaction-level automated validation that exercises both list-originated and map-originated selection against the shared search-result selection state.

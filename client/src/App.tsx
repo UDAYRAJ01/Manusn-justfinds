@@ -8,6 +8,7 @@ import AdminWorkspace from "./pages/AdminWorkspace";
 import AuthEntry from "./pages/AuthEntry";
 import BusinessDetail from "./pages/BusinessDetail";
 import Categories from "./pages/Categories";
+import { CategoryLanding, CityLanding } from "./pages/DiscoveryLanding";
 import Home from "./pages/Home";
 import Jobs from "./pages/Jobs";
 import NotFound from "./pages/NotFound";
@@ -20,6 +21,10 @@ function Router() {
     <Route path="/" component={Home} />
     <Route path="/search" component={SearchResults} />
     <Route path="/categories" component={Categories} />
+    <Route path="/category/:category/:subcategory" component={CategoryLanding} />
+    <Route path="/category/:category" component={CategoryLanding} />
+    <Route path="/city/:city/:locality" component={CityLanding} />
+    <Route path="/city/:city" component={CityLanding} />
     <Route path="/login" component={AuthEntry} />
     <Route path="/signup" component={AuthEntry} />
     <Route path="/forgot-password" component={AuthEntry} />
