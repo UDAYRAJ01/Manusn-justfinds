@@ -30,16 +30,20 @@ export const notificationRouter = router({
     }),
 
   unreadCount: protectedProcedure.query(async ({ ctx }) => {
-    const db = await getDb();
-    if (!db) return { count: 0 };
-    const userId = ctx.user.id;
+    try {
+      const db = await getDb();
+      if (!db) return { count: 0 };
+      const userId = ctx.user.id;
 
-    const [res] = await db
-      .select({ count: count() })
-      .from(notifications)
-      .where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
+      const [res] = await db
+        .select({ count: count() })
+        .from(notifications)
+        .where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
 
-    return { count: res?.count ?? 0 };
+      return { count: res?.count ?? 0 };
+    } catch {
+      return { count: 0 };
+    }
   }),
 
   markAsRead: protectedProcedure
