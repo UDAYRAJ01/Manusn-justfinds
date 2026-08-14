@@ -121,3 +121,7 @@
 
 - [x] Add router-level regression coverage proving createDraft/createBusiness generate `-2` and later suffixes for occupied slugs
 - [x] Handle slug-collision exhaustion explicitly and test the resulting clear error path
+
+- [x] Normalize category slugs from category names, converting spaces/underscores to hyphens and lowercasing
+- [x] Apply category slug normalization consistently in the supported category-create UI and server validation
+- [x] Add focused category-create regression coverage for `dental_clinic` -> `dental-clinic` and invalid normalized slugs

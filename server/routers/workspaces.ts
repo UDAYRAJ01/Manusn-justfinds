@@ -7,6 +7,7 @@ import { canManageAdmins, canManageBusiness, canModerate } from "../domain/permi
 import { buildVoiceIntroductionScript } from "../domain/voiceScript";
 import { storagePut } from "../storage";
 import { numberedSlug, preferredBusinessSlug } from "../domain/slug";
+import { normalizeCategorySlug } from "../domain/categorySlug";
 import { protectedProcedure, router } from "../_core/trpc";
 
 type JustFindsRole = "user" | "business_owner" | "admin" | "super_admin";
@@ -71,7 +72,7 @@ export const workspaceRouter = router({
     if (!deleted) throw new TRPCError({ code: "NOT_FOUND", message: "Only designated Just Finds internal test listings can be deleted here." });
     return { deleted: true };
   }),
-  createCategory: protectedProcedure.input(z.object({ name: z.string().min(2).max(100), slug: z.string().min(2).max(120).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/), description: z.string().max(1000).optional(), icon: z.string().min(1).max(100).default("Sparkles") })).mutation(async ({ ctx, input }) => {
+  createCategory: protectedProcedure.input(z.object({ name: z.string().min(2).max(100), slug: z.preprocess(value => typeof value === "string" ? normalizeCategorySlug(value) : value, z.string().min(2).max(120).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)), description: z.string().max(1000).optional(), icon: z.string().min(1).max(100).default("Sparkles") })).mutation(async ({ ctx, input }) => {
     requireSuperAdmin(ctx.user.role);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The category service is temporarily unavailable." });
