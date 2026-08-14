@@ -136,3 +136,10 @@
 - [x] Harden gallery fallback/media rendering and add focused regression coverage for public profile interactions.
 - [x] Run full Vitest and TypeScript validation, then capture desktop and mobile profile evidence before the Phase 6 checkpoint.
 - [x] Enforce explicit consent on public lead capture in both the profile form and server procedure.
+- [ ] Connect `/owner` and `/business` owner workflows so business context and navigation remain synchronized.
+- [ ] Add explicit navigation links from `/owner` to `/business/:businessId` and a clear "Back to Owner Overview" button in `/business`.
+- [ ] Verify route transitions and validate with automated tests.
+- [x] Connect `/owner` overview and `/business` management workspace with direct workspace links and synchronized business selection.
+- [x] Add clear back navigation and breadcrumbs between the portfolio dashboard and detailed `/business/:businessId/:tool` tools.
+- [x] Pass real business names to workspace tool headers for clear context.
+- [x] Run full regression test suite to ensure all 157+ automated tests pass cleanly.
