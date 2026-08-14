@@ -235,3 +235,11 @@
 - [x] Integrate imported drafts with existing onboarding, owner editing, AI content, preview, submit, and administrator approval workflows
 - [x] Add tests for authentication, server-secret isolation, external-ID duplicate detection, field mapping, and error handling
 - [x] Validate the desktop/mobile import route and secure official API contract without creating fabricated listings; live credential validation and automated official-place tests pass
+
+## Google category and About-field import prefill
+- [x] Inspect the official Places detail fields and current category/description import mapping
+- [x] Automatically map the official Google primary type into the matching Just Finds category when an approved mapping exists
+- [x] Prefill the editable About field from an available factual Google business description, without replacing owner edits
+- [x] Preserve clear source labels and an owner review/change option for both imported values
+- [x] Add focused category, description, and fallback-mapping regression coverage
+- [x] Validate responsive desktop/mobile import entry behavior and the editable review contract without creating fabricated listings; prepare the prefill enhancement for publishing

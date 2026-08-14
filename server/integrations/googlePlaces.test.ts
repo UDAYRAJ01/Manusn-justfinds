@@ -19,16 +19,25 @@ describe("official Google Places client", () => {
     expect(JSON.stringify(results)).not.toContain("server-only-test-key");
   });
 
-  it("maps only permitted factual detail fields and keeps ratings, reviews, and photos absent", async () => {
+  it("maps permitted factual fields plus an editorial About prefill while keeping ratings, reviews, and photos absent", async () => {
     vi.stubEnv("GOOGLE_PLACES_API_KEY", "server-only-test-key");
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "ChIJ123", displayName: { text: "Vishnoi Face Hospital" }, formattedAddress: "Kanpur, Uttar Pradesh", primaryType: "hospital", nationalPhoneNumber: "+91 512 123 4567", websiteUri: "https://example.test", location: { latitude: 26.4499, longitude: 80.3319 }, regularOpeningHours: { weekdayDescriptions: ["Monday: 09:00 – 17:00"], periods: [{ open: { day: 1, hour: 9, minute: 0 }, close: { day: 1, hour: 17, minute: 0 } }] }, rating: 4.9, reviews: [{ text: "Do not import" }], photos: [{ name: "Do not import" }] }), { status: 200 })));
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "ChIJ123", displayName: { text: "Vishnoi Face Hospital" }, formattedAddress: "Kanpur, Uttar Pradesh", primaryType: "hospital", nationalPhoneNumber: "+91 512 123 4567", websiteUri: "https://example.test", editorialSummary: { text: "Specialist facial healthcare clinic." }, location: { latitude: 26.4499, longitude: 80.3319 }, regularOpeningHours: { weekdayDescriptions: ["Monday: 09:00 – 17:00"], periods: [{ open: { day: 1, hour: 9, minute: 0 }, close: { day: 1, hour: 17, minute: 0 } }] }, rating: 4.9, reviews: [{ text: "Do not import" }], photos: [{ name: "Do not import" }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
 
     const detail = await getOfficialPlaceDetail("ChIJ123", "a1b2c3d4e5f6");
 
-    expect(detail).toMatchObject({ placeId: "ChIJ123", displayName: "Vishnoi Face Hospital", phone: "+91 512 123 4567", website: "https://example.test", latitude: "26.4499", longitude: "80.3319" });
+    expect(detail).toMatchObject({ placeId: "ChIJ123", displayName: "Vishnoi Face Hospital", primaryType: "hospital", aboutDescription: "Specialist facial healthcare clinic.", phone: "+91 512 123 4567", website: "https://example.test", latitude: "26.4499", longitude: "80.3319" });
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/v1/places/ChIJ123"), expect.objectContaining({ headers: expect.objectContaining({ "X-Goog-FieldMask": expect.stringContaining("editorialSummary") }) }));
     expect(detail).not.toHaveProperty("rating");
     expect(detail).not.toHaveProperty("reviews");
     expect(detail).not.toHaveProperty("photos");
+  });
+
+  it("leaves the editable About prefill empty when Google does not provide an editorial summary", async () => {
+    vi.stubEnv("GOOGLE_PLACES_API_KEY", "server-only-test-key");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "ChIJ456", displayName: { text: "Kanpur Clinic" }, formattedAddress: "Kanpur", primaryType: "doctor" }), { status: 200 })));
+
+    await expect(getOfficialPlaceDetail("ChIJ456", "a1b2c3d4e5f6")).resolves.toMatchObject({ primaryType: "doctor", aboutDescription: null });
   });
 
   it("returns a safe retryable error when the official service rate-limits discovery", async () => {

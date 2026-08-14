@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 
 const BASE_URL = "https://places.googleapis.com/v1";
 const AUTOCOMPLETE_MASK = ["suggestions.placePrediction.placeId", "suggestions.placePrediction.text.text", "suggestions.placePrediction.structuredFormat.mainText.text", "suggestions.placePrediction.structuredFormat.secondaryText.text", "suggestions.placePrediction.types"].join(",");
-const DETAILS_MASK = ["id", "displayName", "formattedAddress", "addressComponents", "primaryType", "types", "nationalPhoneNumber", "internationalPhoneNumber", "websiteUri", "regularOpeningHours.weekdayDescriptions", "regularOpeningHours.periods", "location", "timeZone", "utcOffsetMinutes"].join(",");
+const DETAILS_MASK = ["id", "displayName", "formattedAddress", "addressComponents", "primaryType", "types", "nationalPhoneNumber", "internationalPhoneNumber", "websiteUri", "editorialSummary", "regularOpeningHours.weekdayDescriptions", "regularOpeningHours.periods", "location", "timeZone", "utcOffsetMinutes"].join(",");
 
 export type OfficialPlaceDetail = {
   placeId: string;
@@ -13,6 +13,7 @@ export type OfficialPlaceDetail = {
   types: string[];
   phone: string | null;
   website: string | null;
+  aboutDescription: string | null;
   weekdayDescriptions: string[];
   openingPeriods: unknown;
   latitude: string | null;
@@ -62,11 +63,13 @@ export async function getOfficialPlaceDetail(placeId: string, sessionToken?: str
   if (typeof place.id !== "string" || typeof displayName !== "string" || typeof place.formattedAddress !== "string") throw new TRPCError({ code: "NOT_FOUND", message: "That business place is no longer available. Please choose another result." });
   const location = place.location as { latitude?: unknown; longitude?: unknown } | undefined;
   const hours = place.regularOpeningHours as { weekdayDescriptions?: unknown; periods?: unknown } | undefined;
+  const editorialSummary = (place.editorialSummary as { text?: unknown } | undefined)?.text;
   return {
     placeId: place.id, displayName, formattedAddress: place.formattedAddress, addressComponents: place.addressComponents ?? [], primaryType: typeof place.primaryType === "string" ? place.primaryType : null,
     types: Array.isArray(place.types) ? place.types.filter((value): value is string => typeof value === "string") : [],
     phone: typeof place.nationalPhoneNumber === "string" ? place.nationalPhoneNumber : (typeof place.internationalPhoneNumber === "string" ? place.internationalPhoneNumber : null),
     website: typeof place.websiteUri === "string" ? place.websiteUri : null,
+    aboutDescription: typeof editorialSummary === "string" && editorialSummary.trim() ? editorialSummary.trim() : null,
     weekdayDescriptions: Array.isArray(hours?.weekdayDescriptions) ? hours.weekdayDescriptions.filter((value): value is string => typeof value === "string") : [],
     openingPeriods: hours?.periods ?? [], latitude: typeof location?.latitude === "number" ? String(location.latitude) : null, longitude: typeof location?.longitude === "number" ? String(location.longitude) : null,
     timeZone: typeof place.timeZone === "string" ? place.timeZone : null, utcOffsetMinutes: typeof place.utcOffsetMinutes === "number" ? place.utcOffsetMinutes : null,

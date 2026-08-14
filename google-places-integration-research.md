@@ -23,6 +23,12 @@ Text Search (New), `POST https://places.googleapis.com/v1/places:searchText`, is
 
 The explicit `/business/add/import` route must be registered before the generic `/business/:businessId/:tool` route. Without that ordering, the `add` path segment is parsed as a business identifier and the import screen renders an owner workspace with an invalid numeric ID. The route ordering was corrected and the official Google Places discovery interface was then visually verified at the intended URL. The screen exposes a business-name field, optional locality field, server-side credential disclosure notice, debounced and rate-limited search messaging, and a clear return path to manual listing creation.
 
+## 2026-08-15 category and About prefill
+
+Place Details (New) exposes `primaryType` for an official primary category and `editorialSummary` as an available detail field. The field mask must name each desired field explicitly, rather than use a wildcard. Just Finds uses `primaryType` only to select an existing approved mapping and uses `editorialSummary.text` only when the official response contains it. The resulting category and About value remain editable by the owner. The implementation does not request ratings, reviews, photos, or a generative summary.
+
+The protected `/business/add/import` entry route was also rendered at 1280×720 and 375×812 after the prefill enhancement. Both layouts preserve the official discovery heading, business-name field, optional locality field, server-side-credential notice, and return path to manual creation. The review form is reached only after a real official result is selected, so no fabricated business or import draft was created for visual validation.
+
 ## Official references
 
 1. [Autocomplete (New) — Google for Developers](https://developers.google.com/maps/documentation/places/web-service/place-autocomplete)
