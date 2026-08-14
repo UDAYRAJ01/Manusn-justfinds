@@ -52,6 +52,22 @@ describe("WebsiteBuilder section interactions", () => {
     await act(async () => { root.unmount(); });
     container.remove();
   });
+  it("marks the selected mobile preview mode and live canvas state", async () => {
+    (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => { root.render(<WebsiteBuilder businessId={5} />); });
+    const mobile = container.querySelector('button[aria-label="Show mobile preview"]') as HTMLButtonElement;
+    const desktop = container.querySelector('button[aria-label="Show desktop preview"]') as HTMLButtonElement;
+    expect(desktop.getAttribute("aria-pressed")).toBe("true");
+    expect(mobile.getAttribute("aria-pressed")).toBe("false");
+    await act(async () => { mobile.click(); });
+    expect(mobile.getAttribute("aria-pressed")).toBe("true");
+    expect(container.querySelector('[data-preview-mode="mobile"]')).toBeTruthy();
+    await act(async () => { root.unmount(); });
+    container.remove();
+  });
   it("selects a section without toggling it and exposes an explicit hide action", async () => {
     (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     const container = document.createElement("div");
