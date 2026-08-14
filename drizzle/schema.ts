@@ -753,3 +753,42 @@ export const domainVerificationRecords = mysqlTable("domain_verification_records
 });
 
 
+
+export const notificationTypes = [
+  "business",
+  "job",
+  "application",
+  "lead",
+  "review",
+  "verification",
+  "admin",
+  "system",
+] as const;
+
+export const notifications = mysqlTable("notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id),
+  type: mysqlEnum("type", notificationTypes).notNull().default("system"),
+  title: varchar("title", { length: 200 }).notNull(),
+  message: text("message").notNull(),
+  actionUrl: varchar("actionUrl", { length: 500 }),
+  isRead: boolean("isRead").default(false).notNull(),
+  readAt: timestamp("readAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  index("notification_user_read_idx").on(table.userId, table.isRead),
+  index("notification_created_idx").on(table.createdAt),
+]);
+
+export const userNotificationPreferences = mysqlTable("user_notification_preferences", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id).unique(),
+  inAppEnabled: boolean("inAppEnabled").default(true).notNull(),
+  emailEnabled: boolean("emailEnabled").default(true).notNull(),
+  whatsappEnabled: boolean("whatsappEnabled").default(false).notNull(),
+  notifyBusiness: boolean("notifyBusiness").default(true).notNull(),
+  notifyJobs: boolean("notifyJobs").default(true).notNull(),
+  notifyLeads: boolean("notifyLeads").default(true).notNull(),
+  notifyReviews: boolean("notifyReviews").default(true).notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});

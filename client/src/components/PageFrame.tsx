@@ -5,6 +5,7 @@ import { BriefcaseBusiness, Building2, Heart, Home, LayoutDashboard, MapPin, Men
 import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { JustFindsLogo } from "./JustFindsLogo";
+import { NotificationBell } from "./NotificationBell";
 
 const links = [
   { label: "Explore", href: "/search", icon: Search },
@@ -40,13 +41,17 @@ export function PageFrame({ children, className }: { children: React.ReactNode; 
             ))}
           </nav>
           <div className="hidden items-center gap-2 md:flex">
+            <NotificationBell />
             <Button asChild variant="ghost" className="text-slate-700 hover:text-slate-950"><Link href="/business">Manage a listing</Link></Button>
             {canAccessAdmin && <Button asChild variant="outline" className="rounded-xl bg-white"><Link href="/admin">Admin workspace</Link></Button>}
             {user ? <Button asChild className="rounded-xl bg-[#173d9c] px-4 shadow-[0_8px_16px_rgba(23,61,156,.18)] hover:bg-[#123587]"><Link href="/business">My listings</Link></Button> : <Button asChild className="rounded-xl bg-[#173d9c] px-4 shadow-[0_8px_16px_rgba(23,61,156,.18)] hover:bg-[#123587]"><Link href="/login">Sign in</Link></Button>}
           </div>
-          <button onClick={() => setMenuOpen(value => !value)} className="grid size-10 place-items-center rounded-xl text-slate-700 hover:bg-slate-100 md:hidden" aria-label="Open navigation menu" aria-expanded={menuOpen}>
-            {menuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
-          </button>
+          <div className="flex items-center gap-2 md:hidden">
+            <NotificationBell />
+            <button onClick={() => setMenuOpen(value => !value)} className="grid size-10 place-items-center rounded-xl text-slate-700 hover:bg-slate-100" aria-label="Open navigation menu" aria-expanded={menuOpen}>
+              {menuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+            </button>
+          </div>
         </div>
         {menuOpen && <div className="border-t border-slate-200 bg-[#fcfcfa] px-4 py-3 md:hidden">
           <div className="container grid gap-1 px-0">
