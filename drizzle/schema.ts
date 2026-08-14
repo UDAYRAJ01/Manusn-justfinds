@@ -233,13 +233,27 @@ export const businessLeads = mysqlTable("business_leads", {
   email: varchar("email", { length: 320 }),
   message: text("message"),
   source: varchar("source", { length: 100 }).notNull().default("business-page"),
+  sourceDetail: varchar("sourceDetail", { length: 240 }),
   page: varchar("page", { length: 500 }),
   consentGiven: boolean("consentGiven").default(false).notNull(),
   consentAt: timestamp("consentAt"),
   status: mysqlEnum("status", ["new", "contacted", "qualified", "converted", "closed"]).default("new").notNull(),
   notes: text("notes"),
+  assignedToId: int("assignedToId").references(() => users.id),
+  followUpAt: timestamp("followUpAt"),
+  lastContactedAt: timestamp("lastContactedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-}, table => [index("lead_business_status_idx").on(table.businessId, table.status)]);
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [index("lead_business_status_idx").on(table.businessId, table.status), index("lead_business_follow_up_idx").on(table.businessId, table.followUpAt), index("lead_assignee_idx").on(table.assignedToId, table.updatedAt)]);
+
+export const businessLeadNotes = mysqlTable("business_lead_notes", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  leadId: int("leadId").notNull().references(() => businessLeads.id),
+  authorId: int("authorId").notNull().references(() => users.id),
+  body: text("body").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [index("lead_note_lead_created_idx").on(table.leadId, table.createdAt), index("lead_note_business_idx").on(table.businessId)]);
 
 export const businessAiContent = mysqlTable("business_ai_content", {
   id: int("id").autoincrement().primaryKey(),
@@ -345,11 +359,36 @@ export const businessVerifications = mysqlTable("business_verifications", {
   businessId: int("businessId").notNull().references(() => businesses.id),
   status: mysqlEnum("status", ["unverified", "pending", "verified", "rejected"]).default("unverified").notNull(),
   evidenceUrl: varchar("evidenceUrl", { length: 1000 }),
+  submissionNote: text("submissionNote"),
+  submittedAt: timestamp("submittedAt"),
   reviewedById: int("reviewedById").references(() => users.id),
   reviewNote: text("reviewNote"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   reviewedAt: timestamp("reviewedAt"),
 }, table => [uniqueIndex("verification_business_uidx").on(table.businessId), index("verification_status_idx").on(table.status)]);
+
+export const businessVerificationDocuments = mysqlTable("business_verification_documents", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  verificationId: int("verificationId").notNull().references(() => businessVerifications.id),
+  uploadedById: int("uploadedById").notNull().references(() => users.id),
+  documentType: mysqlEnum("documentType", ["registration", "licence", "address_proof", "ownership_proof", "other"]).notNull(),
+  storageKey: varchar("storageKey", { length: 1000 }).notNull(),
+  fileName: varchar("fileName", { length: 255 }).notNull(),
+  mimeType: varchar("mimeType", { length: 120 }).notNull(),
+  fileSize: int("fileSize").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [index("verification_document_verification_idx").on(table.verificationId, table.createdAt), index("verification_document_business_idx").on(table.businessId)]);
+
+export const businessVerificationEvents = mysqlTable("business_verification_events", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  verificationId: int("verificationId").notNull().references(() => businessVerifications.id),
+  actorId: int("actorId").references(() => users.id),
+  action: mysqlEnum("action", ["submitted", "approved", "changes_requested"]).notNull(),
+  note: text("note"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [index("verification_event_verification_created_idx").on(table.verificationId, table.createdAt), index("verification_event_business_idx").on(table.businessId)]);
 
 export const businessReputation = mysqlTable("business_reputation", {
   id: int("id").autoincrement().primaryKey(),

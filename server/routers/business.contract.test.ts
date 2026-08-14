@@ -30,6 +30,8 @@ describe("business router contracts", () => {
       "listReviews",
       "respondToReview",
       "listLeads",
+      "leadDetail",
+      "addLeadNote",
       "updateLead",
       "listOffers",
       "saveOffer",
@@ -39,5 +41,17 @@ describe("business router contracts", () => {
     ]));
     expect(procedures).not.toContain("seedReviews");
     expect(procedures).not.toContain("mockAnalytics");
+  });
+
+  it("exposes the guarded duplicate, verification, and moderation workflows", () => {
+    expect(procedures).toEqual(expect.arrayContaining([
+      "duplicateCandidates",
+      "verificationStatus",
+      "uploadVerificationDocument",
+      "submitVerification",
+      "verificationDocumentUrl",
+      "verificationQueue",
+      "reviewVerification",
+    ]));
   });
 });

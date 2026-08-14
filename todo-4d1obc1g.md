@@ -194,3 +194,13 @@
 - [x] Confirm visible Desktop, Tablet, and Mobile preview labels in the propagated production owner builder bundle
 - [x] Directly select Mobile in the production owner builder and confirm its active state and narrow responsive canvas
 - [x] Prepare the final checkpoint after all validation notes and ledger entries are complete
+
+## Marketplace conversion layer — verification, duplicate prevention, and CRM
+- [x] Inspect current schemas, routers, owner tools, admin tools, and reusable components for compatible extension points
+- [x] Add the verification-case and verification-document data model with evidence metadata, owner submission, and administrator decision history
+- [x] Add duplicate-candidate detection using normalized business identity, contact details, and location signals without auto-merging records
+- [x] Add owner-scoped lead CRM fields and actions for status, assignment, follow-up, notes, and source attribution
+- [x] Build owner interfaces for duplicate review, verification evidence/status, and lead CRM management
+- [x] Build administrator interfaces for verification review and clear approve/changes-requested decisions
+- [x] Add focused tests for ownership isolation, review authorization, duplicate matching, and lead lifecycle transitions
+- [x] Validate desktop/mobile critical paths and prepare the completed conversion release for publishing

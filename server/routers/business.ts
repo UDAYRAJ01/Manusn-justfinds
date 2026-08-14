@@ -1,4 +1,4 @@
-import { and, desc, eq, like, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, like, or, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
@@ -11,10 +11,14 @@ import {
   businessHours,
   businessImages,
   businessItems,
+  businessLeadNotes,
   businessLeads,
   businessNotifications,
   businessOffers,
   businessReviewReports,
+  businessVerificationDocuments,
+  businessVerificationEvents,
+  businessVerifications,
   ownerNotificationPrefs,
   businessReviews,
   businessServices,
@@ -28,8 +32,9 @@ import {
 import { canManageBusiness, canModerate } from "../domain/permissions";
 import { getDb } from "../db";
 import { protectedProcedure, router } from "../_core/trpc";
-import { storagePut } from "../storage";
+import { storageGetSignedUrl, storagePut } from "../storage";
 import { numberedSlug, preferredBusinessSlug } from "../domain/slug";
+import { scoreDuplicateCandidate } from "../domain/duplicateCheck";
 
 const roleSchema = z.enum(["user", "business_owner", "admin", "super_admin"]);
 const businessIdInput = z.object({ businessId: z.number().int().positive() });
@@ -158,6 +163,98 @@ export const businessRouter = router({
       .limit(20);
   }),
 
+  duplicateCandidates: protectedProcedure.input(z.object({ businessId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+    const { db, business } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
+    const candidates = await db.select({ id: businesses.id, name: businesses.name, phone: businesses.phone, email: businesses.email, address: businesses.address, cityId: businesses.cityId, latitude: businesses.latitude, longitude: businesses.longitude, slug: businesses.slug, status: businesses.status })
+      .from(businesses)
+      .where(and(eq(businesses.cityId, business.cityId), eq(businesses.status, "published")))
+      .limit(100);
+    return candidates
+      .filter(candidate => candidate.id !== business.id)
+      .map(candidate => ({ candidate, match: scoreDuplicateCandidate(business, candidate) }))
+      .filter((result): result is { candidate: typeof candidates[number]; match: NonNullable<ReturnType<typeof scoreDuplicateCandidate>> } => Boolean(result.match))
+      .sort((a, b) => b.match.score - a.match.score)
+      .slice(0, 8)
+      .map(({ candidate, match }) => ({ id: candidate.id, name: candidate.name, slug: candidate.slug, address: candidate.address, phone: candidate.phone, score: match.score, classification: match.classification, reasons: match.reasons }));
+  }),
+
+  verificationStatus: protectedProcedure.input(businessIdInput).query(async ({ ctx, input }) => {
+    const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
+    const verifications = await db.select().from(businessVerifications).where(eq(businessVerifications.businessId, input.businessId)).limit(1);
+    const verification = verifications[0] ?? null;
+    if (!verification) return { verification: null, documents: [], events: [] };
+    const [documents, events] = await Promise.all([
+      db.select({ id: businessVerificationDocuments.id, documentType: businessVerificationDocuments.documentType, fileName: businessVerificationDocuments.fileName, mimeType: businessVerificationDocuments.mimeType, fileSize: businessVerificationDocuments.fileSize, createdAt: businessVerificationDocuments.createdAt }).from(businessVerificationDocuments).where(eq(businessVerificationDocuments.verificationId, verification.id)).orderBy(desc(businessVerificationDocuments.createdAt)),
+      db.select({ id: businessVerificationEvents.id, action: businessVerificationEvents.action, note: businessVerificationEvents.note, createdAt: businessVerificationEvents.createdAt, actorName: users.name }).from(businessVerificationEvents).leftJoin(users, eq(businessVerificationEvents.actorId, users.id)).where(eq(businessVerificationEvents.verificationId, verification.id)).orderBy(desc(businessVerificationEvents.createdAt)),
+    ]);
+    return { verification, documents, events };
+  }),
+
+  uploadVerificationDocument: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), documentType: z.enum(["registration", "licence", "address_proof", "ownership_proof", "other"]), fileName: z.string().min(1).max(255), mimeType: z.enum(["application/pdf", "image/jpeg", "image/png", "image/webp"]), dataBase64: z.string().min(4).max(7_000_000).regex(/^[A-Za-z0-9+/=]+$/, "File data is invalid.") })).mutation(async ({ ctx, input }) => {
+    const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
+    const existing = await db.select().from(businessVerifications).where(eq(businessVerifications.businessId, input.businessId)).limit(1);
+    const verification = existing[0];
+    if (verification?.status === "pending") throw new TRPCError({ code: "BAD_REQUEST", message: "Verification is already under review. Wait for the administrator decision before changing evidence." });
+    const bytes = Buffer.from(input.dataBase64, "base64");
+    if (!bytes.length || bytes.length > 5_000_000) throw new TRPCError({ code: "BAD_REQUEST", message: "Upload a PDF or image smaller than 5 MB." });
+    const safeName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 180) || "evidence";
+    const uploaded = await storagePut(`private-verification/${input.businessId}/${input.documentType}-${safeName}`, bytes, input.mimeType);
+    let verificationId = verification?.id;
+    if (!verificationId) {
+      const inserted = await db.insert(businessVerifications).values({ businessId: input.businessId, status: "unverified" });
+      verificationId = Number(inserted[0].insertId);
+    }
+    const insertedDocument = await db.insert(businessVerificationDocuments).values({ businessId: input.businessId, verificationId, uploadedById: ctx.user.id, documentType: input.documentType, storageKey: uploaded.key, fileName: input.fileName, mimeType: input.mimeType, fileSize: bytes.length });
+    return { documentId: Number(insertedDocument[0].insertId) };
+  }),
+
+  submitVerification: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), note: z.string().max(2000).optional() })).mutation(async ({ ctx, input }) => {
+    const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
+    const rows = await db.select().from(businessVerifications).where(eq(businessVerifications.businessId, input.businessId)).limit(1);
+    const verification = rows[0];
+    if (verification?.status === "pending") throw new TRPCError({ code: "BAD_REQUEST", message: "Verification is already under review." });
+    const documentCount = verification ? await db.select({ id: businessVerificationDocuments.id }).from(businessVerificationDocuments).where(eq(businessVerificationDocuments.verificationId, verification.id)).limit(1) : [];
+    if (!verification || (!documentCount.length && !verification.evidenceUrl)) throw new TRPCError({ code: "BAD_REQUEST", message: "Add at least one current evidence document before submitting verification." });
+    const now = new Date();
+    await db.update(businessVerifications).set({ status: "pending", submissionNote: input.note, submittedAt: now, reviewNote: null, reviewedAt: null, reviewedById: null }).where(eq(businessVerifications.id, verification.id));
+    await db.insert(businessVerificationEvents).values({ businessId: input.businessId, verificationId: verification.id, actorId: ctx.user.id, action: "submitted", note: input.note });
+    return { status: "pending" as const };
+  }),
+
+  verificationDocumentUrl: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), documentId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+    const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
+    const documents = await db.select({ storageKey: businessVerificationDocuments.storageKey }).from(businessVerificationDocuments).where(and(eq(businessVerificationDocuments.id, input.documentId), eq(businessVerificationDocuments.businessId, input.businessId))).limit(1);
+    if (!documents[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Verification document not found." });
+    return { url: await storageGetSignedUrl(documents[0].storageKey) };
+  }),
+
+  verificationQueue: protectedProcedure.query(async ({ ctx }) => {
+    if (!canModerate(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "Administrator access is required." });
+    const db = await dbOrThrow();
+    const rows = await db.select({ verification: businessVerifications, business: businesses, ownerName: users.name }).from(businessVerifications).innerJoin(businesses, eq(businessVerifications.businessId, businesses.id)).leftJoin(users, eq(businesses.ownerId, users.id)).where(eq(businessVerifications.status, "pending")).orderBy(asc(businessVerifications.submittedAt));
+    return Promise.all(rows.map(async row => {
+      const documents = await db.select({ id: businessVerificationDocuments.id, documentType: businessVerificationDocuments.documentType, fileName: businessVerificationDocuments.fileName, mimeType: businessVerificationDocuments.mimeType, fileSize: businessVerificationDocuments.fileSize }).from(businessVerificationDocuments).where(eq(businessVerificationDocuments.verificationId, row.verification.id)).orderBy(desc(businessVerificationDocuments.createdAt));
+      return { ...row, documents };
+    }));
+  }),
+
+  reviewVerification: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), decision: z.enum(["verified", "changes_requested"]), note: z.string().min(5).max(2000) })).mutation(async ({ ctx, input }) => {
+    if (!canModerate(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "Administrator access is required." });
+    const db = await dbOrThrow();
+    const rows = await db.select().from(businessVerifications).where(eq(businessVerifications.businessId, input.businessId)).limit(1);
+    const verification = rows[0];
+    if (!verification) throw new TRPCError({ code: "NOT_FOUND", message: "Verification case not found." });
+    if (verification.status !== "pending") throw new TRPCError({ code: "BAD_REQUEST", message: "Only pending verification cases can be reviewed." });
+    const verified = input.decision === "verified";
+    const now = new Date();
+    await db.transaction(async tx => {
+      await tx.update(businessVerifications).set({ status: verified ? "verified" : "rejected", reviewedById: ctx.user.id, reviewNote: input.note, reviewedAt: now }).where(eq(businessVerifications.id, verification.id));
+      await tx.update(businesses).set({ isVerified: verified }).where(eq(businesses.id, input.businessId));
+      await tx.insert(businessVerificationEvents).values({ businessId: input.businessId, verificationId: verification.id, actorId: ctx.user.id, action: verified ? "approved" : "changes_requested", note: input.note });
+    });
+    return { status: verified ? "verified" as const : "changes_requested" as const };
+  }),
+
   requestClaim: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), evidenceNote: z.string().max(2000).optional() })).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
     const target = await db.select({ id: businesses.id, ownerId: businesses.ownerId }).from(businesses).where(eq(businesses.id, input.businessId)).limit(1);
@@ -261,7 +358,8 @@ export const businessRouter = router({
     const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
     const rows = await db.select().from(businessLeads).where(and(eq(businessLeads.id, input.leadId), eq(businessLeads.businessId, input.businessId))).limit(1);
     if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Lead not found." });
-    return rows[0];
+    const notes = await db.select({ id: businessLeadNotes.id, body: businessLeadNotes.body, createdAt: businessLeadNotes.createdAt, authorName: users.name }).from(businessLeadNotes).innerJoin(users, eq(businessLeadNotes.authorId, users.id)).where(and(eq(businessLeadNotes.leadId, input.leadId), eq(businessLeadNotes.businessId, input.businessId))).orderBy(desc(businessLeadNotes.createdAt));
+    return { lead: rows[0], notes };
   }),
   savePhoto: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), imageId: z.number().int().positive().optional(), url: z.string().url().max(1000).optional(), dataBase64: z.string().max(7_000_000).optional(), mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif"]).default("image/jpeg"), imageType: z.enum(["logo", "cover", "gallery"]).default("gallery"), alt: z.string().max(240).optional(), sortOrder: z.number().int().min(0).default(0) }).refine(input => Boolean(input.url) !== Boolean(input.dataBase64), "Provide either an image URL or an uploaded image." )).mutation(async ({ ctx, input }) => {
     const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
@@ -299,9 +397,18 @@ export const businessRouter = router({
     return db.select().from(businessLeads).where(eq(businessLeads.businessId, input.businessId)).orderBy(desc(businessLeads.createdAt)).limit(input.limit).offset(input.offset);
   }),
 
-  updateLead: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), leadId: z.number().int().positive(), status: z.enum(["new", "contacted", "qualified", "converted", "closed"]).optional(), notes: z.string().max(5000).optional() })).mutation(async ({ ctx, input }) => {
+  addLeadNote: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), leadId: z.number().int().positive(), body: z.string().trim().min(1).max(5000) })).mutation(async ({ ctx, input }) => {
     const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
-    await db.update(businessLeads).set({ ...(input.status ? { status: input.status } : {}), ...(input.notes !== undefined ? { notes: input.notes } : {}) }).where(and(eq(businessLeads.id, input.leadId), eq(businessLeads.businessId, input.businessId)));
+    const lead = await db.select({ id: businessLeads.id }).from(businessLeads).where(and(eq(businessLeads.id, input.leadId), eq(businessLeads.businessId, input.businessId))).limit(1);
+    if (!lead[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Lead not found." });
+    const inserted = await db.insert(businessLeadNotes).values({ businessId: input.businessId, leadId: input.leadId, authorId: ctx.user.id, body: input.body });
+    return { noteId: Number(inserted[0].insertId) };
+  }),
+
+  updateLead: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), leadId: z.number().int().positive(), status: z.enum(["new", "contacted", "qualified", "converted", "closed"]).optional(), notes: z.string().max(5000).optional(), assignToMe: z.boolean().optional(), followUpAt: z.coerce.date().nullable().optional() })).mutation(async ({ ctx, input }) => {
+    const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
+    const contactStatus = input.status === "contacted" || input.status === "qualified" || input.status === "converted";
+    await db.update(businessLeads).set({ ...(input.status ? { status: input.status } : {}), ...(input.notes !== undefined ? { notes: input.notes } : {}), ...(input.assignToMe !== undefined ? { assignedToId: input.assignToMe ? ctx.user.id : null } : {}), ...(input.followUpAt !== undefined ? { followUpAt: input.followUpAt } : {}), ...(contactStatus ? { lastContactedAt: new Date() } : {}) }).where(and(eq(businessLeads.id, input.leadId), eq(businessLeads.businessId, input.businessId)));
     return { success: true };
   }),
 

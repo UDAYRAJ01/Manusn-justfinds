@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { AiContentWorkspace } from "@/components/AiContentWorkspace";
+import { ConversionLeadsManager, DuplicateCheckManager, VerificationManager } from "@/components/ConversionTools";
 import WebsiteBuilder from "./WebsiteBuilder";
 import DomainSettings from "./DomainSettings";
 import GoogleImportSettings from "./GoogleImportSettings";
@@ -12,7 +13,7 @@ import { useEffect, useState } from "react";
 export default function BusinessTools({ businessId, businessName }: { businessId: number; businessName: string }) {
   const [location] = useLocation();
   const tool = location.split("/").at(-1) ?? "overview";
-  const labels: Record<string, string> = { preview: "Public preview", profile: "Profile & location", hours: "Hours", services: "Services & items", facilities: "Facilities", items: "Items", photos: "Photos", leads: "Lead inbox", reviews: "Reviews", offers: "Offers", "ai-content": "AI content", seo: "SEO", domain: "Custom Domain", "google-import": "Google Import", certificate: "Certificate", qr: "QR code", notifications: "Notifications", settings: "Settings", website: "Website Builder" };
+  const labels: Record<string, string> = { preview: "Public preview", profile: "Profile & location", duplicates: "Duplicate check", hours: "Hours", services: "Services & items", facilities: "Facilities", items: "Items", photos: "Photos", verification: "Verification", leads: "Lead CRM", reviews: "Reviews", offers: "Offers", "ai-content": "AI content", seo: "SEO", domain: "Custom Domain", "google-import": "Google Import", certificate: "Certificate", qr: "QR code", notifications: "Notifications", settings: "Settings", website: "Website Builder" };
   return <div className="min-h-screen bg-[#f6f8fc] text-slate-950"><header className="border-b border-slate-200 bg-white"><div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6"><Link href="/business" className="inline-flex items-center gap-2 text-sm font-semibold"><ArrowLeft className="size-4" />Business workspace</Link><span className="text-xs text-slate-500">{businessName}</span></div></header><main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8"><div className="-mx-1 flex max-w-full gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible">{Object.entries(labels).map(([key, label]) => <Link key={key} href={`/business/${businessId}/${key}`} className={`min-w-max rounded-xl px-3 py-2 text-sm font-medium ${tool === key ? "bg-[#173d9c] text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-blue-50"}`}>{label}</Link>)}</div><section className="mt-5 rounded-[24px] border border-slate-200 bg-white p-4 sm:mt-6 sm:rounded-[28px] sm:p-8"><div className="flex flex-col items-start gap-3 sm:flex-row sm:gap-4"><div className="grid size-11 place-items-center rounded-2xl bg-blue-50 text-[#2456c8]"><ToolIcon tool={tool} /></div><div><p className="text-xs font-semibold uppercase tracking-[.18em] text-[#2456c8]">Owner tool</p><h1 className="mt-1 text-2xl font-semibold tracking-[-.04em]">{labels[tool] ?? "Workspace"}</h1><p className="mt-2 text-sm text-slate-500">Changes are scoped to this business and remain private until approved.</p></div></div><ToolContent tool={tool} businessId={businessId} /></section></main></div>;
 }
 
@@ -23,11 +24,13 @@ function ToolContent({ tool, businessId }: { tool: string; businessId: number })
   if (tool === "preview") return <PreviewManager businessId={businessId} />;
   if (tool === "website") return <WebsiteBuilder businessId={businessId} />;
   if (tool === "profile") return <ProfileManager businessId={businessId} />;
+  if (tool === "duplicates") return <DuplicateCheckManager businessId={businessId} />;
   if (tool === "services") return <ServicesManager businessId={businessId} />;
   if (tool === "photos") return <PhotosManager businessId={businessId} />;
   if (tool === "items") return <ItemsManager businessId={businessId} />;
   if (tool === "facilities") return <FacilitiesManager businessId={businessId} />;
-  if (tool === "leads") return <LeadsManager businessId={businessId} />;
+  if (tool === "verification") return <VerificationManager businessId={businessId} />;
+  if (tool === "leads") return <ConversionLeadsManager businessId={businessId} />;
   if (tool === "reviews") return <ReviewsManager businessId={businessId} />;
   if (tool === "offers") return <OffersManager businessId={businessId} />;
   if (tool === "hours") return <HoursManager businessId={businessId} />;
