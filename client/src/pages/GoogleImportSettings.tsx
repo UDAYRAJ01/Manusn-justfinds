@@ -1,190 +1,55 @@
-import React, { useState } from "react";
-import { trpc } from "@/lib/trpc";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowLeft, Building2, CheckCircle2, CircleAlert, Loader2, MapPin, Search, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { CheckCircle2, AlertTriangle, ExternalLink, RefreshCw, Building2, MapPin, Sparkles, ShieldCheck } from "lucide-react";
-import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
+
+type DraftForm = { name: string; categoryId: number; cityId: number; address: string; phone: string; website: string; latitude: string; longitude: string };
+type GoogleImportDraftData = { categories: Array<{ id: number; name: string }>; cities: Array<{ id: number; name: string }> };
+type GoogleDraftQuery = { isLoading: boolean; error: { message: string } | null; data: GoogleImportDraftData | undefined };
+const blank: DraftForm = { name: "", categoryId: 0, cityId: 0, address: "", phone: "", website: "", latitude: "", longitude: "" };
+const token = () => typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `jf-${Date.now()}-${Math.random().toString(36).slice(2, 15)}`;
 
 export default function GoogleImportSettings() {
-  const [useSimulation, setUseSimulation] = useState(true);
+  const [, navigate] = useLocation();
+  const [query, setQuery] = useState("");
+  const [debounced, setDebounced] = useState("");
+  const [locationText, setLocationText] = useState("");
+  const [sessionToken, setSessionToken] = useState(token);
+  const [placeId, setPlaceId] = useState<string | null>(null);
+  const [importId, setImportId] = useState<number | null>(null);
+  const [form, setForm] = useState<DraftForm>(blank);
+  const status = trpc.googleImport.status.useQuery();
+  const suggestions = trpc.googleImport.autocomplete.useQuery({ query: debounced, locationText: locationText.trim() || undefined, sessionToken }, { enabled: debounced.length >= 2, retry: false });
+  const details = trpc.googleImport.placeDetails.useQuery({ placeId: placeId ?? "not-selected", sessionToken }, { enabled: Boolean(placeId), retry: false });
+  const draft = trpc.googleImport.draft.useQuery({ importId: importId ?? 0 }, { enabled: Boolean(importId), retry: false });
+  const create = trpc.googleImport.createDraft.useMutation({ onSuccess: data => { setImportId(data.importId); setPlaceId(null); setQuery(""); setSessionToken(token()); } });
+  const finalize = trpc.googleImport.finalizeDraft.useMutation({ onSuccess: data => navigate(`/business/${data.businessId}/profile`) });
 
-  const statusQuery = trpc.googleImport.status.useQuery();
-  const authUrlQuery = trpc.googleImport.authUrl.useQuery(undefined, { enabled: false });
-  const locationsQuery = trpc.googleImport.fetchLocations.useQuery({ mock: useSimulation });
+  useEffect(() => { const timer = window.setTimeout(() => setDebounced(query.trim()), 350); return () => window.clearTimeout(timer); }, [query]);
+  useEffect(() => {
+    if (!draft.data) return;
+    const detail = draft.data.detail;
+    setForm({ name: draft.data.import.businessName || detail?.displayName || "", categoryId: draft.data.mapping?.categoryId ?? 0, cityId: 0, address: draft.data.import.formattedAddress || detail?.formattedAddress || "", phone: detail?.phone || "", website: detail?.website || "", latitude: detail?.latitude || "", longitude: detail?.longitude || "" });
+  }, [draft.data]);
 
-  const utils = trpc.useUtils();
-  const importMutation = trpc.googleImport.importLocation.useMutation({
-    onSuccess: (data) => {
-      toast.success(data.message);
-      utils.googleImport.status.invalidate();
-    },
-    onError: (err) => {
-      toast.error(err.message);
-    },
-  });
+  const set = (key: keyof DraftForm, value: string | number) => setForm(current => ({ ...current, [key]: value }));
+  const finalizeDraft = () => importId && finalize.mutate({ importId, name: form.name.trim(), categoryId: form.categoryId, cityId: form.cityId, address: form.address.trim(), phone: form.phone.trim() || null, website: form.website.trim() || null, latitude: form.latitude.trim() || null, longitude: form.longitude.trim() || null });
 
-  const syncMutation = trpc.googleImport.syncGoogleImports.useMutation({
-    onSuccess: (data) => {
-      toast.success(data.message);
-      utils.googleImport.status.invalidate();
-    },
-    onError: (err) => {
-      toast.error(err.message);
-    },
-  });
-
-  const handleConnectGoogle = async () => {
-    try {
-      const res = await authUrlQuery.refetch();
-      if (res.data?.url) {
-        window.location.href = res.data.url;
-      } else {
-        toast.error("Google API client credentials are not configured on the server.");
-      }
-    } catch (e: any) {
-      toast.error(e.message || "Failed to initiate Google OAuth.");
-    }
-  };
-
-  const locations = locationsQuery.data?.locations || [];
-  const isConfigured = statusQuery.data?.isConfigured ?? false;
-
-  return (
-    <div className="space-y-6 max-w-5xl mx-auto py-6 px-4">
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-card p-6 rounded-xl border border-border shadow-xs">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight">Google Business Profile (GBP) Import</h1>
-            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">Secure OAuth</Badge>
-          </div>
-          <p className="text-muted-foreground mt-1">
-            Import and synchronize your verified business locations from Google directly into Just Finds with S3 photo caching and duplicate protection.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setUseSimulation(!useSimulation)}
-          >
-            {useSimulation ? "Switch to Live API" : "Switch to Simulation"}
-          </Button>
-          <Button
-            variant="default"
-            size="sm"
-            onClick={() => syncMutation.mutate()}
-            disabled={syncMutation.isPending}
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${syncMutation.isPending ? "animate-spin" : ""}`} />
-            Sync Listings
-          </Button>
-        </div>
-      </div>
-
-      {!isConfigured && useSimulation && (
-        <Alert className="bg-amber-500/10 border-amber-500/20 text-amber-900 dark:text-amber-200">
-          <AlertTriangle className="w-4 h-4 text-amber-600" />
-          <AlertTitle className="font-semibold">Google API Credentials Not Configured</AlertTitle>
-          <AlertDescription className="mt-1 text-sm leading-relaxed">
-            GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables are not set on the server. You are viewing simulated Google Business Profile locations for evaluation. To connect your live Google account, configure credentials via webdev_request_secrets.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="md:col-span-1 border-border">
-          <CardHeader>
-            <CardTitle className="text-lg">Google Account Connection</CardTitle>
-            <CardDescription>Link your verified Google manager account securely.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="p-4 rounded-lg bg-muted/50 border border-border/60 space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Connection Status</span>
-                <Badge variant={isConfigured ? "default" : "secondary"}>
-                  {isConfigured ? "Connected" : (useSimulation ? "Simulation Active" : "Unconfigured")}
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">S3 Photo Caching</span>
-                <span className="font-medium text-green-600 flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5" /> Enabled
-                </span>
-              </div>
-            </div>
-
-            <Button className="w-full" onClick={handleConnectGoogle} disabled={authUrlQuery.isFetching}>
-              <ExternalLink className="w-4 h-4 mr-2" /> Connect Google Account
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="md:col-span-2 border-border">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-lg">Available Google Locations</CardTitle>
-                <CardDescription>Select verified locations to import as draft listings.</CardDescription>
-              </div>
-              <Badge variant="outline">{locations.length} Locations</Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {locationsQuery.isLoading ? (
-              <div className="py-12 text-center text-muted-foreground flex flex-col items-center gap-2">
-                <RefreshCw className="w-6 h-6 animate-spin text-primary" />
-                Fetching verified locations from Google...
-              </div>
-            ) : locations.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground border border-dashed border-border rounded-xl">
-                <Building2 className="w-10 h-10 mx-auto mb-2 opacity-40" />
-                <p className="font-medium">No Google Business locations found</p>
-                <p className="text-xs text-muted-foreground mt-1">Make sure your Google account manages verified business listings.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {locations.map((loc: any) => (
-                  <div key={loc.locationId} className="flex items-center justify-between p-4 rounded-xl border border-border bg-background hover:border-primary/40 transition-colors">
-                    <div className="flex items-start gap-3">
-                      {loc.photoUrl && (
-                        <img src={loc.photoUrl} alt={loc.businessName} className="w-12 h-12 rounded-lg object-cover border border-border" />
-                      )}
-                      <div>
-                        <h4 className="font-semibold">{loc.businessName}</h4>
-                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                          <MapPin className="w-3 h-3" /> {loc.address}
-                        </p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <Badge variant="outline" className="text-[10px]">{loc.categoryName || "Local Business"}</Badge>
-                          <span className="text-[10px] text-muted-foreground">{loc.phone}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() => importMutation.mutate({
-                        locationId: loc.locationId,
-                        businessName: loc.businessName,
-                        address: loc.address,
-                        phone: loc.phone,
-                        website: loc.website,
-                        categoryName: loc.categoryName,
-                        photoUrl: loc.photoUrl,
-                        rawPayload: loc,
-                      })}
-                      disabled={importMutation.isPending}
-                    >
-                      <Sparkles className="w-3.5 h-3.5 mr-1.5" /> Import as Draft
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
+  if (importId) return <DraftEditor draft={draft} form={form} set={set} onBack={() => setImportId(null)} onSubmit={finalizeDraft} pending={finalize.isPending} error={finalize.error?.message} />;
+  const selected = details.data?.detail;
+  return <main className="min-h-screen bg-[#f6f8fc] px-4 py-8 sm:px-6"><section className="mx-auto max-w-4xl"><button onClick={() => navigate("/business/add")} className="inline-flex items-center gap-2 text-sm font-semibold text-[#2456c8]"><ArrowLeft className="size-4" />Back to Add Business</button><header className="mt-5 rounded-[28px] bg-[#102a6b] p-6 text-white sm:p-8"><p className="text-xs font-semibold uppercase tracking-[.2em] text-blue-200">Official Google Places discovery</p><h1 className="mt-3 text-3xl font-semibold tracking-[-.04em]">Find your business details</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-blue-100">Search a real business place, choose the correct result, then edit factual details before creating a private Just Finds draft.</p></header>{status.data && !status.data.isConfigured && <Notice tone="amber" text="Business discovery is temporarily unavailable. You can still create a listing manually." />}
+  <section className="mt-5 rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-7"><div className="grid gap-3 sm:grid-cols-2"><label className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 size-4 text-slate-400" /><input autoFocus className="field pl-9" value={query} onChange={event => setQuery(event.target.value)} placeholder="Business name" /></label><label className="relative"><MapPin className="pointer-events-none absolute left-3 top-3.5 size-4 text-slate-400" /><input className="field pl-9" value={locationText} onChange={event => setLocationText(event.target.value)} placeholder="City or locality, optional" /></label></div><p className="mt-3 text-xs leading-5 text-slate-500">Results are debounced and rate limited. Just Finds uses server-side API credentials; your location is optional.</p><div className="mt-5 space-y-2">{suggestions.isFetching && <LoadingRow label="Searching official business results…" />}{suggestions.error && <Notice tone="rose" text={suggestions.error.message} />}{!suggestions.isFetching && debounced.length >= 2 && !suggestions.error && !(suggestions.data?.suggestions.length) && <EmptyResults />}{suggestions.data?.suggestions.map(item => <button key={item.placeId} onClick={() => setPlaceId(item.placeId)} className="flex w-full items-start justify-between gap-3 rounded-2xl border border-slate-200 p-4 text-left hover:border-[#2456c8] hover:bg-blue-50"><span><b className="block text-slate-950">{item.primaryText}</b><span className="mt-1 block text-sm text-slate-500">{item.secondaryText || item.text}</span></span><MapPin className="mt-0.5 size-4 shrink-0 text-[#2456c8]" /></button>)}</div></section>
+  {placeId && <section className="mt-5 rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-7">{details.isLoading ? <LoadingRow label="Loading the selected place…" /> : details.error ? <Notice tone="rose" text={details.error.message} /> : selected && <><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[.16em] text-[#2456c8]">Selected Google Place</p><h2 className="mt-2 text-xl font-semibold">{selected.displayName}</h2><p className="mt-2 text-sm text-slate-500">{selected.formattedAddress}</p></div><Button variant="outline" className="rounded-xl" onClick={() => setPlaceId(null)}>Choose another</Button></div><div className="mt-5 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600"><b className="text-slate-800">Only factual listing fields are available for review.</b><p className="mt-1">Google ratings, reviews, user content, and photos are never copied into Just Finds.</p></div><Button className="mt-5 rounded-xl bg-[#173d9c]" disabled={create.isPending} onClick={() => create.mutate({ placeId, sessionToken })}>{create.isPending ? <><Loader2 className="mr-2 size-4 animate-spin" />Creating draft…</> : <><Sparkles className="mr-2 size-4" />Use this place as a draft</>}</Button>{create.error && <div className="mt-3"><Notice tone="rose" text={create.error.message} /></div>}</>}</section>}</section></main>;
 }
+
+function DraftEditor({ draft, form, set, onBack, onSubmit, pending, error }: { draft: GoogleDraftQuery; form: DraftForm; set: (key: keyof DraftForm, value: string | number) => void; onBack: () => void; onSubmit: () => void; pending: boolean; error?: string }) {
+  if (draft.isLoading) return <main className="grid min-h-screen place-items-center bg-[#f6f8fc]"><LoadingRow label="Preparing your editable import draft…" /></main>;
+  if (draft.error || !draft.data) return <main className="grid min-h-screen place-items-center bg-[#f6f8fc] p-5"><section className="max-w-md rounded-3xl bg-white p-7 text-center shadow-sm"><CircleAlert className="mx-auto size-10 text-rose-600" /><h1 className="mt-4 text-xl font-semibold">Import draft unavailable</h1><p className="mt-2 text-sm text-slate-600">{draft.error?.message || "Please return to search and try again."}</p><Button className="mt-5 rounded-xl" onClick={onBack}>Return to search</Button></section></main>;
+  return <main className="min-h-screen bg-[#f6f8fc] px-4 py-8 sm:px-6"><section className="mx-auto max-w-4xl"><button onClick={onBack} className="inline-flex items-center gap-2 text-sm font-semibold text-[#2456c8]"><ArrowLeft className="size-4" />Back to Google results</button><header className="mt-5 rounded-[28px] bg-[#102a6b] p-6 text-white sm:p-8"><p className="text-xs font-semibold uppercase tracking-[.2em] text-blue-200">Google Places import</p><h1 className="mt-3 text-3xl font-semibold tracking-[-.04em]">Review before creating your draft</h1><p className="mt-3 text-sm leading-6 text-blue-100">Every imported fact can be edited. The place identity is retained privately to prevent duplicate listings.</p></header><section className="mt-5 rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-7"><div className="mb-6 rounded-2xl bg-blue-50 p-4 text-sm text-blue-950"><b>Source: Google Places</b><p className="mt-1">Ratings, reviews, and photos are not imported.</p></div><div className="grid gap-4 sm:grid-cols-2"><TextField label="Business name" value={form.name} onChange={value => set("name", value)} /><TextField label="Phone" value={form.phone} onChange={value => set("phone", value)} /><TextField label="Website" value={form.website} type="url" onChange={value => set("website", value)} /><label className="grid gap-1.5 text-sm font-medium text-slate-700">Category<select className="field" value={form.categoryId || ""} onChange={event => set("categoryId", Number(event.target.value))}><option value="">Choose a category</option>{draft.data.categories.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label className="grid gap-1.5 text-sm font-medium text-slate-700">City<select className="field" value={form.cityId || ""} onChange={event => set("cityId", Number(event.target.value))}><option value="">Choose a city</option>{draft.data.cities.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><TextField label="Latitude" value={form.latitude} onChange={value => set("latitude", value)} /><TextField label="Longitude" value={form.longitude} onChange={value => set("longitude", value)} /></div><label className="mt-4 grid gap-1.5 text-sm font-medium text-slate-700">Address<textarea className="field min-h-24" value={form.address} onChange={event => set("address", event.target.value)} /></label><div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5"><p className="max-w-xl text-xs leading-5 text-slate-500">A private draft opens next. Complete hours, services, verification, AI content, and preview before you submit it for administrator review.</p><Button className="rounded-xl bg-[#173d9c]" disabled={!form.name.trim() || !form.categoryId || !form.cityId || form.address.trim().length < 5 || pending} onClick={onSubmit}>{pending ? <><Loader2 className="mr-2 size-4 animate-spin" />Checking…</> : <><CheckCircle2 className="mr-2 size-4" />Create editable draft</>}</Button></div>{error && <div className="mt-4"><Notice tone="rose" text={error} /></div>}</section></section></main>;
+}
+
+function TextField({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (value: string) => void; type?: string }) { return <label className="grid gap-1.5 text-sm font-medium text-slate-700">{label}<input className="field" type={type} value={value} onChange={event => onChange(event.target.value)} /></label>; }
+function LoadingRow({ label }: { label: string }) { return <div className="flex items-center gap-2 rounded-2xl bg-slate-50 p-4 text-sm text-slate-500"><Loader2 className="size-4 animate-spin" />{label}</div>; }
+function Notice({ tone, text }: { tone: "amber" | "rose"; text: string }) { return <div className={`rounded-2xl p-4 text-sm ${tone === "rose" ? "bg-rose-50 text-rose-800" : "border border-amber-200 bg-amber-50 text-amber-900"}`}>{text}</div>; }
+function EmptyResults() { return <div className="rounded-2xl border border-dashed border-slate-200 p-7 text-center text-sm text-slate-500"><Building2 className="mx-auto mb-2 size-8 text-slate-300" />No matching businesses were found. Try a fuller name or nearby locality, or create the listing manually.</div>; }

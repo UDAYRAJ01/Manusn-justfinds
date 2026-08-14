@@ -1,41 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { appRouter } from "../routers";
 
-describe("Google Business Profile Import Router", () => {
-  it("returns status and configuration flag without crashing", async () => {
-    const caller = appRouter.createCaller({
-      user: { id: 1, role: "owner", openId: "test-user", name: "Test Owner" } as any,
-      req: {} as any,
-      res: {} as any,
-    });
-
+describe("official Google Places import router", () => {
+  it("reports the official provider and import status for an authenticated owner without exposing a credential", async () => {
+    const caller = appRouter.createCaller({ user: { id: 1, role: "business_owner", openId: "test-user", name: "Test Owner" } as any, req: {} as any, res: {} as any });
     const status = await caller.googleImport.status();
+
+    expect(status.provider).toBe("google_places_api_new");
     expect(status).toHaveProperty("isConfigured");
     expect(status).toHaveProperty("importedCount");
-  });
-
-  it("returns simulated locations when fetched with mock=true", async () => {
-    const caller = appRouter.createCaller({
-      user: { id: 1, role: "owner", openId: "test-user", name: "Test Owner" } as any,
-      req: {} as any,
-      res: {} as any,
-    });
-
-    const res = await caller.googleImport.fetchLocations({ mock: true });
-    expect(res).toHaveProperty("locations");
-    expect(Array.isArray(res.locations)).toBe(true);
-    expect(res.locations.length).toBeGreaterThan(0);
+    expect(JSON.stringify(status)).not.toContain("GOOGLE_PLACES_API_KEY");
   });
 });
-
-  it("supports syncGoogleImports mutation", async () => {
-    const caller = appRouter.createCaller({
-      user: { id: 1, role: "owner", openId: "test-user", name: "Test Owner" } as any,
-      req: {} as any,
-      res: {} as any,
-    });
-
-    const res = await caller.googleImport.syncGoogleImports();
-    expect(res.success).toBe(true);
-    expect(res).toHaveProperty("syncedCount");
-  });

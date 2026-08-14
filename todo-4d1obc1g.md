@@ -224,3 +224,14 @@
 - [x] Create and validate a reusable appointment-workflow skill using the required skill-creation process
 - [x] Add regression tests for ownership, token-gated customer access, calendar export, decision transitions, and CRM synchronization
 - [x] Validate desktop/mobile owner controls and secure customer-link handling without creating fabricated bookings; automated contracts cover decision, token, calendar-export, and CRM paths
+
+## Google-powered business discovery and editable import drafts
+- [x] Inspect existing Google Import work, official Google Places API readiness, and current Add Business owner entry points
+- [x] Add an external-place identity and import-draft model that preserves editable owner fields and supports duplicate detection without duplicate business entities
+- [x] Implement secure server-side official Google Places autocomplete/text search and permitted place-detail retrieval with debouncing, quota, and failure handling
+- [x] Map available imported facts into editable Just Finds draft fields, without importing Google ratings, reviews, or photos
+- [x] Add category-mapping review and source-label metadata for imported fields
+- [x] Build the simple Add Business choice screen and `/business/add/import` flow with search, location text, optional one-time location, and clear empty/error states
+- [x] Integrate imported drafts with existing onboarding, owner editing, AI content, preview, submit, and administrator approval workflows
+- [x] Add tests for authentication, server-secret isolation, external-ID duplicate detection, field mapping, and error handling
+- [x] Validate the desktop/mobile import route and secure official API contract without creating fabricated listings; live credential validation and automated official-place tests pass
