@@ -722,3 +722,32 @@ export const pageAnalytics = mysqlTable("page_analytics", {
 export type BusinessPage = typeof businessPages.$inferSelect;
 export type PageSection = typeof pageSections.$inferSelect;
 export type PageVersion = typeof pageVersions.$inferSelect;
+
+export const domainVerificationStatusValues = ["pending", "verified", "failed", "expired"] as const;
+export const routingStatusValues = ["pending", "connected", "error"] as const;
+export const sslStatusValues = ["active", "pending", "not_configured"] as const;
+
+export const customDomains = mysqlTable("custom_domains", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull(),
+  domain: varchar("domain", { length: 255 }).notNull().unique(),
+  domainType: varchar("domainType", { length: 32 }).default("apex").notNull(),
+  isPrimary: boolean("isPrimary").default(false).notNull(),
+  verificationStatus: mysqlEnum("verificationStatus", domainVerificationStatusValues).default("pending").notNull(),
+  routingStatus: mysqlEnum("routingStatus", routingStatusValues).default("pending").notNull(),
+  sslStatus: mysqlEnum("sslStatus", sslStatusValues).default("not_configured").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const domainVerificationRecords = mysqlTable("domain_verification_records", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull(),
+  domain: varchar("domain", { length: 255 }).notNull(),
+  verificationMethod: varchar("verificationMethod", { length: 32 }).default("txt").notNull(),
+  verificationToken: varchar("verificationToken", { length: 255 }).notNull(),
+  status: mysqlEnum("status", domainVerificationStatusValues).default("pending").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  verifiedAt: timestamp("verifiedAt"),
+  expiresAt: timestamp("expiresAt"),
+});
