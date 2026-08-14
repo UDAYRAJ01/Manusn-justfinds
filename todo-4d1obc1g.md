@@ -173,3 +173,8 @@
 
 - [x] Repair the initial default website page flow so it can create a first saved design version before publication
 - [x] Add regression coverage for saving and publishing a newly created website page without manual design changes
+
+- [x] Repair the public website resolver so the published VISHNOI FACE HOSPITAL page is served at its slug URL
+- [x] Add regression coverage for resolving a published business and page at the public slug route
+
+- [ ] Verify the deployed public hospital slug route after the resolver release, then validate its desktop and mobile rendering

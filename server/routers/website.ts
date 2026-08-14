@@ -188,7 +188,7 @@ export const websiteRouter = router({
   }),
   publicPage: publicProcedure.input(z.object({ slug: z.string().min(2).max(240) })).query(async ({ input }) => {
     const db = await dbOrThrow();
-    const rows = await db.select({ page: businessPages, business: businesses, category: categories.name, city: cities.name }).from(businessPages).innerJoin(businesses, eq(businessPages.businessId, businesses.id)).leftJoin(categories, eq(businesses.categoryId, categories.id)).leftJoin(cities, eq(businesses.cityId, cities.id)).where(and(eq(businessPages.slug, input.slug), eq(businessPages.status, "published"))).limit(1);
+    const rows = await db.select({ page: businessPages, business: businesses, category: categories.name, city: cities.name }).from(businessPages).innerJoin(businesses, eq(businessPages.businessId, businesses.id)).leftJoin(categories, eq(businesses.categoryId, categories.id)).leftJoin(cities, eq(businesses.cityId, cities.id)).where(and(eq(businesses.slug, input.slug), eq(businessPages.status, "published"))).limit(1);
     const row = rows[0];
     if (!row || !["approved", "published"].includes(row.business.status)) throw new TRPCError({ code: "NOT_FOUND", message: "Published website not found." });
     const [sections, services, images, reviews] = await Promise.all([
