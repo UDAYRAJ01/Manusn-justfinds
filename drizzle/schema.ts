@@ -751,3 +751,5 @@ export const domainVerificationRecords = mysqlTable("domain_verification_records
   verifiedAt: timestamp("verifiedAt"),
   expiresAt: timestamp("expiresAt"),
 });
+
+
