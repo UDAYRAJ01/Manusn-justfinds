@@ -1,7 +1,9 @@
 import { TRPCError } from "@trpc/server";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { businessImages, businessServices, businessReviews, businesses, businessPages, pageAnalytics, pagePublishHistory, pageSections, pageVersions, categories, cities } from "../../drizzle/schema";
+import { businessImages, businessServices, businessReviews, businesses, businessPages, pageAnalytics, pagePublishHistory, pageSections, pageVersions, businessHours, categories, cities } from "../../drizzle/schema";
+import { generateStructured } from "../domain/ai/provider";
+import { canonicalWebsiteSectionTypes, normalizeWebsiteDraft, websiteDraftOutputSchema, websiteDraftSystemPrompt, type GeneratedWebsiteDraft } from "../domain/websiteDraft";
 import { canManageBusiness } from "../domain/permissions";
 import { getDb } from "../db";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "../_core/trpc";
@@ -84,9 +86,68 @@ async function ownedPage(businessId: number, userId: number, role: string) {
 }
 
 function defaultSections(categoryName?: string | null) {
-  const category = (categoryName ?? "").toLowerCase();
-  const types = category.includes("restaurant") ? ["hero", "about", "menu", "services", "gallery", "offers", "reviews", "faq", "map", "contact", "footer"] : category.includes("hotel") ? ["hero", "about", "rooms", "gallery", "offers", "reviews", "map", "contact", "footer"] : category.includes("doctor") ? ["hero", "about", "services", "facilities", "reviews", "faq", "contact", "map", "footer"] : category.includes("hospital") ? ["hero", "about", "doctors", "facilities", "reviews", "faq", "map", "contact", "footer"] : ["hero", "about", "services", "gallery", "hours", "reviews", "map", "contact", "footer"];
-  return types.map((sectionType, displayOrder) => ({ sectionType, displayOrder, enabled: true, config: {} }));
+  return canonicalWebsiteSectionTypes(categoryName).map((sectionType, displayOrder) => ({ sectionType, displayOrder, enabled: true, config: {} }));
+}
+
+async function websiteFacts(db: Awaited<ReturnType<typeof dbOrThrow>>, business: typeof businesses.$inferSelect) {
+  const [categoryRows, cityRows, hours, services, images] = await Promise.all([
+    db.select({ name: categories.name }).from(categories).where(eq(categories.id, business.categoryId)).limit(1),
+    db.select({ name: cities.name }).from(cities).where(eq(cities.id, business.cityId)).limit(1),
+    db.select({ dayOfWeek: businessHours.dayOfWeek, opensAt: businessHours.opensAt, closesAt: businessHours.closesAt, isClosed: businessHours.isClosed, isTwentyFourHours: businessHours.isTwentyFourHours }).from(businessHours).where(eq(businessHours.businessId, business.id)).orderBy(asc(businessHours.dayOfWeek)),
+    db.select({ name: businessServices.name, description: businessServices.description, isEnabled: businessServices.isEnabled }).from(businessServices).where(eq(businessServices.businessId, business.id)).orderBy(asc(businessServices.sortOrder)),
+    db.select({ imageType: businessImages.imageType, alt: businessImages.alt }).from(businessImages).where(eq(businessImages.businessId, business.id)).orderBy(asc(businessImages.sortOrder)),
+  ]);
+  return {
+    business: {
+      name: business.name,
+      category: categoryRows[0]?.name ?? null,
+      city: cityRows[0]?.name ?? null,
+      status: business.status,
+      isVerified: business.isVerified,
+      shortDescription: business.shortDescription,
+      approvedDescription: business.approvedDescription,
+      aboutDescription: business.aboutDescription,
+      address: business.address,
+      postcode: business.postcode,
+      phone: business.phone,
+      whatsapp: business.whatsapp,
+      email: business.email,
+      website: business.website,
+      latitude: business.latitude,
+      longitude: business.longitude,
+    },
+    hours,
+    services: services.filter(service => service.isEnabled).map(({ isEnabled: _isEnabled, ...service }) => service),
+    photoInventory: images.map(image => ({ imageType: image.imageType, alt: image.alt })),
+    supportedSections: canonicalWebsiteSectionTypes(categoryRows[0]?.name),
+  };
+}
+
+function sectionOutputSchema() {
+  return {
+    name: "grounded_website_section",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: {
+        config: {
+          type: "object",
+          properties: {
+            label: { type: "string" },
+            eyebrow: { type: "string" },
+            headline: { type: "string" },
+            body: { type: "string" },
+            ctaLabel: { type: "string" },
+            ctaHref: { type: "string", enum: ["#contact", "#services", "#book-appointment"] },
+            bullets: { type: "array", maxItems: 8, items: { type: "string" } },
+          },
+          additionalProperties: false,
+        },
+      },
+      required: ["config"],
+      additionalProperties: false,
+    },
+  } as const;
 }
 
 export const websiteRouter = router({
@@ -119,6 +180,33 @@ export const websiteRouter = router({
     const parsed = typeof raw === "string" ? JSON.parse(raw) : current;
     const proposal = safeDesignSchema.parse({ ...defaultDesignConfig, ...parsed });
     return { proposal, source: "ai_design_only", businessId: input.businessId };
+  }),
+  generateDraft: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), instruction: z.string().trim().max(500).optional() })).mutation(async ({ ctx, input }) => {
+    const { db, business } = await ownedPage(input.businessId, ctx.user.id, ctx.user.role);
+    const facts = await websiteFacts(db, business);
+    const generation = await generateStructured<GeneratedWebsiteDraft>({
+      system: websiteDraftSystemPrompt(),
+      user: JSON.stringify({ request: input.instruction ?? "Create a complete factual first website draft.", approvedFacts: facts }),
+      outputSchema: websiteDraftOutputSchema,
+      maxTokens: 2800,
+    });
+    const draft = normalizeWebsiteDraft(generation.data, facts.business.category);
+    return { businessId: input.businessId, draft, source: "approved_business_facts" as const, provider: generation.provider, model: generation.model };
+  }),
+  regenerateSection: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), sectionType: z.string().min(2).max(60), currentConfig: z.record(z.string(), z.unknown()).optional(), instruction: z.string().trim().max(500).optional() })).mutation(async ({ ctx, input }) => {
+    const { db, business } = await ownedPage(input.businessId, ctx.user.id, ctx.user.role);
+    const facts = await websiteFacts(db, business);
+    const supported = canonicalWebsiteSectionTypes(facts.business.category);
+    if (!supported.includes(input.sectionType as (typeof supported)[number])) throw new TRPCError({ code: "BAD_REQUEST", message: "That section is not supported for this business category." });
+    const generation = await generateStructured<{ config: GeneratedWebsiteDraft["sections"][number]["config"] }>({
+      system: websiteDraftSystemPrompt() + " You are regenerating exactly one section. Keep the response limited to concise presentation copy for that section.",
+      user: JSON.stringify({ sectionType: input.sectionType, request: input.instruction ?? "Improve clarity and local relevance without adding facts.", currentConfig: input.currentConfig ?? {}, approvedFacts: facts }),
+      outputSchema: sectionOutputSchema(),
+      maxTokens: 1200,
+    });
+    const normalized = normalizeWebsiteDraft({ sections: [{ sectionType: input.sectionType, config: generation.data.config }] }, facts.business.category);
+    const section = normalized.sections.find(item => item.sectionType === input.sectionType);
+    return { businessId: input.businessId, sectionType: input.sectionType, config: section?.config ?? {}, source: "approved_business_facts" as const, provider: generation.provider, model: generation.model };
   }),
   applyRedesign: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), designConfig: safeDesignSchema })).mutation(async ({ ctx, input }) => {
     const { db, business, page } = await ownedPage(input.businessId, ctx.user.id, ctx.user.role);

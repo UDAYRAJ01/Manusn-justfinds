@@ -3,7 +3,7 @@ import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ save: vi.fn(), publish: vi.fn(), suggest: vi.fn(), apply: vi.fn(), reject: vi.fn(), submitReview: vi.fn(), invalidate: vi.fn() }));
+const mocks = vi.hoisted(() => ({ save: vi.fn(), publish: vi.fn(), suggest: vi.fn(), generateDraft: vi.fn(), regenerateSection: vi.fn(), apply: vi.fn(), reject: vi.fn(), submitReview: vi.fn(), invalidate: vi.fn() }));
 
 vi.mock("@/components/WebsiteRenderer", () => ({ default: ({ data }: { data: { business: { name: string } } }) => <div data-testid="shared-renderer">{data.business.name}</div> }));
 vi.mock("@/lib/trpc", () => ({
@@ -14,6 +14,8 @@ vi.mock("@/lib/trpc", () => ({
       saveDraft: { useMutation: () => ({ mutate: mocks.save, isPending: false, error: null }) },
       publish: { useMutation: () => ({ mutate: mocks.publish, isPending: false, error: null }) },
       suggestRedesign: { useMutation: () => ({ mutate: mocks.suggest, isPending: false, error: null }) },
+      generateDraft: { useMutation: () => ({ mutate: mocks.generateDraft, isPending: false, error: null }) },
+      regenerateSection: { useMutation: () => ({ mutate: mocks.regenerateSection, isPending: false, error: null }) },
       applyRedesign: { useMutation: () => ({ mutate: mocks.apply, isPending: false, error: null }) },
       rejectRedesign: { useMutation: () => ({ mutate: mocks.reject, isPending: false, error: null }) },
       submitForReview: { useMutation: () => ({ mutate: mocks.submitReview, isPending: false, error: null }) },

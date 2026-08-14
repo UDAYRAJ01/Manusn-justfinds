@@ -24,7 +24,7 @@ describe("Phase 7 website builder contracts", () => {
   });
 
   it("exposes presentation-only AI and admin moderation contracts", () => {
-    expect(Object.keys(websiteRouter._def.procedures)).toEqual(expect.arrayContaining(["suggestRedesign", "applyRedesign", "rejectRedesign", "moderationQueue", "moderate", "templateLibrary"]));
+    expect(Object.keys(websiteRouter._def.procedures)).toEqual(expect.arrayContaining(["suggestRedesign", "applyRedesign", "rejectRedesign", "generateDraft", "regenerateSection", "moderationQueue", "moderate", "templateLibrary"]));
     expect(Object.keys(defaultDesignConfig)).not.toEqual(expect.arrayContaining(["businessName", "address", "serviceDescription", "reviewText", "rating", "testimonial"]));
   });
 

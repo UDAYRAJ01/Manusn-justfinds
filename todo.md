@@ -166,3 +166,10 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Implement section autosave with visible 'last saved' timestamps.
 - [x] Add owner dashboard reminders for profile completion and review status.
 - [x] Run test suite, verify compilation, and save a release checkpoint.
+
+## AI-Assisted Website Builder
+- [ ] Inspect existing website builder builder routes, storage schema, and AI content generation endpoints.
+- [ ] Implement AI auto-generation procedure that compiles approved business facts (name, category, city, short description, hours, services, photos) into a structured multi-section website draft.
+- [ ] Add editable section controls in the website builder workspace so owners can edit headline, subtitle, hero image, services list, testimonials/features, and CTA buttons.
+- [ ] Add AI section regeneration tooltips/buttons that let owners regenerate individual sections using approved business knowledge while respecting factual boundaries.
+- [ ] Write Vitest coverage for AI website generation, section persistence, and owner permissions; run TypeScript validation and deliver the release.
