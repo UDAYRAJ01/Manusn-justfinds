@@ -141,12 +141,21 @@
 - [x] Add clear back navigation and breadcrumbs between the portfolio dashboard and detailed `/business/:businessId/:tool` tools.
 - [x] Pass real business names to workspace tool headers for clear context.
 - [x] Run full regression test suite to ensure all 157+ automated tests pass cleanly.
-- [ ] Unify `/owner/profile` and `/business` around one canonical owner listing-management entry point.
-- [ ] Remove conflicting duplicate listing-management presentation while preserving guided onboarding and detailed business tools.
-- [ ] Add synchronized navigation and selected-business continuity between the canonical owner listing view and detailed workspace.
-- [ ] Add regression tests for the unified listing flow and owner-scoped route transitions.
-- [ ] Revalidate the live owner/profile and business entry points after implementation.
+- [x] Unify `/owner/profile` and `/business` around one canonical owner listing-management entry point.
+- [x] Remove conflicting duplicate listing-management presentation while preserving guided onboarding and detailed business tools.
+- [x] Add synchronized navigation and selected-business continuity between the canonical owner listing view and detailed workspace.
+- [x] Add regression tests for the unified listing flow and owner-scoped route transitions.
+- [x] Revalidate the live owner/profile and business entry points after implementation.
 
 ## Current Owner Listing Flow Fix
 
 The user reports that `/owner/profile` and `/business` still expose separate business-listing options with no meaningful connection. The target is one canonical listing-management flow: portfolio overview selects a business, detailed tools edit that selected business, and all create/manage actions return to the same owner-scoped context.
+
+## GMB-Style Progressive Listing Workflow
+
+- [x] Remove the duplicate guided listing onboarding presentation and keep one canonical business listing entry point.
+- [x] Change new-listing flow so owners submit only the essential basic information first, then continue completing the profile after submission.
+- [x] Add a truthful profile-completion percentage with clear completed and missing sections.
+- [x] Add progressive completion actions for profile facts, hours, services/items, photos, and other supported business tools without bypassing approval rules.
+- [x] Add regression tests for completion calculations, initial submission, and owner-scoped progressive editing.
+- [x] Validate the streamlined listing flow visually and with the full test suite.

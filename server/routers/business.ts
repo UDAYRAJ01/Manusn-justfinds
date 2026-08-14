@@ -43,6 +43,7 @@ import { storageGetSignedUrl, storagePut } from "../storage";
 import { numberedSlug, preferredBusinessSlug } from "../domain/slug";
 import { scoreDuplicateCandidate } from "../domain/duplicateCheck";
 import { assertTimeZone, isValidIsoDate, isValidTime, slotsForAvailability } from "../domain/appointmentAvailability";
+import { calculateProfileCompletion } from "../domain/profileCompletion";
 
 const roleSchema = z.enum(["user", "business_owner", "admin", "super_admin"]);
 const businessIdInput = z.object({ businessId: z.number().int().positive() });
@@ -166,9 +167,22 @@ export const businessRouter = router({
       db.select().from(businessItems).where(eq(businessItems.businessId, business.id)).orderBy(businessItems.sortOrder),
       db.select().from(businessImages).where(eq(businessImages.businessId, business.id)).orderBy(businessImages.sortOrder),
     ]);
-    const checks = [business.name, business.shortDescription, business.aboutDescription, business.phone, business.email, business.website, business.address, business.latitude && business.longitude, hours.length > 0, services.length > 0, facilities.length > 0, images.some(image => image.imageType === "cover")];
-    const completeness = Math.round((checks.filter(Boolean).length / checks.length) * 100);
-    return { business, category: category[0] ?? null, city: city[0] ?? null, fields, hours, specialHours, services, facilities, items, images, completeness };
+    const completion = calculateProfileCompletion({
+      name: business.name,
+      shortDescription: business.shortDescription,
+      aboutDescription: business.aboutDescription,
+      phone: business.phone,
+      email: business.email,
+      website: business.website,
+      address: business.address,
+      latitude: business.latitude,
+      longitude: business.longitude,
+      hoursCount: hours.length,
+      servicesCount: services.length + items.length,
+      facilitiesCount: facilities.length,
+      coverImageCount: images.filter(image => image.imageType === "cover").length,
+    });
+    return { business, category: category[0] ?? null, city: city[0] ?? null, fields, hours, specialHours, services, facilities, items, images, completeness: completion.percentage, completion };
   }),
 
   createDraft: protectedProcedure.input(profileInput.omit({ businessId: true })).mutation(async ({ ctx, input }) => {
