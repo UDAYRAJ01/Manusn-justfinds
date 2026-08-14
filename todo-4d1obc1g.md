@@ -268,3 +268,10 @@
 - [x] Refine owner dashboard, onboarding, and business tools into denser software-style operational surfaces
 - [x] Refine admin dashboard and governance screens into clear, data-first administration software surfaces
 - [x] Run targeted component coverage, TypeScript, full regression tests, desktop/mobile visual verification, and publish the refined interface; 179 tests across 61 files pass
+
+## Reference-guided clean local-discovery UI rebuild
+- [x] Convert the supplied home, search-results, category, listing-detail, and dashboard references into an original Just Finds UI specification without copying protected branding or fabricating data
+- [x] Rebuild the public header, search hero, category browsing, local-result cards, and footer around a clean white-and-blue local-discovery layout
+- [x] Rebuild search results, category browsing, and business-detail composition while preserving actual data availability and existing result/filter behavior
+- [x] Refine authenticated user, owner, and administrator workspace presentation without changing authentication, role gates, routes, actions, or business logic
+- [x] Validate desktop and mobile layouts, run targeted and full regression checks, and publish only the non-disruptive presentation update; 179 tests across 61 files pass and TypeScript is clean
