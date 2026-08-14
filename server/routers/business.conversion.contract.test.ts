@@ -40,4 +40,16 @@ describe("conversion workflow boundaries", () => {
     expect(procedures).not.toContain("publicAppointmentSettings");
     expect(procedures).not.toContain("publicUpdateAppointmentRequest");
   });
+
+  it("requires owner authority for appointment decisions and an opaque customer token for self-service", () => {
+    expect(procedures).toEqual(expect.arrayContaining([
+      "ownerAppointmentAvailability",
+      "decideAppointmentRequest",
+      "customerAppointment",
+      "customerAppointmentAction",
+    ]));
+    expect(procedures).not.toContain("publicAppointmentById");
+    expect(procedures).not.toContain("publicDecideAppointmentRequest");
+    expect(procedures).not.toContain("customerAppointmentByRequestId");
+  });
 });

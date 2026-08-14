@@ -214,3 +214,13 @@
 - [x] Build public availability and appointment-request UI on published appointment-based business websites
 - [x] Add regression tests for ownership isolation, slot conflict prevention, public-request validation, and CRM integration
 - [x] Validate desktop/mobile booking paths and prepare the booking-calendar release for publishing
+
+## Appointment decisions, customer self-service, and reusable skill
+- [x] Inspect the appointment, Lead CRM, public website, routing, and notification extension points
+- [x] Add appointment decision, proposed-time, cancellation, and secure customer-access fields with immutable event history
+- [x] Add owner CRM actions to approve, reject, or propose a new appointment time while keeping lead status synchronized
+- [x] Add secure customer appointment page for viewing, accepting a proposed time, requesting a reschedule, or cancelling a pending appointment
+- [x] Add Google Calendar deep links and iCalendar downloads only for approved appointments
+- [x] Create and validate a reusable appointment-workflow skill using the required skill-creation process
+- [x] Add regression tests for ownership, token-gated customer access, calendar export, decision transitions, and CRM synchronization
+- [x] Validate desktop/mobile owner controls and secure customer-link handling without creating fabricated bookings; automated contracts cover decision, token, calendar-export, and CRM paths

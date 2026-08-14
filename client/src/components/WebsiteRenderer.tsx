@@ -18,6 +18,7 @@ type TrackingEvent = "page_view" | "cta_click" | "lead_start" | "lead_submit" | 
 export default function WebsiteRenderer({ data, preview = false, onTrack }: { data: WebsiteData; preview?: boolean; onTrack?: (eventType: TrackingEvent) => void }) {
   const [lead, setLead] = useState({ name: "", email: "", phone: "", message: "", consentGiven: false });
   const [appointment, setAppointment] = useState({ slot: "", name: "", email: "", phone: "", message: "", consentGiven: false });
+  const [customerAppointmentToken, setCustomerAppointmentToken] = useState<string | null>(null);
   const createLead = trpc.ai.createLead.useMutation();
   const availability = trpc.business.publicAppointmentAvailability.useQuery({ businessId: data.business.id }, { enabled: !preview });
   const requestAppointment = trpc.business.requestAppointment.useMutation();
@@ -33,7 +34,7 @@ export default function WebsiteRenderer({ data, preview = false, onTrack }: { da
   const submitAppointment = () => {
     if (preview || !appointment.slot || !appointment.name.trim() || !appointment.consentGiven) return;
     requestAppointment.mutate({ businessId: data.business.id, startsAt: appointment.slot, name: appointment.name.trim(), phone: appointment.phone.trim() || undefined, email: appointment.email.trim() || undefined, message: appointment.message.trim() || undefined, consentGiven: true }, {
-      onSuccess: () => { onTrack?.("lead_submit"); setAppointment({ slot: "", name: "", email: "", phone: "", message: "", consentGiven: false }); },
+      onSuccess: result => { onTrack?.("lead_submit"); setCustomerAppointmentToken(result.customerAccessToken); setAppointment({ slot: "", name: "", email: "", phone: "", message: "", consentGiven: false }); },
     });
   };
 
@@ -82,7 +83,7 @@ export default function WebsiteRenderer({ data, preview = false, onTrack }: { da
           <textarea className="field min-h-24 sm:col-span-2" placeholder="Reason for appointment (optional)" value={appointment.message} onChange={event => setAppointment({ ...appointment, message: event.target.value })} />
           <label className="sm:col-span-2 flex items-start gap-2 text-xs text-slate-500"><input type="checkbox" checked={appointment.consentGiven} onChange={event => setAppointment({ ...appointment, consentGiven: event.target.checked })} />I agree to share these details with this business to arrange this appointment.</label>
           <button disabled={!appointment.slot || !appointment.consentGiven || requestAppointment.isPending} className="rounded-xl bg-[#173d9c] px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">{requestAppointment.isPending ? "Sending request…" : "Request appointment"}</button>
-          {requestAppointment.isSuccess && <p className="self-center text-sm text-emerald-700">Request sent. The business will confirm the appointment.</p>}
+          {requestAppointment.isSuccess && customerAppointmentToken && <p className="self-center text-sm text-emerald-700">Request sent. <a href={`/appointment/${customerAppointmentToken}`} className="font-semibold underline">View or manage your appointment</a>.</p>}
           {requestAppointment.error && <p className="sm:col-span-2 text-sm text-rose-700">{requestAppointment.error.message}</p>}
         </form> : <p className="mt-5 rounded-xl bg-white p-4 text-sm text-slate-600">No appointment times are currently available. Please call or send an enquiry instead.</p>}
       </section>}

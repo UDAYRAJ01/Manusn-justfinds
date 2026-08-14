@@ -291,11 +291,32 @@ export const businessAppointmentRequests = mysqlTable("business_appointment_requ
   startsAt: timestamp("startsAt").notNull(),
   endsAt: timestamp("endsAt").notNull(),
   timeZone: varchar("timeZone", { length: 64 }).notNull(),
-  status: mysqlEnum("status", ["requested", "confirmed", "declined", "cancelled"]).default("requested").notNull(),
+  status: mysqlEnum("status", ["requested", "proposed", "reschedule_requested", "confirmed", "declined", "cancelled"]).default("requested").notNull(),
+  proposedStartsAt: timestamp("proposedStartsAt"),
+  proposedEndsAt: timestamp("proposedEndsAt"),
+  customerAccessToken: varchar("customerAccessToken", { length: 96 }),
   ownerNote: text("ownerNote"),
+  customerNote: text("customerNote"),
+  decidedAt: timestamp("decidedAt"),
+  cancelledAt: timestamp("cancelledAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, table => [index("appt_request_business_start_idx").on(table.businessId, table.startsAt), index("appt_request_lead_idx").on(table.leadId)]);
+}, table => [index("appt_request_business_start_idx").on(table.businessId, table.startsAt), index("appt_request_lead_idx").on(table.leadId), uniqueIndex("appt_request_customer_token_uidx").on(table.customerAccessToken)]);
+
+export const businessAppointmentEvents = mysqlTable("business_appointment_events", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  requestId: int("requestId").notNull().references(() => businessAppointmentRequests.id),
+  actorType: mysqlEnum("actorType", ["owner", "customer", "system"]).notNull(),
+  actorUserId: int("actorUserId").references(() => users.id),
+  eventType: mysqlEnum("eventType", ["requested", "approved", "rejected", "proposed_time", "proposal_accepted", "reschedule_requested", "cancelled"]).notNull(),
+  fromStatus: varchar("fromStatus", { length: 40 }),
+  toStatus: varchar("toStatus", { length: 40 }).notNull(),
+  startsAt: timestamp("startsAt"),
+  endsAt: timestamp("endsAt"),
+  note: text("note"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [index("appt_event_request_created_idx").on(table.requestId, table.createdAt), index("appt_event_business_created_idx").on(table.businessId, table.createdAt)]);
 
 export const businessAiContent = mysqlTable("business_ai_content", {
   id: int("id").autoincrement().primaryKey(),

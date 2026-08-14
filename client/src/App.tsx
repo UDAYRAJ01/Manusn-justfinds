@@ -13,6 +13,7 @@ import BusinessPlatform from "./pages/BusinessPlatform";
 import BusinessTools from "./pages/BusinessTools";
 import PublicWebsite from "./pages/PublicWebsite";
 import Categories from "./pages/Categories";
+import CustomerAppointment from "./pages/CustomerAppointment";
 import { CategoryLanding, CityLanding } from "./pages/DiscoveryLanding";
 import Home from "./pages/Home";
 import Jobs from "./pages/Jobs";
@@ -36,6 +37,7 @@ function Router() {
     <Route path="/forgot-password" component={AuthEntry} />
     <Route path="/jobs" component={Jobs} />
     <Route path="/saved" component={Saved} />
+    <Route path="/appointment/:token" component={CustomerAppointmentRoute} />
     <Route path="/dashboard" component={OwnerWorkspace} />
     <Route path="/business" component={BusinessPlatform} />
     <Route path="/business/onboarding" component={BusinessPlatform} />
@@ -58,6 +60,10 @@ function OwnerProfileRedirect() {
   const [, navigate] = useLocation();
   useEffect(() => { navigate("/business"); }, [navigate]);
   return <div className="grid min-h-screen place-items-center bg-[#f6f8fc] text-sm text-slate-500">Opening your unified business workspace…</div>;
+}
+
+function CustomerAppointmentRoute({ params }: { params: { token: string } }) {
+  return <CustomerAppointment token={params.token} />;
 }
 
 function BusinessWebsiteRoute({ params }: { params: { identifier: string } }) {

@@ -1,7 +1,8 @@
 import { and, asc, desc, eq, like, or, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { inArray } from "drizzle-orm";
+import { inArray, ne } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 import {
   businessAiContent,
   businessCertificates,
@@ -15,6 +16,7 @@ import {
   businessLeadNotes,
   businessLeads,
   businessAppointmentBlackouts,
+  businessAppointmentEvents,
   businessAppointmentRequests,
   businessAppointmentSettings,
   businessAppointmentWindows,
@@ -47,6 +49,11 @@ const businessIdInput = z.object({ businessId: z.number().int().positive() });
 const urlOrEmpty = z.string().max(500).refine(value => value === "" || /^https?:\/\//i.test(value), "Enter a valid URL.");
 const appointmentWindowInput = z.object({ dayOfWeek: z.number().int().min(0).max(6), startsAt: z.string().refine(isValidTime, "Use HH:MM time."), endsAt: z.string().refine(isValidTime, "Use HH:MM time.") }).refine(value => value.startsAt < value.endsAt, "Availability must end after it starts.");
 const appointmentStatusInput = z.enum(["requested", "confirmed", "declined", "cancelled"]);
+const appointmentOwnerActionInput = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("approve"), ownerNote: z.string().trim().max(2000).optional() }),
+  z.object({ action: z.literal("reject"), ownerNote: z.string().trim().max(2000).optional() }),
+  z.object({ action: z.literal("propose_time"), startsAt: z.string().datetime(), ownerNote: z.string().trim().max(2000).optional() }),
+]);
 
 async function dbOrThrow() {
   const db = await getDb();
@@ -64,14 +71,14 @@ async function ownedBusinessOrThrow(businessId: number, userId: number, role: z.
   return { db, business };
 }
 
-async function availableAppointmentSlots(db: Awaited<ReturnType<typeof dbOrThrow>>, businessId: number) {
+async function availableAppointmentSlots(db: Awaited<ReturnType<typeof dbOrThrow>>, businessId: number, excludeRequestId?: number) {
   const settings = await db.select().from(businessAppointmentSettings).where(eq(businessAppointmentSettings.businessId, businessId)).limit(1);
   const setting = settings[0];
   if (!setting?.isEnabled) return null;
   const [windows, blackouts, requests] = await Promise.all([
     db.select().from(businessAppointmentWindows).where(eq(businessAppointmentWindows.businessId, businessId)),
     db.select().from(businessAppointmentBlackouts).where(eq(businessAppointmentBlackouts.businessId, businessId)),
-    db.select({ startsAt: businessAppointmentRequests.startsAt }).from(businessAppointmentRequests).where(and(eq(businessAppointmentRequests.businessId, businessId), inArray(businessAppointmentRequests.status, ["requested", "confirmed"]))),
+    db.select({ startsAt: businessAppointmentRequests.startsAt }).from(businessAppointmentRequests).where(and(eq(businessAppointmentRequests.businessId, businessId), inArray(businessAppointmentRequests.status, ["requested", "confirmed"]), ...(excludeRequestId ? [ne(businessAppointmentRequests.id, excludeRequestId)] : []))),
   ]);
   return {
     setting,
@@ -83,6 +90,30 @@ async function availableAppointmentSlots(db: Awaited<ReturnType<typeof dbOrThrow
       blackoutDates: blackouts.map(value => value.localDate), unavailableStartsAt: requests.map(value => value.startsAt),
     }),
   };
+}
+
+function leadStatusForAppointment(status: "requested" | "proposed" | "reschedule_requested" | "confirmed" | "declined" | "cancelled") {
+  if (status === "confirmed") return "qualified" as const;
+  if (status === "declined" || status === "cancelled") return "closed" as const;
+  return status === "requested" ? "new" as const : "contacted" as const;
+}
+
+async function recordAppointmentEvent(db: Awaited<ReturnType<typeof dbOrThrow>>, event: {
+  businessId: number; requestId: number; actorType: "owner" | "customer" | "system"; actorUserId?: number | null;
+  eventType: "requested" | "approved" | "rejected" | "proposed_time" | "proposal_accepted" | "reschedule_requested" | "cancelled";
+  fromStatus?: string | null; toStatus: string; startsAt?: Date | null; endsAt?: Date | null; note?: string | null;
+}) {
+  await db.insert(businessAppointmentEvents).values({ ...event, actorUserId: event.actorUserId ?? null, fromStatus: event.fromStatus ?? null, startsAt: event.startsAt ?? null, endsAt: event.endsAt ?? null, note: event.note ?? null });
+}
+
+async function appointmentByCustomerToken(db: Awaited<ReturnType<typeof dbOrThrow>>, customerAccessToken: string) {
+  const rows = await db.select({ request: businessAppointmentRequests, lead: businessLeads, business: { id: businesses.id, name: businesses.name, address: businesses.address, slug: businesses.slug } })
+    .from(businessAppointmentRequests)
+    .innerJoin(businessLeads, eq(businessAppointmentRequests.leadId, businessLeads.id))
+    .innerJoin(businesses, eq(businessAppointmentRequests.businessId, businesses.id))
+    .where(eq(businessAppointmentRequests.customerAccessToken, customerAccessToken))
+    .limit(1);
+  return rows[0] ?? null;
 }
 
 const profileInput = z.object({
@@ -209,13 +240,21 @@ export const businessRouter = router({
 
   appointmentSettings: protectedProcedure.input(businessIdInput).query(async ({ ctx, input }) => {
     const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
-    const [settings, windows, blackouts, requests] = await Promise.all([
+    const [settings, windows, blackouts, requests, events] = await Promise.all([
       db.select().from(businessAppointmentSettings).where(eq(businessAppointmentSettings.businessId, input.businessId)).limit(1),
       db.select().from(businessAppointmentWindows).where(eq(businessAppointmentWindows.businessId, input.businessId)).orderBy(businessAppointmentWindows.dayOfWeek, businessAppointmentWindows.startsAt),
       db.select().from(businessAppointmentBlackouts).where(eq(businessAppointmentBlackouts.businessId, input.businessId)).orderBy(desc(businessAppointmentBlackouts.localDate)),
       db.select({ request: businessAppointmentRequests, lead: businessLeads }).from(businessAppointmentRequests).innerJoin(businessLeads, eq(businessAppointmentRequests.leadId, businessLeads.id)).where(eq(businessAppointmentRequests.businessId, input.businessId)).orderBy(desc(businessAppointmentRequests.startsAt)).limit(60),
+      db.select().from(businessAppointmentEvents).where(eq(businessAppointmentEvents.businessId, input.businessId)).orderBy(desc(businessAppointmentEvents.createdAt)).limit(120),
     ]);
-    return { settings: settings[0] ?? { isEnabled: false, timeZone: "Asia/Kolkata", slotDurationMinutes: 30, minimumNoticeMinutes: 120, maximumAdvanceDays: 30 }, windows, blackouts, requests };
+    return { settings: settings[0] ?? { isEnabled: false, timeZone: "Asia/Kolkata", slotDurationMinutes: 30, minimumNoticeMinutes: 120, maximumAdvanceDays: 30 }, windows, blackouts, requests, events };
+  }),
+
+  ownerAppointmentAvailability: protectedProcedure.input(businessIdInput).query(async ({ ctx, input }) => {
+    const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
+    const availability = await availableAppointmentSlots(db, input.businessId);
+    if (!availability) return { enabled: false as const, timeZone: null, slots: [] };
+    return { enabled: true as const, timeZone: availability.setting.timeZone, slots: availability.slots.slice(0, 160) };
   }),
 
   saveAppointmentSettings: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), isEnabled: z.boolean(), timeZone: z.string().min(1).max(64), slotDurationMinutes: z.number().int().min(10).max(240), minimumNoticeMinutes: z.number().int().min(0).max(10_080), maximumAdvanceDays: z.number().int().min(1).max(180), windows: z.array(appointmentWindowInput).max(28) })).mutation(async ({ ctx, input }) => {
@@ -244,8 +283,44 @@ export const businessRouter = router({
     const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
     const existing = await db.select().from(businessAppointmentRequests).where(and(eq(businessAppointmentRequests.id, input.requestId), eq(businessAppointmentRequests.businessId, input.businessId))).limit(1);
     if (!existing[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Booking request not found." });
-    await db.update(businessAppointmentRequests).set({ status: input.status, ownerNote: input.ownerNote || null }).where(eq(businessAppointmentRequests.id, input.requestId));
+    await db.update(businessAppointmentRequests).set({ status: input.status, ownerNote: input.ownerNote || null, decidedAt: new Date(), cancelledAt: input.status === "cancelled" ? new Date() : null }).where(eq(businessAppointmentRequests.id, input.requestId));
+    await db.update(businessLeads).set({ status: leadStatusForAppointment(input.status), lastContactedAt: new Date() }).where(eq(businessLeads.id, existing[0].leadId));
+    await recordAppointmentEvent(db, { businessId: input.businessId, requestId: input.requestId, actorType: "owner", actorUserId: ctx.user.id, eventType: input.status === "confirmed" ? "approved" : input.status === "cancelled" ? "cancelled" : "rejected", fromStatus: existing[0].status, toStatus: input.status, startsAt: existing[0].startsAt, endsAt: existing[0].endsAt, note: input.ownerNote });
     return { success: true };
+  }),
+
+  decideAppointmentRequest: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), requestId: z.number().int().positive() }).and(appointmentOwnerActionInput)).mutation(async ({ ctx, input }) => {
+    const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
+    const existing = await db.select().from(businessAppointmentRequests).where(and(eq(businessAppointmentRequests.id, input.requestId), eq(businessAppointmentRequests.businessId, input.businessId))).limit(1);
+    const request = existing[0];
+    if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Booking request not found." });
+    if (!["requested", "reschedule_requested", "proposed"].includes(request.status)) throw new TRPCError({ code: "BAD_REQUEST", message: "This appointment request is already closed." });
+    if (input.action === "approve") {
+      if (request.status === "proposed") throw new TRPCError({ code: "BAD_REQUEST", message: "Wait for the customer to accept the proposed time." });
+      if (request.status === "reschedule_requested") {
+        const availability = await availableAppointmentSlots(db, input.businessId, request.id);
+        const stillAvailable = availability?.slots.some(slot => slot.startAt.getTime() === request.startsAt.getTime());
+        if (!stillAvailable) throw new TRPCError({ code: "CONFLICT", message: "The requested reschedule time is no longer available. Propose another available time instead." });
+      }
+      await db.update(businessAppointmentRequests).set({ status: "confirmed", ownerNote: input.ownerNote || null, proposedStartsAt: null, proposedEndsAt: null, decidedAt: new Date() }).where(eq(businessAppointmentRequests.id, request.id));
+      await db.update(businessLeads).set({ status: "qualified", lastContactedAt: new Date() }).where(eq(businessLeads.id, request.leadId));
+      await recordAppointmentEvent(db, { businessId: input.businessId, requestId: request.id, actorType: "owner", actorUserId: ctx.user.id, eventType: "approved", fromStatus: request.status, toStatus: "confirmed", startsAt: request.startsAt, endsAt: request.endsAt, note: input.ownerNote });
+      return { success: true, status: "confirmed" as const };
+    }
+    if (input.action === "reject") {
+      await db.update(businessAppointmentRequests).set({ status: "declined", ownerNote: input.ownerNote || null, decidedAt: new Date() }).where(eq(businessAppointmentRequests.id, request.id));
+      await db.update(businessLeads).set({ status: "closed", lastContactedAt: new Date() }).where(eq(businessLeads.id, request.leadId));
+      await recordAppointmentEvent(db, { businessId: input.businessId, requestId: request.id, actorType: "owner", actorUserId: ctx.user.id, eventType: "rejected", fromStatus: request.status, toStatus: "declined", startsAt: request.startsAt, endsAt: request.endsAt, note: input.ownerNote });
+      return { success: true, status: "declined" as const };
+    }
+    const availability = await availableAppointmentSlots(db, input.businessId, request.id);
+    const proposedStart = new Date(input.startsAt);
+    const proposed = availability?.slots.find(slot => slot.startAt.getTime() === proposedStart.getTime());
+    if (!proposed) throw new TRPCError({ code: "CONFLICT", message: "That proposed time is no longer available." });
+    await db.update(businessAppointmentRequests).set({ status: "proposed", proposedStartsAt: proposed.startAt, proposedEndsAt: proposed.endAt, ownerNote: input.ownerNote || null, decidedAt: new Date() }).where(eq(businessAppointmentRequests.id, request.id));
+    await db.update(businessLeads).set({ status: "contacted", lastContactedAt: new Date() }).where(eq(businessLeads.id, request.leadId));
+    await recordAppointmentEvent(db, { businessId: input.businessId, requestId: request.id, actorType: "owner", actorUserId: ctx.user.id, eventType: "proposed_time", fromStatus: request.status, toStatus: "proposed", startsAt: proposed.startAt, endsAt: proposed.endAt, note: input.ownerNote });
+    return { success: true, status: "proposed" as const };
   }),
 
   publicAppointmentAvailability: publicProcedure.input(businessIdInput).query(async ({ input }) => {
@@ -268,8 +343,51 @@ export const businessRouter = router({
     if (!slot) throw new TRPCError({ code: "CONFLICT", message: "That time is no longer available. Please choose another slot." });
     const leadResult = await db.insert(businessLeads).values({ businessId: input.businessId, name: input.name, phone: input.phone || null, email: input.email || null, message: input.message || null, source: "appointment-request", sourceDetail: `Appointment request · ${availability.setting.timeZone}`, page: "appointment-calendar", consentGiven: true, consentAt: new Date() });
     const leadId = Number(leadResult[0].insertId);
-    await db.insert(businessAppointmentRequests).values({ businessId: input.businessId, leadId, startsAt: slot.startAt, endsAt: slot.endAt, timeZone: availability.setting.timeZone, status: "requested" });
-    return { success: true, requestStatus: "requested" as const };
+    const customerAccessToken = randomUUID();
+    const result = await db.insert(businessAppointmentRequests).values({ businessId: input.businessId, leadId, startsAt: slot.startAt, endsAt: slot.endAt, timeZone: availability.setting.timeZone, status: "requested", customerAccessToken });
+    const requestId = Number(result[0].insertId);
+    await recordAppointmentEvent(db, { businessId: input.businessId, requestId, actorType: "system", eventType: "requested", toStatus: "requested", startsAt: slot.startAt, endsAt: slot.endAt });
+    return { success: true, requestStatus: "requested" as const, customerAccessToken };
+  }),
+
+  customerAppointment: publicProcedure.input(z.object({ customerAccessToken: z.string().uuid() })).query(async ({ input }) => {
+    const db = await dbOrThrow();
+    const appointment = await appointmentByCustomerToken(db, input.customerAccessToken);
+    if (!appointment) throw new TRPCError({ code: "NOT_FOUND", message: "Appointment request not found." });
+    const events = await db.select({ eventType: businessAppointmentEvents.eventType, toStatus: businessAppointmentEvents.toStatus, startsAt: businessAppointmentEvents.startsAt, endsAt: businessAppointmentEvents.endsAt, createdAt: businessAppointmentEvents.createdAt }).from(businessAppointmentEvents).where(eq(businessAppointmentEvents.requestId, appointment.request.id)).orderBy(desc(businessAppointmentEvents.createdAt));
+    return { business: appointment.business, lead: { name: appointment.lead.name }, request: appointment.request, events };
+  }),
+
+  customerAppointmentAction: publicProcedure.input(z.object({ customerAccessToken: z.string().uuid(), action: z.enum(["accept_proposal", "request_reschedule", "cancel"]), preferredStartsAt: z.string().datetime().optional(), customerNote: z.string().trim().max(2000).optional() })).mutation(async ({ input }) => {
+    const db = await dbOrThrow();
+    const appointment = await appointmentByCustomerToken(db, input.customerAccessToken);
+    if (!appointment) throw new TRPCError({ code: "NOT_FOUND", message: "Appointment request not found." });
+    const { request } = appointment;
+    if (!["requested", "proposed", "reschedule_requested", "confirmed"].includes(request.status)) throw new TRPCError({ code: "BAD_REQUEST", message: "This appointment request is already closed." });
+    if (input.action === "cancel") {
+      await db.update(businessAppointmentRequests).set({ status: "cancelled", customerNote: input.customerNote || null, cancelledAt: new Date() }).where(eq(businessAppointmentRequests.id, request.id));
+      await db.update(businessLeads).set({ status: "closed" }).where(eq(businessLeads.id, request.leadId));
+      await recordAppointmentEvent(db, { businessId: request.businessId, requestId: request.id, actorType: "customer", eventType: "cancelled", fromStatus: request.status, toStatus: "cancelled", startsAt: request.startsAt, endsAt: request.endsAt, note: input.customerNote });
+      return { success: true, status: "cancelled" as const };
+    }
+    if (input.action === "accept_proposal") {
+      if (request.status !== "proposed" || !request.proposedStartsAt || !request.proposedEndsAt) throw new TRPCError({ code: "BAD_REQUEST", message: "There is no proposed time to accept." });
+      const availability = await availableAppointmentSlots(db, request.businessId, request.id);
+      const stillAvailable = availability?.slots.some(slot => slot.startAt.getTime() === request.proposedStartsAt!.getTime());
+      if (!stillAvailable) throw new TRPCError({ code: "CONFLICT", message: "The proposed time is no longer available. Please request a new time." });
+      await db.update(businessAppointmentRequests).set({ status: "confirmed", startsAt: request.proposedStartsAt, endsAt: request.proposedEndsAt, customerNote: input.customerNote || null, proposedStartsAt: null, proposedEndsAt: null, decidedAt: new Date() }).where(eq(businessAppointmentRequests.id, request.id));
+      await db.update(businessLeads).set({ status: "qualified" }).where(eq(businessLeads.id, request.leadId));
+      await recordAppointmentEvent(db, { businessId: request.businessId, requestId: request.id, actorType: "customer", eventType: "proposal_accepted", fromStatus: "proposed", toStatus: "confirmed", startsAt: request.proposedStartsAt, endsAt: request.proposedEndsAt, note: input.customerNote });
+      return { success: true, status: "confirmed" as const };
+    }
+    const availability = await availableAppointmentSlots(db, request.businessId, request.id);
+    const preferredStart = input.preferredStartsAt ? new Date(input.preferredStartsAt) : null;
+    const preferred = preferredStart ? availability?.slots.find(slot => slot.startAt.getTime() === preferredStart.getTime()) : null;
+    if (!preferred) throw new TRPCError({ code: "CONFLICT", message: "Choose a currently available time for your reschedule request." });
+    await db.update(businessAppointmentRequests).set({ status: "reschedule_requested", startsAt: preferred.startAt, endsAt: preferred.endAt, customerNote: input.customerNote || null, proposedStartsAt: null, proposedEndsAt: null }).where(eq(businessAppointmentRequests.id, request.id));
+    await db.update(businessLeads).set({ status: "contacted" }).where(eq(businessLeads.id, request.leadId));
+    await recordAppointmentEvent(db, { businessId: request.businessId, requestId: request.id, actorType: "customer", eventType: "reschedule_requested", fromStatus: request.status, toStatus: "reschedule_requested", startsAt: preferred.startAt, endsAt: preferred.endAt, note: input.customerNote });
+    return { success: true, status: "reschedule_requested" as const };
   }),
 
   verificationStatus: protectedProcedure.input(businessIdInput).query(async ({ ctx, input }) => {
