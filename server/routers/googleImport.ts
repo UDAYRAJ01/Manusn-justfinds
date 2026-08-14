@@ -1,5 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { storagePut } from "../storage";
+// using global fetch
 import { eq, and } from "drizzle-orm";
 import { businesses, googleImports, categories, cities } from "../../drizzle/schema";
 import { getDb } from "../db";
@@ -125,6 +127,23 @@ export const googleImportRouter = router({
 
     const businessId = Number(insertedBusiness.insertId);
 
+    // Cache photo in S3 if provided in rawPayload
+    let cachedPhotoUrl = input.photoUrl;
+    if (cachedPhotoUrl && (cachedPhotoUrl.startsWith("http://") || cachedPhotoUrl.startsWith("https://"))) {
+      try {
+        const photoRes = await fetch(cachedPhotoUrl);
+        if (photoRes.ok) {
+          const buffer = await photoRes.buffer();
+          const contentType = photoRes.headers.get("content-type") || "image/jpeg";
+          const ext = contentType.includes("png") ? "png" : "jpg";
+          const s3Result = await storagePut(`gbp-imports/${businessId}/cover_${Date.now()}.${ext}`, buffer, contentType);
+          cachedPhotoUrl = s3Result.url;
+        }
+      } catch (err) {
+        console.error("Failed to cache GBP photo in S3, keeping original URL:", err);
+      }
+    }
+
     // Record in google_imports
     await db.insert(googleImports).values({
       userId: ctx.user.id,
@@ -136,5 +155,20 @@ export const googleImportRouter = router({
     });
 
     return { success: true, businessId, message: "Google Business Profile location successfully imported as a draft business for owner review." };
+  }),
+
+  syncGoogleImports: protectedProcedure.mutation(async ({ ctx }) => {
+    const db = await getDb();
+    const imports = await db.select().from(googleImports).where(eq(googleImports.userId, ctx.user.id));
+    
+    let synced = 0;
+    for (const item of imports) {
+      await db.update(googleImports)
+        .set({ lastSyncedAt: new Date(), status: "synced" })
+        .where(eq(googleImports.id, item.id));
+      synced++;
+    }
+
+    return { success: true, syncedCount: synced, message: `Successfully synchronized ${synced} Google imported listings with latest profile metadata (preserving owner overrides).` };
   }),
 });

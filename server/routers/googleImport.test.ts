@@ -27,3 +27,15 @@ describe("Google Business Profile Import Router", () => {
     expect(res.locations.length).toBeGreaterThan(0);
   });
 });
+
+  it("supports syncGoogleImports mutation", async () => {
+    const caller = appRouter.createCaller({
+      user: { id: 1, role: "owner", openId: "test-user", name: "Test Owner" } as any,
+      req: {} as any,
+      res: {} as any,
+    });
+
+    const res = await caller.googleImport.syncGoogleImports();
+    expect(res.success).toBe(true);
+    expect(res).toHaveProperty("syncedCount");
+  });
