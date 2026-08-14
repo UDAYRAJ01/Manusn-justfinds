@@ -80,4 +80,48 @@ describe("guided owner onboarding moderation contract", () => {
 
     expect(values).toHaveBeenCalledWith(expect.objectContaining({ slug: "owner-supplied-business-3" }));
   });
+
+  it("lets an ordinary authenticated user create a private first draft and promotes only that user to business owner", async () => {
+    const values = vi.fn().mockResolvedValue([{ insertId: 46 }]);
+    const insert = vi.fn(() => ({ values }));
+    const roleWhere = vi.fn(async () => undefined);
+    const roleSet = vi.fn(() => ({ where: roleWhere }));
+    const update = vi.fn(() => ({ set: roleSet }));
+    const limit = vi.fn(async () => []);
+    const whereSelect = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where: whereSelect }));
+    const select = vi.fn(() => ({ from }));
+    dbMocks.getDb.mockResolvedValue({ insert, select, update });
+
+    const caller = workspaceRouter.createCaller({ user: { id: 71, role: "user" } } as never);
+    await expect(caller.createBusiness({
+      name: "First owner listing",
+      categoryId: 1,
+      cityId: 1,
+      address: "123 Verified Main Street",
+      shortDescription: "A factual first private draft created by an authenticated ordinary user.",
+      latitude: "18.520430",
+      longitude: "73.856744",
+      dynamicValues: [],
+    })).resolves.toEqual({ businessId: 46, status: "draft" });
+
+    expect(values).toHaveBeenCalledWith(expect.objectContaining({ ownerId: 71, status: "draft" }));
+    expect(roleSet).toHaveBeenCalledWith({ role: "business_owner" });
+  });
+
+  it("keeps a newly promoted owner from mutating a different owner’s listing", async () => {
+    const limit = vi.fn(async () => [{ id: 88, ownerId: 72, status: "draft", name: "Another owner listing", approvedDescription: null }]);
+    const whereSelect = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where: whereSelect }));
+    const select = vi.fn(() => ({ from }));
+    const update = vi.fn();
+    dbMocks.getDb.mockResolvedValue({ select, update });
+
+    const caller = workspaceRouter.createCaller({ user: { id: 71, role: "business_owner" } } as never);
+    await expect(caller.updateBusiness({ businessId: 88, name: "Attempted foreign change" })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: "You cannot manage this business.",
+    });
+    expect(update).not.toHaveBeenCalled();
+  });
 });

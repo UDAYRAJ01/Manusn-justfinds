@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { approvalQueue, businesses, businessFieldValues, categories, categoryFields, cities } from "../../drizzle/schema";
+import { approvalQueue, businesses, businessFieldValues, categories, categoryFields, cities, users } from "../../drizzle/schema";
 import { deleteInternalValidationBusiness, getAdminCounts, getCategorySchemas, getDb, getInternalValidationBusinesses, getOwnerBusinesses, getPendingBusinesses } from "../db";
 import { canManageAdmins, canManageBusiness, canModerate } from "../domain/permissions";
 import { buildVoiceIntroductionScript } from "../domain/voiceScript";
@@ -96,7 +96,6 @@ export const workspaceRouter = router({
     return { fieldId: Number(result[0].insertId) };
   }),
   createBusiness: protectedProcedure.input(businessInput).mutation(async ({ ctx, input }) => {
-    if (ctx.user.role !== "business_owner" && !canModerate(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "Business-owner access is required to create a listing." });
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The business workspace is temporarily unavailable." });
     const { dynamicValues, slug: requestedSlug, ...business } = input;
@@ -111,6 +110,7 @@ export const workspaceRouter = router({
     if (!available) throw new TRPCError({ code: "CONFLICT", message: "This business name is already in use too many times. Please choose a more specific name." });
     const created = await db.insert(businesses).values({ ...business, slug, ownerId: ctx.user.id, status: "draft" });
     const businessId = Number(created[0].insertId);
+    if (ctx.user.role === "user") await db.update(users).set({ role: "business_owner" }).where(eq(users.id, ctx.user.id));
     if (dynamicValues?.length) await db.insert(businessFieldValues).values(dynamicValues.map(field => ({ businessId, categoryFieldId: field.categoryFieldId, value: field.value })));
     return { businessId, status: "draft" as const };
   }),

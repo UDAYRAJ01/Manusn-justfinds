@@ -149,3 +149,10 @@
 
 - [x] Diagnose and repair the reported blank page on the genuine business website or owner-builder route
 - [x] Add regression coverage for the resolved blank-page path and revalidate it in the browser
+
+- [ ] Diagnose the blank take-control authentication view and provide a safe owner-login recovery path
+
+- [ ] Obtain explicit authorization before transferring or otherwise changing ownership of the genuine business for publication access
+
+- [x] Diagnose and repair the reported “Business-owner access is required to create a listing” error for an authenticated first-listing user
+- [x] Add regression coverage proving ordinary authenticated users can create a first private draft while foreign-business isolation remains enforced
