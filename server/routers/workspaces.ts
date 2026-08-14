@@ -79,11 +79,13 @@ export const workspaceRouter = router({
     const result = await db.insert(categories).values({ ...input, status: "active", isActive: true });
     return { categoryId: Number(result[0].insertId) };
   }),
-  createCity: protectedProcedure.input(z.object({ name: z.string().min(2).max(120), slug: z.string().min(2).max(140).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/), state: z.string().max(120).optional(), latitude: z.string().max(24).optional(), longitude: z.string().max(24).optional() })).mutation(async ({ ctx, input }) => {
+  createCity: protectedProcedure.input(z.object({ name: z.string().min(2).max(120), slug: z.string().max(140).optional(), state: z.string().max(120).optional(), latitude: z.string().max(24).optional(), longitude: z.string().max(24).optional() })).mutation(async ({ ctx, input }) => {
     requireSuperAdmin(ctx.user.role);
+    const citySlug = normalizeCategorySlug(input.name);
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(citySlug)) throw new TRPCError({ code: "BAD_REQUEST", message: "City name must produce a valid URL slug." });
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The location service is temporarily unavailable." });
-    const result = await db.insert(cities).values({ ...input, isActive: true });
+    const result = await db.insert(cities).values({ ...input, slug: citySlug, isActive: true });
     return { cityId: Number(result[0].insertId) };
   }),
   createCategoryField: protectedProcedure.input(z.object({ categoryId: z.number().int().positive(), fieldKey: z.string().min(2).max(80).regex(/^[a-z][a-z0-9_]*$/), label: z.string().min(2).max(120), fieldType: z.enum(["text", "textarea", "number", "currency", "boolean", "select", "multiselect", "multi_select", "date", "time", "image", "url", "phone", "email"]), placeholder: z.string().max(240).optional(), options: z.array(z.string().max(100)).max(50).optional(), isRequired: z.boolean().default(false), isPublic: z.boolean().default(true), sortOrder: z.number().int().min(0).default(0) })).mutation(async ({ ctx, input }) => {

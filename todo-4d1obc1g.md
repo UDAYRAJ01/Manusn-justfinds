@@ -125,3 +125,7 @@
 - [x] Normalize category slugs from category names, converting spaces/underscores to hyphens and lowercasing
 - [x] Apply category slug normalization consistently in the supported category-create UI and server validation
 - [x] Add focused category-create regression coverage for `dental_clinic` -> `dental-clinic` and invalid normalized slugs
+
+- [x] Auto-generate city slugs from city names so `Kannur` becomes `kannur` and manual mismatches cannot persist
+- [x] Preserve super-admin authorization for city creation and show a clear permission error to non-super-admin users
+- [x] Add city slug and permission regression coverage
