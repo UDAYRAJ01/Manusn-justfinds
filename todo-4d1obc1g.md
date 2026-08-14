@@ -142,3 +142,10 @@
 
 - [x] Create the requested `Hospital` category through the authenticated super-admin workspace and verify server-side persistence
 - [x] Create the requested `Kanpur` city through the authenticated super-admin workspace and verify server-side persistence
+
+- [x] Verify the user-created non-test business record, ownership, and factual source data before Phase 7 website publication
+- [ ] Publish the verified business website from the authenticated owner workflow and capture its canonical public URL
+- [ ] Validate owner-builder and published public website desktop/mobile layouts using the genuine business data
+
+- [x] Diagnose and repair the reported blank page on the genuine business website or owner-builder route
+- [x] Add regression coverage for the resolved blank-page path and revalidate it in the browser

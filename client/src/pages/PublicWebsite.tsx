@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import { useParams } from "wouter";
 import { Loader2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
@@ -7,7 +7,7 @@ import WebsiteRenderer from "@/components/WebsiteRenderer";
 export default function PublicWebsite({ slug }: { slug?: string }) {
   const { businessSlug = "" } = useParams<{ businessSlug: string }>();
   const resolvedSlug = slug ?? businessSlug;
-  const page = trpc.website.publicPage.useQuery({ slug: resolvedSlug });
+  const page = trpc.website.publicPage.useQuery({ slug: resolvedSlug }, { retry: false });
   const track = trpc.website.track.useMutation();
   useEffect(() => { if (page.data) track.mutate({ pageId: page.data.page.id, businessId: page.data.business.id, eventType: "page_view" }); }, [page.data?.page.id, page.data?.business.id]);
   if (page.isLoading) return <div className="grid min-h-screen place-items-center text-slate-500"><Loader2 className="size-5 animate-spin" /></div>;
