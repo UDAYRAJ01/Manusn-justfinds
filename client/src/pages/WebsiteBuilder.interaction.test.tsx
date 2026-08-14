@@ -62,6 +62,8 @@ describe("WebsiteBuilder section interactions", () => {
     const desktop = container.querySelector('button[aria-label="Show desktop preview"]') as HTMLButtonElement;
     expect(desktop.getAttribute("aria-pressed")).toBe("true");
     expect(mobile.getAttribute("aria-pressed")).toBe("false");
+    expect(mobile.textContent).toContain("Mobile");
+    expect(desktop.textContent).toContain("Desktop");
     await act(async () => { mobile.click(); });
     expect(mobile.getAttribute("aria-pressed")).toBe("true");
     expect(container.querySelector('[data-preview-mode="mobile"]')).toBeTruthy();

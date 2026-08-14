@@ -145,7 +145,7 @@
 
 - [x] Verify the user-created non-test business record, ownership, and factual source data before Phase 7 website publication
 - [x] Publish the verified business website from the authenticated owner workflow and capture its canonical public URL
-- [ ] Validate owner-builder and published public website desktop/mobile layouts using the genuine business data
+- [x] Validate owner-builder and published public website desktop/mobile layouts using the genuine business data
 
 - [x] Diagnose and repair the reported blank page on the genuine business website or owner-builder route
 - [x] Add regression coverage for the resolved blank-page path and revalidate it in the browser
@@ -168,10 +168,12 @@
 - [ ] Inspect a real non-admin post-login session showing its signed-in identity and My listings workspace
 - [ ] Confirm a real non-admin session cannot enter `/admin` and capture the resulting protected state
 
-- [ ] Directly verify the genuine hospital owner Website Builder in both desktop and mobile layouts
-- [ ] Switch the genuine hospital Website Builder into its mobile preview mode and capture the changed mobile preview state
+- [x] Directly verify the genuine hospital owner Website Builder in both desktop and mobile layouts
+- [x] Switch the genuine hospital Website Builder into its mobile preview mode and capture the changed mobile preview state
 
 - [x] Expose the active builder preview mode through accessible labels and selected-state semantics for direct validation
+
+- [x] Render visible Desktop, Tablet, and Mobile labels on builder preview controls so the active mode is directly observable
 - [ ] Capture a real non-admin OAuth callback, identity, My listings workspace, and `/admin` protected state before closing user-role acceptance validation
 
 - [ ] Capture the real non-admin OAuth callback/session completion and visible signed-in identity
