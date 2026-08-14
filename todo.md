@@ -141,3 +141,12 @@
 - [x] Add clear back navigation and breadcrumbs between the portfolio dashboard and detailed `/business/:businessId/:tool` tools.
 - [x] Pass real business names to workspace tool headers for clear context.
 - [x] Run full regression test suite to ensure all 157+ automated tests pass cleanly.
+- [ ] Unify `/owner/profile` and `/business` around one canonical owner listing-management entry point.
+- [ ] Remove conflicting duplicate listing-management presentation while preserving guided onboarding and detailed business tools.
+- [ ] Add synchronized navigation and selected-business continuity between the canonical owner listing view and detailed workspace.
+- [ ] Add regression tests for the unified listing flow and owner-scoped route transitions.
+- [ ] Revalidate the live owner/profile and business entry points after implementation.
+
+## Current Owner Listing Flow Fix
+
+The user reports that `/owner/profile` and `/business` still expose separate business-listing options with no meaningful connection. The target is one canonical listing-management flow: portfolio overview selects a business, detailed tools edit that selected business, and all create/manage actions return to the same owner-scoped context.

@@ -2,7 +2,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PageMeta } from "@/components/PageMeta";
 import { trpc } from "@/lib/trpc";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
+import { useEffect } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import AdminWorkspace from "./pages/AdminWorkspace";
@@ -42,6 +43,7 @@ function Router() {
     <Route path="/business/:businessId/:tool" component={BusinessToolRoute} />
     <Route path="/business/:rest*" component={BusinessPlatform} />
     <Route path="/owner" component={OwnerWorkspace} />
+    <Route path="/owner/profile" component={OwnerProfileRedirect} />
     <Route path="/owner/:rest*" component={OwnerWorkspace} />
     <Route path="/admin" component={AdminWorkspace} />
     <Route path="/admin/:rest*" component={AdminWorkspace} />
@@ -50,6 +52,12 @@ function Router() {
     <Route path="/404" component={NotFound} />
     <Route component={NotFound} />
   </Switch>;
+}
+
+function OwnerProfileRedirect() {
+  const [, navigate] = useLocation();
+  useEffect(() => { navigate("/business"); }, [navigate]);
+  return <div className="grid min-h-screen place-items-center bg-[#f6f8fc] text-sm text-slate-500">Opening your unified business workspace…</div>;
 }
 
 function BusinessWebsiteRoute({ params }: { params: { identifier: string } }) {
