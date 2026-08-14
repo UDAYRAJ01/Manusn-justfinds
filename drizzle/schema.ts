@@ -75,10 +75,11 @@ export const localities = mysqlTable("localities", {
   cityId: int("cityId").notNull().references(() => cities.id),
   name: varchar("name", { length: 160 }).notNull(),
   slug: varchar("slug", { length: 180 }).notNull(),
+  pincode: varchar("pincode", { length: 12 }),
   latitude: varchar("latitude", { length: 24 }),
   longitude: varchar("longitude", { length: 24 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-}, table => [uniqueIndex("locality_city_slug_uidx").on(table.cityId, table.slug), index("locality_city_idx").on(table.cityId)]);
+}, table => [uniqueIndex("locality_city_slug_uidx").on(table.cityId, table.slug), index("locality_city_idx").on(table.cityId), index("locality_name_idx").on(table.name), index("locality_pincode_idx").on(table.pincode)]);
 
 export const categories = mysqlTable("categories", {
   id: int("id").autoincrement().primaryKey(),
