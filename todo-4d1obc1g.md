@@ -251,3 +251,12 @@
 - [x] Add city-match and unmatched-city fallbacks with no manual-slug requirement
 - [x] Add focused category, city, and About-field mapping regression coverage
 - [x] Validate responsive owner import review behavior; capture desktop/mobile findings in google-city-prefill-validation.md; 174 tests across 60 files pass; prepare the expanded Google prefill release for publishing
+
+## Full-site visual redesign
+- [x] Audit current public, owner, administrator, and shared-layout visual inconsistencies at desktop and mobile breakpoints
+- [x] Establish a premium responsive design system for typography, colors, spacing, cards, controls, and motion without changing application behavior
+- [x] Redesign shared public navigation, search/discovery pages, listing/detail surfaces, and informational states
+- [x] Redesign business-owner navigation, workspace, onboarding, business tools, website builder, and Google import review surfaces
+- [x] Redesign administrator workspace, moderation, category/city, and verification tools while retaining role gates
+- [x] Add or update targeted visual/component tests where shared markup changes require regression coverage
+- [x] Verify representative public, owner, administrator, desktop, and mobile experiences; run full tests and TypeScript checks; 177 tests across 61 files pass; publish the redesign

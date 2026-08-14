@@ -9,14 +9,16 @@
 }
 
 :root {
-  --radius: .85rem; --background: oklch(.984 .002 95); --foreground: oklch(.19 .016 260); --card: oklch(1 0 0); --card-foreground: oklch(.19 .016 260); --popover: oklch(1 0 0); --popover-foreground: oklch(.19 .016 260); --primary: oklch(.38 .17 264); --primary-foreground: oklch(.985 .005 264); --secondary: oklch(.964 .008 260); --secondary-foreground: oklch(.32 .025 260); --muted: oklch(.966 .004 260); --muted-foreground: oklch(.52 .02 260); --accent: oklch(.95 .02 264); --accent-foreground: oklch(.28 .09 264); --destructive: oklch(.577 .245 27.325); --destructive-foreground: oklch(.985 0 0); --border: oklch(.91 .006 260); --input: oklch(.91 .006 260); --ring: oklch(.48 .18 264); --chart-1: oklch(.52 .18 264); --chart-2: oklch(.63 .14 209); --chart-3: oklch(.64 .14 46); --chart-4: oklch(.54 .14 318); --chart-5: oklch(.64 .12 143); --sidebar: oklch(1 0 0); --sidebar-foreground: oklch(.19 .016 260); --sidebar-primary: oklch(.38 .17 264); --sidebar-primary-foreground: oklch(.985 .005 264); --sidebar-accent: oklch(.95 .02 264); --sidebar-accent-foreground: oklch(.28 .09 264); --sidebar-border: oklch(.91 .006 260); --sidebar-ring: oklch(.48 .18 264);
+  --radius: 1rem; --background: oklch(.979 .004 95); --foreground: oklch(.19 .025 260); --card: oklch(1 0 0); --card-foreground: oklch(.19 .025 260); --popover: oklch(1 0 0); --popover-foreground: oklch(.19 .025 260); --primary: oklch(.44 .18 262); --primary-foreground: oklch(.985 .005 264); --secondary: oklch(.955 .012 256); --secondary-foreground: oklch(.29 .035 260); --muted: oklch(.96 .006 260); --muted-foreground: oklch(.49 .025 260); --accent: oklch(.93 .035 258); --accent-foreground: oklch(.27 .095 262); --destructive: oklch(.577 .245 27.325); --destructive-foreground: oklch(.985 0 0); --border: oklch(.89 .009 260); --input: oklch(.89 .009 260); --ring: oklch(.52 .18 262); --chart-1: oklch(.52 .18 262); --chart-2: oklch(.67 .14 205); --chart-3: oklch(.67 .14 48); --chart-4: oklch(.57 .14 318); --chart-5: oklch(.68 .12 143); --sidebar: oklch(.985 .004 95); --sidebar-foreground: oklch(.19 .025 260); --sidebar-primary: oklch(.44 .18 262); --sidebar-primary-foreground: oklch(.985 .005 264); --sidebar-accent: oklch(.93 .035 258); --sidebar-accent-foreground: oklch(.27 .095 262); --sidebar-border: oklch(.89 .009 260); --sidebar-ring: oklch(.52 .18 262);
 }
 
 .dark { --background: oklch(.16 .02 260); --foreground: oklch(.91 .01 260); --card: oklch(.21 .02 260); --card-foreground: oklch(.91 .01 260); --popover: oklch(.21 .02 260); --popover-foreground: oklch(.91 .01 260); --secondary: oklch(.28 .02 260); --secondary-foreground: oklch(.84 .01 260); --muted: oklch(.28 .02 260); --muted-foreground: oklch(.7 .02 260); --accent: oklch(.28 .04 264); --accent-foreground: oklch(.9 .01 260); --border: oklch(1 0 0 / 10%); --input: oklch(1 0 0 / 15%); --sidebar: oklch(.21 .02 260); --sidebar-foreground: oklch(.91 .01 260); --sidebar-accent: oklch(.28 .04 264); --sidebar-accent-foreground: oklch(.9 .01 260); --sidebar-border: oklch(1 0 0 / 10%); }
 
 @layer base {
   * { @apply border-border outline-ring/50; }
-  body { @apply bg-background text-foreground; font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif; font-feature-settings: "ss01" 1, "cv01" 1; }
+  html { scroll-behavior: smooth; }
+  body { @apply bg-background text-foreground; min-width: 320px; background-image: radial-gradient(circle at 12% -10%, rgba(37,89,214,.07), transparent 25rem), radial-gradient(circle at 100% 0%, rgba(217,112,75,.055), transparent 28rem); font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif; font-feature-settings: "ss01" 1, "cv01" 1; }
+  ::selection { background: rgba(37,89,214,.2); color: #0e1b3d; }
   button:not(:disabled), [role="button"]:not([aria-disabled="true"]), [type="button"]:not(:disabled), [type="submit"]:not(:disabled), [type="reset"]:not(:disabled), a[href], select:not(:disabled), input[type="checkbox"]:not(:disabled), input[type="radio"]:not(:disabled) { @apply cursor-pointer; }
   :where(a, button, input, select, textarea, [role="button"]):focus-visible { outline: 3px solid oklch(.55 .17 264 / .9); outline-offset: 3px; border-radius: .7rem; }
 }
@@ -24,8 +26,11 @@
 @layer components {
   .container { width: 100%; margin-left: auto; margin-right: auto; padding-left: 1rem; padding-right: 1rem; }
   .flex { min-height: 0; min-width: 0; }
-  .eyebrow { color: #315fcb; font-size: .69rem; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
-  .section-title { margin-top: .45rem; color: #0f172a; font-size: clamp(1.75rem, 3vw, 2.45rem); font-weight: 600; letter-spacing: -.052em; line-height: 1.08; }
+  .eyebrow { color: #2559d6; font-size: .68rem; font-weight: 800; letter-spacing: .17em; text-transform: uppercase; }
+  .section-title { margin-top: .55rem; color: #0e1b3d; font-size: clamp(1.9rem, 3.2vw, 2.7rem); font-weight: 700; letter-spacing: -.06em; line-height: 1.02; }
+  .local-grid { background-image: linear-gradient(rgba(255,255,255,.075) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.075) 1px, transparent 1px); background-size: 28px 28px; }
+  .signal-orb { background: radial-gradient(circle, rgba(87,127,245,.7) 0%, rgba(37,89,214,.08) 47%, transparent 70%); }
+  .surface-card { border: 1px solid rgba(212,220,233,.92); background: rgba(255,255,255,.88); box-shadow: 0 14px 36px rgba(14,27,61,.055); }
   .skip-link { position: fixed; left: 1rem; top: -5rem; z-index: 100; border-radius: .75rem; background: #173d9c; color: white; padding: .75rem 1rem; font-size: .875rem; font-weight: 700; transition: top 160ms cubic-bezier(.23,1,.32,1); }
   .skip-link:focus, .skip-link[data-focused="true"] { top: 1rem; }
   @media (min-width: 640px) { .container { padding-left: 1.5rem; padding-right: 1.5rem; } }
