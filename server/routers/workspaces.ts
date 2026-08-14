@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { approvalQueue, businesses, businessFieldValues, categories, categoryFields, cities, users } from "../../drizzle/schema";
+import { approvalQueue, businesses, businessFieldValues, businessNotifications, categories, categoryFields, cities, users } from "../../drizzle/schema";
 import { deleteInternalValidationBusiness, getAdminCounts, getCategorySchemas, getDb, getInternalValidationBusinesses, getOwnerBusinesses, getPendingBusinesses } from "../db";
 import { canManageAdmins, canManageBusiness, canModerate } from "../domain/permissions";
 import { buildVoiceIntroductionScript } from "../domain/voiceScript";
@@ -168,10 +168,18 @@ export const workspaceRouter = router({
   }),
   reviewBusiness: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), decision: z.enum(["approved", "rejected", "published", "suspended"]), reviewerNote: z.string().max(2000).optional() })).mutation(async ({ ctx, input }) => {
     requireModerator(ctx.user.role);
-    const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
+    const { db, business } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
     const publishedAt = input.decision === "published" ? new Date() : undefined;
     await db.update(businesses).set({ status: input.decision, ...(publishedAt ? { publishedAt } : {}) }).where(eq(businesses.id, input.businessId));
     await db.update(approvalQueue).set({ status: input.decision === "rejected" ? "rejected" : "approved", reviewerId: ctx.user.id, reviewerNote: input.reviewerNote, resolvedAt: new Date() }).where(and(eq(approvalQueue.businessId, input.businessId), eq(approvalQueue.status, "pending")));
+    if (business.ownerId) {
+      const notice = input.decision === "rejected"
+        ? { type: "review_rejected", title: "Changes requested for your listing", body: input.reviewerNote || "Review the owner dashboard for the requested changes." }
+        : input.decision === "suspended"
+          ? { type: "review_suspended", title: "Listing temporarily suspended", body: input.reviewerNote || "Review the owner dashboard for the current listing status." }
+          : { type: `review_${input.decision}`, title: input.decision === "published" ? "Listing is now live" : "Listing approved", body: input.reviewerNote || "Your listing review status has been updated." };
+      await db.insert(businessNotifications).values({ userId: business.ownerId, businessId: input.businessId, type: notice.type, title: notice.title, body: notice.body, isRead: false });
+    }
     return { status: input.decision };
   }),
   bulkImportPreview: protectedProcedure.input(z.object({ filename: z.string().min(1).max(255) })).mutation(async ({ ctx, input }) => {

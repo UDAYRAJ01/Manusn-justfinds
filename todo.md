@@ -159,3 +159,10 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Add progressive completion actions for profile facts, hours, services/items, photos, and other supported business tools without bypassing approval rules.
 - [x] Add regression tests for completion calculations, initial submission, and owner-scoped progressive editing.
 - [x] Validate the streamlined listing flow visually and with the full test suite.
+
+## GMB-Style Progressive Listing Skill & Dashboard Upgrades
+- [ ] Initialize and publish the `progressive-listing-workflow` skill using `/skill-creator`.
+- [ ] Add prioritized 'Next best action' recommendation to the business completion dashboard.
+- [ ] Implement section autosave with visible 'last saved' timestamps.
+- [ ] Add owner dashboard reminders for profile completion and review status.
+- [ ] Run test suite, verify compilation, and save a release checkpoint.

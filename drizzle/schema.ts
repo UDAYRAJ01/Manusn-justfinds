@@ -580,6 +580,14 @@ export const businessNotifications = mysqlTable("business_notifications", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, table => [index("notification_user_read_idx").on(table.userId, table.isRead, table.createdAt)]);
 
+export const businessProfileSectionSaves = mysqlTable("business_profile_section_saves", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  userId: int("userId").notNull().references(() => users.id),
+  sectionKey: varchar("sectionKey", { length: 40 }).notNull(),
+  savedAt: timestamp("savedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [uniqueIndex("profile_section_business_user_uidx").on(table.businessId, table.userId, table.sectionKey), index("profile_section_business_idx").on(table.businessId, table.savedAt)]);
+
 export const businessRevisions = mysqlTable("business_revisions", {
   id: int("id").autoincrement().primaryKey(),
   businessId: int("businessId").notNull().references(() => businesses.id),
