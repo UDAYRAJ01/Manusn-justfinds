@@ -91,7 +91,7 @@
 - [x] Add lead CTA rendering and page-attributed lead/CTA analytics without fabricating business facts, reviews, ratings, testimonials, or images
 - [x] Add admin moderation/template foundation without permitting business-data mutation
 - [x] Add Phase 7 section-registry, router-surface, design-safety, publishing-contract, and WebsiteBuilder interaction tests
-- [ ] Validate published website and owner-builder desktop/mobile flows against authenticated/seeded data, then save a published checkpoint
+- [ ] Validate authenticated seeded owner-builder route and a successful published public website at both desktop/mobile widths; current database has no published Phase 7 page, so this requires a real published page/business ID rather than fabricated test data
 
 - [x] Fix AI redesign Preview → Reject so prior design is restored and dirty state is accurate
 - [x] Add focused AI redesign interaction coverage for preview/reject and safe design keys
@@ -104,3 +104,11 @@
 
 - [x] Add focused AI redesign safety assertions proving forbidden business-data keys are rejected or omitted
 - [x] Extend moderation workflow coverage through the reject branch with durable reject history and reviewer metadata
+
+- [ ] Select an existing owned business with verified source data for the real Phase 7 publish validation
+- [ ] Create a real draft page from that business's existing facts and publish it through the owner workflow
+- [ ] Validate the resulting public business URL and slug at desktop and mobile widths, then save the final checkpoint
+
+- [x] Diagnose and fix the reported business-listing creation failure
+- [x] Add regression coverage for successful listing creation and invalid-input handling
+- [x] Revalidate owner isolation and claim/onboarding compatibility after the fix

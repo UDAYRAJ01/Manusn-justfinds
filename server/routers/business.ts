@@ -20,6 +20,7 @@ import {
   businessServices,
   businessSpecialHours,
   businesses,
+  users,
   categories,
   cities,
   subcategories,
@@ -44,7 +45,8 @@ async function ownedBusinessOrThrow(businessId: number, userId: number, role: z.
   const rows = await db.select().from(businesses).where(eq(businesses.id, businessId)).limit(1);
   const business = rows[0];
   if (!business) throw new TRPCError({ code: "NOT_FOUND", message: "Business not found." });
-  if (!canManageBusiness(role, userId, business.ownerId)) throw new TRPCError({ code: "FORBIDDEN", message: "You cannot access this business." });
+  const canFinishNewDraft = role === "user" && business.ownerId === userId && business.status === "draft";
+  if (!canManageBusiness(role, userId, business.ownerId) && !canFinishNewDraft) throw new TRPCError({ code: "FORBIDDEN", message: "You cannot access this business." });
   return { db, business };
 }
 
@@ -104,11 +106,11 @@ export const businessRouter = router({
   }),
 
   createDraft: protectedProcedure.input(profileInput.omit({ businessId: true })).mutation(async ({ ctx, input }) => {
-    if (ctx.user.role !== "business_owner" && !canModerate(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "Business-owner access is required." });
     const db = await dbOrThrow();
     const { dynamicValues, ...profile } = input;
     const inserted = await db.insert(businesses).values({ ...profile, ownerId: ctx.user.id, status: "draft", onboardingStep: 1 });
     const businessId = Number(inserted[0].insertId);
+    if (ctx.user.role === "user") await db.update(users).set({ role: "business_owner" }).where(eq(users.id, ctx.user.id));
     if (dynamicValues?.length) await db.insert(businessFieldValues).values(dynamicValues.map(value => ({ businessId, categoryFieldId: value.categoryFieldId, value: value.value })));
     return { businessId, status: "draft" as const };
   }),

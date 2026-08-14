@@ -37,8 +37,7 @@ function Router() {
     <Route path="/dashboard" component={OwnerWorkspace} />
     <Route path="/business" component={BusinessPlatform} />
     <Route path="/business/onboarding" component={BusinessPlatform} />
-    <Route path="/business/:businessSlug/website" component={PublicWebsite} />
-    <Route path="/business/:businessId<[0-9]+>/website" component={BusinessWebsiteBuilderRoute} />
+    <Route path="/business/:identifier/website" component={BusinessWebsiteRoute} />
     <Route path="/business/:businessId/:tool" component={BusinessToolRoute} />
     <Route path="/business/:rest*" component={BusinessPlatform} />
     <Route path="/owner" component={OwnerWorkspace} />
@@ -52,9 +51,12 @@ function Router() {
   </Switch>;
 }
 
-function BusinessWebsiteBuilderRoute({ params }: { params: { businessId: string } }) {
-  const numericId = Number(params.businessId);
-  return <BusinessTools businessId={numericId} businessName={`Business #${numericId}`} />;
+function BusinessWebsiteRoute({ params }: { params: { identifier: string } }) {
+  if (/^\d+$/.test(params.identifier)) {
+    const numericId = Number(params.identifier);
+    return <BusinessTools businessId={numericId} businessName={`Business #${numericId}`} />;
+  }
+  return <PublicWebsite slug={params.identifier} />;
 }
 
 function BusinessToolRoute({ params }: { params: { businessId: string; tool: string } }) {
