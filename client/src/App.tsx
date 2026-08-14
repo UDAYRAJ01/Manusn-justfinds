@@ -60,7 +60,10 @@ function BusinessWebsiteRoute({ params }: { params: { identifier: string } }) {
 }
 
 function BusinessToolRoute({ params }: { params: { businessId: string; tool: string } }) {
-  return <BusinessTools businessId={Number(params.businessId)} businessName={`Business #${params.businessId}`} />;
+  const businessId = Number(params.businessId);
+  const detail = trpc.business.businessDetail.useQuery({ businessId }, { retry: false });
+  const businessName = detail.data?.business?.name ?? `Business #${businessId}`;
+  return <BusinessTools businessId={businessId} businessName={businessName} />;
 }
 
 function App() {
