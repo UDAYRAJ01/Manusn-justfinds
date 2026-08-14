@@ -30,6 +30,30 @@ describe("profile completion", () => {
     ]);
   });
 
+  it("selects the highest-priority incomplete section as the next best action", () => {
+    const result = calculateProfileCompletion({
+      name: "Example Business",
+      shortDescription: "A factual description that is long enough.",
+      phone: "+91 90000 00000",
+      email: null,
+      website: null,
+      address: "12 Main Road",
+      latitude: "26.449900",
+      longitude: "80.331900",
+      hoursCount: 0,
+      servicesCount: 1,
+      facilitiesCount: 1,
+      coverImageCount: 1,
+    });
+
+    expect(result.nextBestAction).toEqual({
+      key: "hours",
+      label: "Opening hours",
+      hint: "Tell customers when you are open.",
+      priority: 4,
+    });
+  });
+
   it("counts contact and location only when the required factual fields exist", () => {
     const incomplete = calculateProfileCompletion({
       name: "Example Business",

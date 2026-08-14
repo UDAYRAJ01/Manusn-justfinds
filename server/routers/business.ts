@@ -78,7 +78,12 @@ type ProfileSectionKey = z.infer<typeof profileSectionKeySchema>;
 
 async function markProfileSectionSaved(db: Awaited<ReturnType<typeof dbOrThrow>>, businessId: number, userId: number, sectionKey: ProfileSectionKey) {
   const savedAt = new Date();
-  await db.insert(businessProfileSectionSaves).values({ businessId, userId, sectionKey, savedAt }).onDuplicateKeyUpdate({ set: { savedAt } });
+  const existing = await db.select({ id: businessProfileSectionSaves.id }).from(businessProfileSectionSaves).where(and(eq(businessProfileSectionSaves.businessId, businessId), eq(businessProfileSectionSaves.userId, userId), eq(businessProfileSectionSaves.sectionKey, sectionKey))).limit(1);
+  if (existing[0]) {
+    await db.update(businessProfileSectionSaves).set({ savedAt }).where(eq(businessProfileSectionSaves.id, existing[0].id));
+  } else {
+    await db.insert(businessProfileSectionSaves).values({ businessId, userId, sectionKey, savedAt });
+  }
   return savedAt;
 }
 
@@ -230,10 +235,10 @@ export const businessRouter = router({
     if (dynamicValues?.length) for (const value of dynamicValues) {
       await db.insert(businessFieldValues).values({ businessId, categoryFieldId: value.categoryFieldId, value: value.value }).onDuplicateKeyUpdate({ set: { value: value.value } });
     }
-    const savedAt = await markProfileSectionSaved(db, businessId, ctx.user.id, "basics");
+    await markProfileSectionSaved(db, businessId, ctx.user.id, "basics");
     await markProfileSectionSaved(db, businessId, ctx.user.id, "contact");
     await markProfileSectionSaved(db, businessId, ctx.user.id, "location");
-    return { success: true, status: nextStatus, savedAt };
+    return { success: true, status: nextStatus };
   }),
 
   saveOnboardingStep: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), step: z.number().int().min(1).max(10) })).mutation(async ({ ctx, input }) => {
@@ -537,21 +542,21 @@ export const businessRouter = router({
     await db.delete(businessHours).where(eq(businessHours.businessId, input.businessId));
     await db.insert(businessHours).values(input.days.map(day => ({ ...day, businessId: input.businessId })));
     const savedAt = await markProfileSectionSaved(db, input.businessId, ctx.user.id, "hours");
-    return { success: true, savedAt };
+    return { success: true };
   }),
 
   saveSpecialHour: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), label: z.string().min(2).max(160), isClosed: z.boolean(), intervals: z.array(z.object({ opensAt: z.string(), closesAt: z.string() })).max(4).default([]) })).mutation(async ({ ctx, input }) => {
     const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
     await db.insert(businessSpecialHours).values(input).onDuplicateKeyUpdate({ set: { label: input.label, isClosed: input.isClosed, intervals: input.intervals } });
     const savedAt = await markProfileSectionSaved(db, input.businessId, ctx.user.id, "hours");
-    return { success: true, savedAt };
+    return { success: true };
   }),
 
   deleteSpecialHour: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), specialHourId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
     await db.delete(businessSpecialHours).where(and(eq(businessSpecialHours.id, input.specialHourId), eq(businessSpecialHours.businessId, input.businessId)));
     const savedAt = await markProfileSectionSaved(db, input.businessId, ctx.user.id, "hours");
-    return { success: true, savedAt };
+    return { success: true };
   }),
 
   openNowPreview: protectedProcedure.input(businessIdInput).query(async ({ ctx, input }) => {
@@ -573,18 +578,18 @@ export const businessRouter = router({
     if (serviceId) {
       await db.update(businessServices).set(values).where(and(eq(businessServices.id, serviceId), eq(businessServices.businessId, input.businessId)));
       const savedAt = await markProfileSectionSaved(db, input.businessId, ctx.user.id, "services");
-      return { serviceId, savedAt };
+      return { serviceId };
     }
     const created = await db.insert(businessServices).values(values);
     const savedAt = await markProfileSectionSaved(db, input.businessId, ctx.user.id, "services");
-    return { serviceId: Number(created[0].insertId), savedAt };
+    return { serviceId: Number(created[0].insertId) };
   }),
 
   deleteService: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), serviceId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
     await db.delete(businessServices).where(and(eq(businessServices.id, input.serviceId), eq(businessServices.businessId, input.businessId)));
     const savedAt = await markProfileSectionSaved(db, input.businessId, ctx.user.id, "services");
-    return { success: true, savedAt };
+    return { success: true };
   }),
 
   setFacilities: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), facilities: z.array(z.object({ name: z.string().min(1).max(160), details: z.string().max(500).optional() })).max(50) })).mutation(async ({ ctx, input }) => {
@@ -592,23 +597,23 @@ export const businessRouter = router({
     await db.delete(businessFacilities).where(eq(businessFacilities.businessId, input.businessId));
     if (input.facilities.length) await db.insert(businessFacilities).values(input.facilities.map((facility, index) => ({ ...facility, businessId: input.businessId, sortOrder: index })));
     const savedAt = await markProfileSectionSaved(db, input.businessId, ctx.user.id, "facilities");
-    return { success: true, savedAt };
+    return { success: true };
   }),
 
   upsertItem: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), itemId: z.number().int().positive().optional(), itemType: z.enum(["product", "menu", "room", "consultation"]), name: z.string().min(1).max(180), description: z.string().max(2000).optional(), price: z.string().max(80).optional(), imageUrl: z.string().url().max(1000).optional(), isEnabled: z.boolean().default(true), sortOrder: z.number().int().min(0).default(0) })).mutation(async ({ ctx, input }) => {
     const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
     const { itemId, ...values } = input;
-    if (itemId) { await db.update(businessItems).set(values).where(and(eq(businessItems.id, itemId), eq(businessItems.businessId, input.businessId))); const savedAt = await markProfileSectionSaved(db, input.businessId, ctx.user.id, "services"); return { itemId, savedAt }; }
+    if (itemId) { await db.update(businessItems).set(values).where(and(eq(businessItems.id, itemId), eq(businessItems.businessId, input.businessId))); const savedAt = await markProfileSectionSaved(db, input.businessId, ctx.user.id, "services"); return { itemId }; }
     const created = await db.insert(businessItems).values(values);
     const savedAt = await markProfileSectionSaved(db, input.businessId, ctx.user.id, "services");
-    return { itemId: Number(created[0].insertId), savedAt };
+    return { itemId: Number(created[0].insertId) };
   }),
 
   deleteItem: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), itemId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
     await db.delete(businessItems).where(and(eq(businessItems.id, input.itemId), eq(businessItems.businessId, input.businessId)));
     const savedAt = await markProfileSectionSaved(db, input.businessId, ctx.user.id, "services");
-    return { success: true, savedAt };
+    return { success: true };
   }),
 
   leadDetail: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), leadId: z.number().int().positive() })).query(async ({ ctx, input }) => {
@@ -623,36 +628,36 @@ export const businessRouter = router({
     const { imageId, dataBase64, mimeType, url, ...rest } = input;
     const resolvedUrl = dataBase64 ? (await storagePut(`business-images/${input.businessId}/${crypto.randomUUID()}`, Buffer.from(dataBase64, "base64"), mimeType)).url : url!;
     const values = { ...rest, url: resolvedUrl };
-    if (imageId) { await db.update(businessImages).set(values).where(and(eq(businessImages.id, imageId), eq(businessImages.businessId, input.businessId))); const savedAt = await markProfileSectionSaved(db, input.businessId, ctx.user.id, "photos"); return { imageId, url: resolvedUrl, savedAt }; }
+    if (imageId) { await db.update(businessImages).set(values).where(and(eq(businessImages.id, imageId), eq(businessImages.businessId, input.businessId))); await markProfileSectionSaved(db, input.businessId, ctx.user.id, "photos"); return { imageId, url: resolvedUrl }; }
     const created = await db.insert(businessImages).values(values);
-    const savedAt = await markProfileSectionSaved(db, input.businessId, ctx.user.id, "photos");
-    return { imageId: Number(created[0].insertId), url: resolvedUrl, savedAt };
+    await markProfileSectionSaved(db, input.businessId, ctx.user.id, "photos");
+    return { imageId: Number(created[0].insertId), url: resolvedUrl };
   }),
   deletePhoto: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), imageId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
     await db.delete(businessImages).where(and(eq(businessImages.id, input.imageId), eq(businessImages.businessId, input.businessId)));
-    const savedAt = await markProfileSectionSaved(db, input.businessId, ctx.user.id, "photos");
-    return { success: true, savedAt };
+    await markProfileSectionSaved(db, input.businessId, ctx.user.id, "photos");
+    return { success: true };
   }),
   setLogo: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), imageId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
     await db.update(businessImages).set({ imageType: "gallery" }).where(and(eq(businessImages.businessId, input.businessId), eq(businessImages.imageType, "logo")));
     await db.update(businessImages).set({ imageType: "logo" }).where(and(eq(businessImages.id, input.imageId), eq(businessImages.businessId, input.businessId)));
-    const savedAt = await markProfileSectionSaved(db, input.businessId, ctx.user.id, "photos");
-    return { success: true, savedAt };
+    await markProfileSectionSaved(db, input.businessId, ctx.user.id, "photos");
+    return { success: true };
   }),
   setCover: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), imageId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
     await db.update(businessImages).set({ imageType: "gallery" }).where(and(eq(businessImages.businessId, input.businessId), eq(businessImages.imageType, "cover")));
     await db.update(businessImages).set({ imageType: "cover" }).where(and(eq(businessImages.id, input.imageId), eq(businessImages.businessId, input.businessId)));
-    const savedAt = await markProfileSectionSaved(db, input.businessId, ctx.user.id, "photos");
-    return { success: true, savedAt };
+    await markProfileSectionSaved(db, input.businessId, ctx.user.id, "photos");
+    return { success: true };
   }),
   reorderPhotos: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), imageIds: z.array(z.number().int().positive()).max(100) })).mutation(async ({ ctx, input }) => {
     const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
     await Promise.all(input.imageIds.map((imageId, sortOrder) => db.update(businessImages).set({ sortOrder }).where(and(eq(businessImages.id, imageId), eq(businessImages.businessId, input.businessId)))));
-    const savedAt = await markProfileSectionSaved(db, input.businessId, ctx.user.id, "photos");
-    return { success: true, savedAt };
+    await markProfileSectionSaved(db, input.businessId, ctx.user.id, "photos");
+    return { success: true };
   }),
   listLeads: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), limit: z.number().int().min(1).max(100).default(50), offset: z.number().int().min(0).default(0) })).query(async ({ ctx, input }) => {
     const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);

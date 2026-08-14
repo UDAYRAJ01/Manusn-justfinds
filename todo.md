@@ -161,8 +161,8 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Validate the streamlined listing flow visually and with the full test suite.
 
 ## GMB-Style Progressive Listing Skill & Dashboard Upgrades
-- [ ] Initialize and publish the `progressive-listing-workflow` skill using `/skill-creator`.
-- [ ] Add prioritized 'Next best action' recommendation to the business completion dashboard.
-- [ ] Implement section autosave with visible 'last saved' timestamps.
-- [ ] Add owner dashboard reminders for profile completion and review status.
-- [ ] Run test suite, verify compilation, and save a release checkpoint.
+- [x] Initialize and publish the `progressive-listing-workflow` skill using `/skill-creator`.
+- [x] Add prioritized 'Next best action' recommendation to the business completion dashboard.
+- [x] Implement section autosave with visible 'last saved' timestamps.
+- [x] Add owner dashboard reminders for profile completion and review status.
+- [x] Run test suite, verify compilation, and save a release checkpoint.
