@@ -28,6 +28,10 @@ describe("Phase 7 website builder contracts", () => {
     expect(Object.keys(defaultDesignConfig)).not.toEqual(expect.arrayContaining(["businessName", "address", "serviceDescription", "reviewText", "rating", "testimonial"]));
   });
 
+  it("exposes an owner-scoped AI photo suggestion procedure for generated sections", () => {
+    expect(Object.keys(websiteRouter._def.procedures)).toEqual(expect.arrayContaining(["suggestSectionImages"]));
+  });
+
   it("accepts only presentation keys and rejects business facts", () => {
     expect(safeDesignKeys).not.toContain("businessName");
     expect(safeDesignKeys).not.toContain("address");

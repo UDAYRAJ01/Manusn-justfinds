@@ -3,7 +3,7 @@ import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ save: vi.fn(), publish: vi.fn(), suggest: vi.fn(), generateDraft: vi.fn(), regenerateSection: vi.fn(), apply: vi.fn(), reject: vi.fn(), submitReview: vi.fn(), invalidate: vi.fn() }));
+const mocks = vi.hoisted(() => ({ save: vi.fn(), publish: vi.fn(), suggest: vi.fn(), generateDraft: vi.fn(), regenerateSection: vi.fn(), suggestSectionImages: vi.fn(), apply: vi.fn(), reject: vi.fn(), submitReview: vi.fn(), invalidate: vi.fn() }));
 
 vi.mock("@/components/WebsiteRenderer", () => ({ default: ({ data }: { data: { business: { name: string } } }) => <div data-testid="shared-renderer">{data.business.name}</div> }));
 vi.mock("@/lib/trpc", () => ({
@@ -16,6 +16,7 @@ vi.mock("@/lib/trpc", () => ({
       suggestRedesign: { useMutation: () => ({ mutate: mocks.suggest, isPending: false, error: null }) },
       generateDraft: { useMutation: () => ({ mutate: mocks.generateDraft, isPending: false, error: null }) },
       regenerateSection: { useMutation: () => ({ mutate: mocks.regenerateSection, isPending: false, error: null }) },
+      suggestSectionImages: { useMutation: () => ({ mutate: mocks.suggestSectionImages, isPending: false, error: null }) },
       applyRedesign: { useMutation: () => ({ mutate: mocks.apply, isPending: false, error: null }) },
       rejectRedesign: { useMutation: () => ({ mutate: mocks.reject, isPending: false, error: null }) },
       submitForReview: { useMutation: () => ({ mutate: mocks.submitReview, isPending: false, error: null }) },
@@ -88,6 +89,33 @@ describe("WebsiteBuilder section interactions", () => {
     await act(async () => { hide.click(); });
     expect(container.textContent).toContain("Unsaved changes");
     expect(container.textContent).toContain("Show");
+    await act(async () => { root.unmount(); });
+    container.remove();
+  });
+  it("sends the owner's own prompt when refining a specific section and requesting photo suggestions", async () => {
+    (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    mocks.regenerateSection.mockClear();
+    mocks.suggestSectionImages.mockClear();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => { root.render(<WebsiteBuilder businessId={5} />); });
+    const about = Array.from(container.querySelectorAll("button")).find(button => button.textContent === "about") as HTMLButtonElement;
+    await act(async () => { about.click(); });
+    const promptInput = Array.from(container.querySelectorAll("input")).find(input => input.placeholder === "Make this clearer and shorter") as HTMLInputElement;
+    expect(promptInput).toBeTruthy();
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+    await act(async () => {
+      setter?.call(promptInput, "Rewrite this section for first-time visitors");
+      promptInput.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const refine = Array.from(container.querySelectorAll("button")).find(button => button.textContent?.includes("Refine section with AI")) as HTMLButtonElement;
+    await act(async () => { refine.click(); });
+    expect(mocks.regenerateSection).toHaveBeenCalledWith(expect.objectContaining({ businessId: 5, sectionType: "about", instruction: "Rewrite this section for first-time visitors" }));
+    const suggestPhotos = Array.from(container.querySelectorAll("button")).find(button => button.textContent?.includes("Suggest photos with AI")) as HTMLButtonElement;
+    expect(suggestPhotos).toBeTruthy();
+    await act(async () => { suggestPhotos.click(); });
+    expect(mocks.suggestSectionImages).toHaveBeenCalledWith(expect.objectContaining({ businessId: 5, sectionType: "about" }));
     await act(async () => { root.unmount(); });
     container.remove();
   });

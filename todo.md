@@ -168,8 +168,16 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Run test suite, verify compilation, and save a release checkpoint.
 
 ## AI-Assisted Website Builder
-- [ ] Inspect existing website builder builder routes, storage schema, and AI content generation endpoints.
-- [ ] Implement AI auto-generation procedure that compiles approved business facts (name, category, city, short description, hours, services, photos) into a structured multi-section website draft.
-- [ ] Add editable section controls in the website builder workspace so owners can edit headline, subtitle, hero image, services list, testimonials/features, and CTA buttons.
-- [ ] Add AI section regeneration tooltips/buttons that let owners regenerate individual sections using approved business knowledge while respecting factual boundaries.
-- [ ] Write Vitest coverage for AI website generation, section persistence, and owner permissions; run TypeScript validation and deliver the release.
+- [x] Inspect existing website builder builder routes, storage schema, and AI content generation endpoints.
+- [x] Implement AI auto-generation procedure that compiles approved business facts (name, category, city, short description, hours, services, photos) into a structured multi-section website draft.
+- [x] Add editable section controls in the website builder workspace so owners can edit headline, subtitle, hero image, services list, testimonials/features, and CTA buttons.
+- [x] Add AI section regeneration tooltips/buttons that let owners regenerate individual sections using approved business knowledge while respecting factual boundaries.
+- [x] Write Vitest coverage for AI website generation, section persistence, and owner permissions; run TypeScript validation and deliver the release.
+
+## AI Website Builder Enhancements
+
+- [x] Package the grounded AI website builder process as a reusable skill via skill-creator.
+- [x] Verify and polish the responsive desktop/tablet/mobile preview before publishing.
+- [x] Add an AI image suggestion feature that recommends relevant photos for generated sections from owner-uploaded listing media.
+- [x] Allow prompt-driven regeneration of individual sections with custom owner instructions and clear retry states.
+- [x] Validate all changes with the full test suite and TypeScript, then save a checkpoint.

@@ -150,6 +150,33 @@ function sectionOutputSchema() {
   } as const;
 }
 
+function imageSuggestionOutputSchema() {
+  return {
+    name: "grounded_section_image_suggestions",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: {
+        suggestions: {
+          type: "array",
+          maxItems: 6,
+          items: {
+            type: "object",
+            properties: {
+              imageId: { type: "number" },
+              reason: { type: "string" },
+            },
+            required: ["imageId", "reason"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["suggestions"],
+      additionalProperties: false,
+    },
+  } as const;
+}
+
 export const websiteRouter = router({
   registry: publicProcedure.query(() => sectionRegistry),
   moderationQueue: adminProcedure.query(async () => { const db = await dbOrThrow(); return db.select({ page: businessPages, business: businesses }).from(businessPages).innerJoin(businesses, eq(businessPages.businessId, businesses.id)).where(eq(businessPages.status, "pending_review")); }),
@@ -207,6 +234,35 @@ export const websiteRouter = router({
     const normalized = normalizeWebsiteDraft({ sections: [{ sectionType: input.sectionType, config: generation.data.config }] }, facts.business.category);
     const section = normalized.sections.find(item => item.sectionType === input.sectionType);
     return { businessId: input.businessId, sectionType: input.sectionType, config: section?.config ?? {}, source: "approved_business_facts" as const, provider: generation.provider, model: generation.model };
+  }),
+  suggestSectionImages: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), sectionType: z.string().min(2).max(60), instruction: z.string().trim().max(300).optional() })).mutation(async ({ ctx, input }) => {
+    const { db, business } = await ownedPage(input.businessId, ctx.user.id, ctx.user.role);
+    const categoryRows = await db.select({ name: categories.name }).from(categories).where(eq(categories.id, business.categoryId)).limit(1);
+    const supported = canonicalWebsiteSectionTypes(categoryRows[0]?.name);
+    if (!supported.includes(input.sectionType as (typeof supported)[number])) throw new TRPCError({ code: "BAD_REQUEST", message: "That section is not supported for this business category." });
+    const ownedImages = await db.select({ id: businessImages.id, url: businessImages.url, alt: businessImages.alt, imageType: businessImages.imageType }).from(businessImages).where(eq(businessImages.businessId, business.id)).orderBy(asc(businessImages.sortOrder));
+    if (!ownedImages.length) return { businessId: input.businessId, sectionType: input.sectionType, suggestions: [], source: "owner_uploaded_photos" as const, provider: null, model: null, message: "No photos have been uploaded for this business yet. Add photos in the Photos tool so they can be recommended here." };
+    const generation = await generateStructured<{ suggestions: Array<{ imageId: number; reason: string }> }>({
+      system: "You recommend which of the business owner's own uploaded photos best suit a website section. Only choose from the supplied imageId values. Never invent photos, never describe content you cannot infer from the supplied imageType and alt text, and never claim awards, ratings, or unverified facts. Return only JSON matching the schema.",
+      user: JSON.stringify({ sectionType: input.sectionType, request: input.instruction ?? "Recommend the most suitable owner photos for this section.", category: categoryRows[0]?.name ?? null, availableImages: ownedImages.map(image => ({ imageId: image.id, imageType: image.imageType, alt: image.alt })) }),
+      outputSchema: imageSuggestionOutputSchema(),
+      maxTokens: 700,
+    });
+    const byId = new Map(ownedImages.map(image => [image.id, image]));
+    const seen = new Set<number>();
+    const suggestions = (Array.isArray(generation.data?.suggestions) ? generation.data.suggestions : [])
+      .filter(item => {
+        if (!item || typeof item.imageId !== "number" || !byId.has(item.imageId) || seen.has(item.imageId)) return false;
+        seen.add(item.imageId);
+        return true;
+      })
+      .slice(0, 6)
+      .map(item => {
+        const image = byId.get(item.imageId)!;
+        const reason = typeof item.reason === "string" ? item.reason.trim().replace(/\s+/g, " ").slice(0, 180) : "";
+        return { imageId: image.id, url: image.url, alt: image.alt, imageType: image.imageType, reason: reason || "Recommended from your uploaded photos." };
+      });
+    return { businessId: input.businessId, sectionType: input.sectionType, suggestions, source: "owner_uploaded_photos" as const, provider: generation.provider, model: generation.model, message: suggestions.length ? null : "No suitable photo could be matched. Upload a photo that shows this part of your business." };
   }),
   applyRedesign: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), designConfig: safeDesignSchema })).mutation(async ({ ctx, input }) => {
     const { db, business, page } = await ownedPage(input.businessId, ctx.user.id, ctx.user.role);
