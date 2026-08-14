@@ -29,6 +29,7 @@ import { canManageBusiness, canModerate } from "../domain/permissions";
 import { getDb } from "../db";
 import { protectedProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
+import { numberedSlug, preferredBusinessSlug } from "../domain/slug";
 
 const roleSchema = z.enum(["user", "business_owner", "admin", "super_admin"]);
 const businessIdInput = z.object({ businessId: z.number().int().positive() });
@@ -53,7 +54,7 @@ async function ownedBusinessOrThrow(businessId: number, userId: number, role: z.
 const profileInput = z.object({
   businessId: z.number().int().positive().optional(),
   name: z.string().min(2).max(220),
-  slug: z.string().min(2).max(240).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  slug: z.string().max(240).optional(),
   categoryId: z.number().int().positive(),
   subcategoryId: z.number().int().positive().nullable().optional(),
   cityId: z.number().int().positive(),
@@ -107,8 +108,17 @@ export const businessRouter = router({
 
   createDraft: protectedProcedure.input(profileInput.omit({ businessId: true })).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
-    const { dynamicValues, ...profile } = input;
-    const inserted = await db.insert(businesses).values({ ...profile, ownerId: ctx.user.id, status: "draft", onboardingStep: 1 });
+    const { dynamicValues, slug: requestedSlug, ...profile } = input;
+    const baseSlug = preferredBusinessSlug(profile.name, requestedSlug);
+    let slug = baseSlug;
+    let available = false;
+    for (let suffix = 1; suffix <= 100; suffix += 1) {
+      const candidate = suffix === 1 ? baseSlug : numberedSlug(baseSlug, suffix);
+      const existing = await db.select({ id: businesses.id }).from(businesses).where(eq(businesses.slug, candidate)).limit(1);
+      if (!existing.length) { slug = candidate; available = true; break; }
+    }
+    if (!available) throw new TRPCError({ code: "CONFLICT", message: "This business name is already in use too many times. Please choose a more specific name." });
+    const inserted = await db.insert(businesses).values({ ...profile, slug, ownerId: ctx.user.id, status: "draft", onboardingStep: 1 });
     const businessId = Number(inserted[0].insertId);
     if (ctx.user.role === "user") await db.update(users).set({ role: "business_owner" }).where(eq(users.id, ctx.user.id));
     if (dynamicValues?.length) await db.insert(businessFieldValues).values(dynamicValues.map(value => ({ businessId, categoryFieldId: value.categoryFieldId, value: value.value })));

@@ -112,3 +112,12 @@
 - [x] Diagnose and fix the reported business-listing creation failure
 - [x] Add regression coverage for successful listing creation and invalid-input handling
 - [x] Revalidate owner isolation and claim/onboarding compatibility after the fix
+
+- [ ] Obtain a genuinely real owned business ID and verified listing facts for public website publishing; do not publish test-only records
+
+- [x] Auto-generate a valid slug from the business name in onboarding and first-listing creation
+- [x] Preserve explicitly supplied valid slugs while normalizing invalid/manual slug input safely
+- [x] Add duplicate-name/duplicate-slug handling and regression tests for slug generation
+
+- [x] Add router-level regression coverage proving createDraft/createBusiness generate `-2` and later suffixes for occupied slugs
+- [x] Handle slug-collision exhaustion explicitly and test the resulting clear error path

@@ -22,7 +22,9 @@ describe("guided owner onboarding moderation contract", () => {
     const whereUpdate = vi.fn(async () => undefined);
     const setUpdate = vi.fn(() => ({ where: whereUpdate }));
     const update = vi.fn(() => ({ set: setUpdate }));
-    const limit = vi.fn(async () => [{ id: 44, ownerId: 7, status: "draft" }]);
+    const limit = vi.fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([{ id: 44, ownerId: 7, status: "draft" }]);
     const whereSelect = vi.fn(() => ({ limit }));
     const from = vi.fn(() => ({ where: whereSelect }));
     const select = vi.fn(() => ({ from }));
@@ -51,5 +53,31 @@ describe("guided owner onboarding moderation contract", () => {
       status: "pending",
     }));
     expect(submission).toEqual({ status: "submitted" });
+  });
+
+  it("generates later numeric suffixes when legacy createBusiness encounters occupied slugs", async () => {
+    const values = vi.fn().mockResolvedValueOnce([{ insertId: 45 }]);
+    const insert = vi.fn(() => ({ values }));
+    const occupiedRows = [[{ id: 1 }], [{ id: 2 }], []] as Array<Array<{ id: number }>>;
+    const limit = vi.fn(async () => occupiedRows.shift() ?? []);
+    const whereSelect = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where: whereSelect }));
+    const select = vi.fn(() => ({ from }));
+    dbMocks.getDb.mockResolvedValue({ insert, select, update: vi.fn() });
+
+    const caller = workspaceRouter.createCaller({ user: { id: 7, role: "business_owner" } } as never);
+    await caller.createBusiness({
+      name: "Owner supplied business",
+      slug: "owner-supplied-business",
+      categoryId: 1,
+      cityId: 1,
+      address: "Verified address supplied by the owner",
+      shortDescription: "Factual owner-supplied description.",
+      latitude: "18.520430",
+      longitude: "73.856744",
+      dynamicValues: [],
+    });
+
+    expect(values).toHaveBeenCalledWith(expect.objectContaining({ slug: "owner-supplied-business-3" }));
   });
 });

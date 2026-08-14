@@ -4,6 +4,8 @@ import { businessRouter } from "./business";
 const state = vi.hoisted(() => ({
   business: { id: 7, ownerId: 42, status: "draft", onboardingStep: 1, name: "Test business", categoryId: 1, cityId: 1 },
   claimRows: [] as Array<{ id: number }>,
+  slugRows: [] as Array<Array<{ id: number }>>,
+  slugCheckMode: false,
   updates: [] as unknown[],
   inserts: [] as unknown[],
 }));
@@ -14,6 +16,7 @@ vi.mock("../db", () => ({
       from: () => ({
         where: () => ({
           limit: async () => {
+            if (state.slugCheckMode) return state.slugRows.shift() ?? [];
             if (state.claimRows.length) return state.claimRows;
             return [state.business];
           },
@@ -38,12 +41,15 @@ describe("business owner flow behavior", () => {
     state.inserts = [];
     state.updates = [];
     state.claimRows = [];
+    state.slugRows = [];
+    state.slugCheckMode = false;
     state.business.ownerId = 42;
   });
 
   it("lets an authenticated user create a private draft and promotes owner access", async () => {
     state.inserts = [];
     state.updates = [];
+    state.slugCheckMode = true;
     const result = await caller(77, "user").createDraft({
       name: "New Local Business",
       slug: "new-local-business",
@@ -57,7 +63,22 @@ describe("business owner flow behavior", () => {
     expect(state.inserts).toContainEqual(expect.objectContaining({ ownerId: 77, status: "draft" }));
     expect(state.updates).toContainEqual({ role: "business_owner" });
     state.business.ownerId = 77;
+    state.slugCheckMode = false;
     await expect(caller(77, "user").setHours({ businessId: 99, days: Array.from({ length: 7 }, (_, dayOfWeek) => ({ dayOfWeek, opensAt: "09:00", closesAt: "17:00", intervals: [{ opensAt: "09:00", closesAt: "17:00" }], isClosed: false, isTwentyFourHours: false })) })).resolves.toEqual({ success: true });
+  });
+
+  it("adds a numeric suffix when the generated slug is already occupied", async () => {
+    state.slugCheckMode = true;
+    state.slugRows = [[{ id: 8 }], []];
+    await caller(77, "user").createDraft({ name: "New Local Business", categoryId: 1, cityId: 1, address: "123 Verified Main Street", shortDescription: "A factual local business description.", aboutDescription: "A factual local business description for the private draft." });
+    expect(state.inserts).toContainEqual(expect.objectContaining({ slug: "new-local-business-2" }));
+  });
+
+  it("returns a clear conflict when all safe slug candidates are occupied", async () => {
+    state.slugCheckMode = true;
+    state.slugRows = Array.from({ length: 100 }, () => [{ id: 8 }]);
+    await expect(caller(77, "user").createDraft({ name: "New Local Business", categoryId: 1, cityId: 1, address: "123 Verified Main Street", shortDescription: "A factual local business description.", aboutDescription: "A factual local business description for the private draft." })).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(state.inserts).toHaveLength(0);
   });
 
   it("rejects invalid listing profile input before touching the database", async () => {

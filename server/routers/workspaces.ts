@@ -6,6 +6,7 @@ import { deleteInternalValidationBusiness, getAdminCounts, getCategorySchemas, g
 import { canManageAdmins, canManageBusiness, canModerate } from "../domain/permissions";
 import { buildVoiceIntroductionScript } from "../domain/voiceScript";
 import { storagePut } from "../storage";
+import { numberedSlug, preferredBusinessSlug } from "../domain/slug";
 import { protectedProcedure, router } from "../_core/trpc";
 
 type JustFindsRole = "user" | "business_owner" | "admin" | "super_admin";
@@ -20,7 +21,7 @@ function requireSuperAdmin(role: JustFindsRole) {
 
 const businessInput = z.object({
   name: z.string().min(2).max(220),
-  slug: z.string().min(2).max(240).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  slug: z.string().max(240).optional(),
   categoryId: z.number().int().positive(),
   subcategoryId: z.number().int().positive().optional(),
   cityId: z.number().int().positive(),
@@ -95,8 +96,17 @@ export const workspaceRouter = router({
     if (ctx.user.role !== "business_owner" && !canModerate(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "Business-owner access is required to create a listing." });
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The business workspace is temporarily unavailable." });
-    const { dynamicValues, ...business } = input;
-    const created = await db.insert(businesses).values({ ...business, ownerId: ctx.user.id, status: "draft" });
+    const { dynamicValues, slug: requestedSlug, ...business } = input;
+    const baseSlug = preferredBusinessSlug(business.name, requestedSlug);
+    let slug = baseSlug;
+    let available = false;
+    for (let suffix = 1; suffix <= 100; suffix += 1) {
+      const candidate = suffix === 1 ? baseSlug : numberedSlug(baseSlug, suffix);
+      const existing = await db.select({ id: businesses.id }).from(businesses).where(eq(businesses.slug, candidate)).limit(1);
+      if (!existing.length) { slug = candidate; available = true; break; }
+    }
+    if (!available) throw new TRPCError({ code: "CONFLICT", message: "This business name is already in use too many times. Please choose a more specific name." });
+    const created = await db.insert(businesses).values({ ...business, slug, ownerId: ctx.user.id, status: "draft" });
     const businessId = Number(created[0].insertId);
     if (dynamicValues?.length) await db.insert(businessFieldValues).values(dynamicValues.map(field => ({ businessId, categoryFieldId: field.categoryFieldId, value: field.value })));
     return { businessId, status: "draft" as const };
