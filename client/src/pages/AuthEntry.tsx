@@ -37,7 +37,7 @@ export default function AuthEntry() {
         <h1 className="mt-2 text-3xl font-semibold tracking-[-.05em] text-slate-950 sm:text-4xl">{content.title}</h1>
         <p className="mt-4 max-w-lg text-sm leading-7 text-slate-600">{content.description}</p>
         <Button onClick={() => startLogin()} className="mt-8 h-12 w-full rounded-xl bg-[#173d9c] text-sm">{content.action}<ArrowRight className="ml-2 size-4" /></Button>
-        <div className="mt-6 rounded-2xl bg-slate-50 p-4 text-xs leading-5 text-slate-600"><span className="flex items-center gap-1.5 font-semibold text-slate-800"><ShieldCheck className="size-4 text-emerald-600" />Managed sign-in</span><p className="mt-1">Email-and-password authentication is not simulated in this environment. It can be enabled only through an approved Supabase migration.</p></div>
+        <div className="mt-6 rounded-2xl bg-slate-50 p-4 text-xs leading-5 text-slate-600"><span className="flex items-center gap-1.5 font-semibold text-slate-800"><ShieldCheck className="size-4 text-emerald-600" />Managed sign-in</span><p className="mt-1">Sign in with your own Just Finds account. Regular users can create and manage only their own listings; administrator tools are available only to accounts separately assigned an administrator role.</p></div>
         <p className="mt-6 text-center text-xs text-slate-500">Looking for local businesses? <Link href="/search" className="font-semibold text-[#1f51c8]">Explore Just Finds</Link></p>
       </section>
     </main>

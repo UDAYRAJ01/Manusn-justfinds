@@ -156,3 +156,7 @@
 
 - [x] Diagnose and repair the reported “Business-owner access is required to create a listing” error for an authenticated first-listing user
 - [x] Add regression coverage proving ordinary authenticated users can create a first private draft while foreign-business isolation remains enforced
+
+- [ ] Verify the home-page managed Sign in journey with a real public-user OAuth callback and authenticated session state
+- [ ] Verify separate administrator and user identities, roles, and business-management permissions in their post-login workspaces
+- [x] Add focused regression coverage for role-gated workspace access in addition to managed-login navigation visibility

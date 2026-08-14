@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, ChevronRight, LogOut, Menu, X } from "lucide-react";
-import { useState } from "react";
+import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
 
 export type WorkspaceNavItem = { href: string; label: string; icon: React.ElementType };
