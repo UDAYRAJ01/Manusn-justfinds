@@ -51,6 +51,14 @@ export async function getDb() {
   return _db;
 }
 
+export function resolveSyncedUserRole(
+  openId: string,
+  requestedRole: InsertUser["role"] | undefined,
+  ownerOpenId = ENV.ownerOpenId,
+) {
+  return requestedRole ?? (openId === ownerOpenId ? "super_admin" : "user");
+}
+
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) throw new Error("User openId is required for upsert");
   const db = await getDb();
@@ -63,7 +71,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet[field] = user[field] ?? null;
     }
   }
-  values.role = user.role ?? (user.openId === ENV.ownerOpenId ? "admin" : "user");
+  values.role = resolveSyncedUserRole(user.openId, user.role);
   if (user.role !== undefined || user.openId === ENV.ownerOpenId) updateSet.role = values.role;
   await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
 }

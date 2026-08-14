@@ -129,3 +129,16 @@
 - [x] Auto-generate city slugs from city names so `Kannur` becomes `kannur` and manual mismatches cannot persist
 - [x] Preserve super-admin authorization for city creation and show a clear permission error to non-super-admin users
 - [x] Add city slug and permission regression coverage
+
+- [x] Inspect the current user-role model and identify the controlled super-admin promotion path
+- [x] Provide a secure, auditable path for the project owner to obtain super-admin access without weakening category/city authorization
+- [x] Add authorization regression coverage for the resulting super-admin access-management flow
+
+- [x] Verify the exact account signed into the project admin workspace and promote that account to super_admin
+- [x] Verify category and city management access after the promoted account signs out and back in
+- [x] Preserve the configured project owner’s super_admin role during authentication sync
+
+- [x] Confirm the authenticated admin-workspace identity after sign-in and verify its category/city create permissions
+
+- [x] Create the requested `Hospital` category through the authenticated super-admin workspace and verify server-side persistence
+- [x] Create the requested `Kanpur` city through the authenticated super-admin workspace and verify server-side persistence
