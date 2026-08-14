@@ -15,6 +15,7 @@ import PublicWebsite from "./pages/PublicWebsite";
 import Categories from "./pages/Categories";
 import CustomerAppointment from "./pages/CustomerAppointment";
 import { CategoryLanding, CityLanding } from "./pages/DiscoveryLanding";
+import GoogleImportSettings from "./pages/GoogleImportSettings";
 import Home from "./pages/Home";
 import Jobs from "./pages/Jobs";
 import NotFound from "./pages/NotFound";
@@ -41,6 +42,7 @@ function Router() {
     <Route path="/dashboard" component={OwnerWorkspace} />
     <Route path="/business" component={BusinessPlatform} />
     <Route path="/business/onboarding" component={BusinessPlatform} />
+    <Route path="/business/add/import" component={GoogleImportSettings} />
     <Route path="/business/:identifier/website" component={BusinessWebsiteRoute} />
     <Route path="/business/:businessId/:tool" component={BusinessToolRoute} />
     <Route path="/business/:rest*" component={BusinessPlatform} />

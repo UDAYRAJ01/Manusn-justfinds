@@ -1,175 +1,43 @@
 import { TRPCError } from "@trpc/server";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { storagePut } from "../storage";
-// using global fetch
-import { eq, and } from "drizzle-orm";
-import { businesses, googleImports, categories, cities } from "../../drizzle/schema";
+import { businessHours, businesses, categories, cities, googleImports, googlePlaceCategoryMappings, subcategories } from "../../drizzle/schema";
 import { getDb } from "../db";
+import { scoreDuplicateCandidate } from "../domain/duplicateCheck";
+import { numberedSlug, preferredBusinessSlug } from "../domain/slug";
+import { autocompleteOfficialPlaces, getOfficialPlaceDetail, type OfficialPlaceDetail } from "../integrations/googlePlaces";
 import { protectedProcedure, router } from "../_core/trpc";
 
-async function dbOrThrow() {
-  const db = await getDb();
-  if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Database is temporarily unavailable." });
-  return db;
+const WINDOWS = new Map<number, { startedAt: number; count: number }>();
+const editableDraft = z.object({ importId: z.number().int().positive(), name: z.string().trim().min(2).max(220), categoryId: z.number().int().positive(), subcategoryId: z.number().int().positive().nullable().optional(), cityId: z.number().int().positive(), address: z.string().trim().min(5).max(3000), phone: z.string().trim().max(32).nullable().optional(), website: z.string().url().max(500).nullable().optional(), latitude: z.string().trim().max(24).nullable().optional(), longitude: z.string().trim().max(24).nullable().optional() });
+
+async function dbOrThrow() { const db = await getDb(); if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Database is temporarily unavailable." }); return db; }
+function rateLimit(userId: number) { const now = Date.now(); const current = WINDOWS.get(userId); if (!current || now - current.startedAt > 60_000) { WINDOWS.set(userId, { startedAt: now, count: 1 }); return; } if (current.count >= 20) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Too many discovery requests. Please wait a minute and try again." }); current.count += 1; }
+async function mappingFor(db: any, googlePrimaryType: string | null) { if (!googlePrimaryType) return null; const rows = await db.select({ category: categories, subcategory: subcategories }).from(googlePlaceCategoryMappings).innerJoin(categories, eq(googlePlaceCategoryMappings.categoryId, categories.id)).leftJoin(subcategories, eq(googlePlaceCategoryMappings.subcategoryId, subcategories.id)).where(and(eq(googlePlaceCategoryMappings.googlePrimaryType, googlePrimaryType), eq(googlePlaceCategoryMappings.isActive, true))); return rows[0] ?? null; }
+async function uniqueSlug(db: any, name: string) { const base = preferredBusinessSlug(name); const conflicts = new Set((await db.select({ slug: businesses.slug }).from(businesses)).map((row: { slug: string }) => row.slug)); if (!conflicts.has(base)) return base; for (let suffix = 2; suffix <= 200; suffix += 1) { const candidate = numberedSlug(base, suffix); if (!conflicts.has(candidate)) return candidate; } throw new TRPCError({ code: "CONFLICT", message: "We could not create a unique listing URL. Please adjust the business name and try again." }); }
+async function duplicateFor(db: any, input: { name: string; phone: string | null; address: string; latitude: string | null; longitude: string | null; cityId: number }) { const candidates = await db.select({ id: businesses.id, name: businesses.name, phone: businesses.phone, email: businesses.email, address: businesses.address, cityId: businesses.cityId, latitude: businesses.latitude, longitude: businesses.longitude }).from(businesses).where(eq(businesses.cityId, input.cityId)); return candidates.map((business: any) => ({ business, match: scoreDuplicateCandidate({ ...input, email: null }, business) })).filter((entry: any) => entry.match).sort((left: any, right: any) => right.match.score - left.match.score)[0] ?? null; }
+function sources(detail: OfficialPlaceDetail) { return { name: "Google Places", address: "Google Places", phone: detail.phone ? "Google Places" : null, website: detail.website ? "Google Places" : null, openingHours: detail.weekdayDescriptions.length ? "Google Places" : null, categoryHint: detail.primaryType ? "Google Places" : null, location: detail.latitude && detail.longitude ? "Google Places" : null }; }
+function importedHours(detail: OfficialPlaceDetail, businessId: number) {
+  const byDay = new Map<number, Array<{ start: string; end: string }>>();
+  const time = (value: unknown) => {
+    const record = value as { day?: unknown; hour?: unknown; minute?: unknown } | undefined;
+    if (!record || typeof record.day !== "number" || !Number.isInteger(record.day) || record.day < 0 || record.day > 6 || typeof record.hour !== "number" || typeof record.minute !== "number") return null;
+    return { day: record.day, value: `${String(record.hour).padStart(2, "0")}:${String(record.minute).padStart(2, "0")}` };
+  };
+  for (const period of Array.isArray(detail.openingPeriods) ? detail.openingPeriods : []) {
+    const record = period as { open?: unknown; close?: unknown };
+    const open = time(record.open); const close = time(record.close);
+    if (!open || !close || open.day !== close.day) continue;
+    byDay.set(open.day, [...(byDay.get(open.day) ?? []), { start: open.value, end: close.value }]);
+  }
+  return Array.from(byDay.entries()).map(([dayOfWeek, ranges]) => ({ businessId, dayOfWeek, opensAt: ranges[0].start, closesAt: ranges[ranges.length - 1].end, intervals: ranges, isClosed: false, isTwentyFourHours: false }));
 }
 
 export const googleImportRouter = router({
-  status: protectedProcedure.query(async ({ ctx }) => {
-    const clientId = process.env.GOOGLE_CLIENT_ID || "";
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET || "";
-    const isConfigured = Boolean(clientId && clientSecret);
-    const db = await dbOrThrow();
-    const imports = await db.select().from(googleImports).where(eq(googleImports.userId, ctx.user.id));
-    return {
-      isConfigured,
-      clientIdConfigured: Boolean(clientId),
-      clientSecretConfigured: Boolean(clientSecret),
-      importedCount: imports.length,
-      imports,
-    };
-  }),
-
-  authUrl: protectedProcedure.query(async ({ ctx }) => {
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    if (!clientId) {
-      throw new TRPCError({
-        code: "PRECONDITION_FAILED",
-        message: "Google Business Profile OAuth is not configured. Please provide GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET secrets.",
-      });
-    }
-    const redirectUri = `${process.env.OAUTH_SERVER_URL || "https://3000-ic8lztj0rjpl006wg6o8c-3a860306.sg1.manus.computer"}/api/google/callback`;
-    const scope = encodeURIComponent("https://www.googleapis.com/auth/business.manage");
-    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`;
-    return { url };
-  }),
-
-  fetchLocations: protectedProcedure.input(z.object({ mock: z.boolean().optional() })).query(async ({ ctx, input }) => {
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    if (!clientId && !input.mock) {
-      throw new TRPCError({
-        code: "PRECONDITION_FAILED",
-        message: "Google Business Profile integration is not configured. Please configure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET or use simulation mode.",
-      });
-    }
-    
-    // Return honest simulated mock locations when mock=true or credentials are placeholder/testing
-    const mockLocations = [
-      {
-        locationId: "gbp_loc_101",
-        accountName: "Sharma Enterprises GBP",
-        businessName: "Sharma Electronics & Home Appliances",
-        address: "14 Market Road, Connaught Place, New Delhi 110001",
-        phone: "+91 11 2345 6789",
-        website: "https://sharmaelectronics.example.com",
-        category: "Electronics Store",
-        city: "New Delhi",
-        lat: 28.6280,
-        lng: 77.2090,
-      },
-      {
-        locationId: "gbp_loc_102",
-        accountName: "Sharma Enterprises GBP",
-        businessName: "Sharma Fresh Bakery & Cafe",
-        address: "22 Residency Road, Bangalore 560025",
-        phone: "+91 80 9876 5432",
-        website: "https://sharmabakery.example.com",
-        category: "Bakery & Cafe",
-        city: "Bangalore",
-        lat: 12.9716,
-        lng: 77.5946,
-      },
-    ];
-
-    return {
-      source: "google_business_profile_api",
-      locations: mockLocations,
-    };
-  }),
-
-  importLocation: protectedProcedure.input(z.object({
-    locationId: z.string().min(1),
-    businessName: z.string().min(2),
-    address: z.string().min(5),
-    phone: z.string().optional(),
-    website: z.string().optional(),
-    categoryName: z.string().optional(),
-    cityName: z.string().optional(),
-    photoUrl: z.string().url().optional(),
-    rawPayload: z.record(z.string(), z.any()).optional(),
-  })).mutation(async ({ ctx, input }) => {
-    const db = await dbOrThrow();
-    
-    // Check duplicate by googleLocationId
-    const existing = await db.select().from(googleImports).where(eq(googleImports.googleLocationId, input.locationId)).limit(1);
-    if (existing.length > 0) {
-      throw new TRPCError({ code: "CONFLICT", message: "This Google Business Profile location has already been imported." });
-    }
-
-    // Find default category & city if matching
-    const defaultCategory = await db.select().from(categories).limit(1);
-    const defaultCity = await db.select().from(cities).limit(1);
-    const categoryId = defaultCategory[0]?.id || 1;
-    const cityId = defaultCity[0]?.id || 1;
-
-    // Create draft business record awaiting review
-    const [insertedBusiness] = await db.insert(businesses).values({
-      ownerId: ctx.user.id,
-      categoryId,
-      cityId,
-      name: input.businessName,
-      slug: `gbp-${input.locationId.toLowerCase()}-${Date.now().toString(36)}`,
-      address: input.address,
-      phone: input.phone || null,
-      website: input.website || null,
-      shortDescription: `Imported from Google Business Profile (${input.categoryName || "Local Business"}).`,
-      status: "draft",
-      onboardingStep: 1,
-    });
-
-    const businessId = Number(insertedBusiness.insertId);
-
-    // Cache photo in S3 if provided in rawPayload
-    let cachedPhotoUrl = input.photoUrl;
-    if (cachedPhotoUrl && (cachedPhotoUrl.startsWith("http://") || cachedPhotoUrl.startsWith("https://"))) {
-      try {
-        const photoRes = await fetch(cachedPhotoUrl);
-        if (photoRes.ok) {
-          const buffer = Buffer.from(await photoRes.arrayBuffer());
-          const contentType = photoRes.headers.get("content-type") || "image/jpeg";
-          const ext = contentType.includes("png") ? "png" : "jpg";
-          const s3Result = await storagePut(`gbp-imports/${businessId}/cover_${Date.now()}.${ext}`, buffer, contentType);
-          cachedPhotoUrl = s3Result.url;
-        }
-      } catch (err) {
-        console.error("Failed to cache GBP photo in S3, keeping original URL:", err);
-      }
-    }
-
-    // Record in google_imports
-    await db.insert(googleImports).values({
-      userId: ctx.user.id,
-      businessId,
-      googleLocationId: input.locationId,
-      businessName: input.businessName,
-      rawPayload: input.rawPayload || input,
-      status: "pending_review",
-    });
-
-    return { success: true, businessId, message: "Google Business Profile location successfully imported as a draft business for owner review." };
-  }),
-
-  syncGoogleImports: protectedProcedure.mutation(async ({ ctx }) => {
-    const db = await dbOrThrow();
-    const imports = await db.select().from(googleImports).where(eq(googleImports.userId, ctx.user.id));
-    
-    let synced = 0;
-    for (const item of imports) {
-      await db.update(googleImports)
-        .set({ status: "imported" })
-        .where(eq(googleImports.id, item.id));
-      synced++;
-    }
-
-    return { success: true, syncedCount: synced, message: `Successfully synchronized ${synced} Google imported listings with latest profile metadata (preserving owner overrides).` };
-  }),
+  status: protectedProcedure.query(async ({ ctx }) => { const db = await dbOrThrow(); const imports = await db.select().from(googleImports).where(eq(googleImports.userId, ctx.user.id)); return { isConfigured: Boolean(process.env.GOOGLE_PLACES_API_KEY?.trim()), provider: "google_places_api_new", importedCount: imports.length, imports }; }),
+  autocomplete: protectedProcedure.input(z.object({ query: z.string().trim().min(2).max(160), locationText: z.string().trim().max(180).optional(), sessionToken: z.string().trim().min(8).max(36).optional() })).query(async ({ ctx, input }) => { rateLimit(ctx.user.id); return { suggestions: await autocompleteOfficialPlaces(input) }; }),
+  placeDetails: protectedProcedure.input(z.object({ placeId: z.string().trim().min(3).max(120), sessionToken: z.string().trim().min(8).max(36).optional() })).query(async ({ ctx, input }) => { rateLimit(ctx.user.id); const detail = await getOfficialPlaceDetail(input.placeId, input.sessionToken); const mapping = await mappingFor(await dbOrThrow(), detail.primaryType); return { detail, mapping: mapping ? { categoryId: mapping.category.id, categoryName: mapping.category.name, subcategoryId: mapping.subcategory?.id ?? null, subcategoryName: mapping.subcategory?.name ?? null } : null }; }),
+  createDraft: protectedProcedure.input(z.object({ placeId: z.string().trim().min(3).max(120), sessionToken: z.string().trim().min(8).max(36).optional() })).mutation(async ({ ctx, input }) => { rateLimit(ctx.user.id); const db = await dbOrThrow(); const existing = await db.select().from(googleImports).where(eq(googleImports.googleLocationId, input.placeId)).limit(1); if (existing[0]) { if (existing[0].userId === ctx.user.id) return { importId: existing[0].id, status: existing[0].status, reused: true }; throw new TRPCError({ code: "CONFLICT", message: "This place is already being added to Just Finds. Search the directory to request a claim if it is your business." }); } const detail = await getOfficialPlaceDetail(input.placeId, input.sessionToken); const mapping = await mappingFor(db, detail.primaryType); const [created] = await db.insert(googleImports).values({ userId: ctx.user.id, googleLocationId: detail.placeId, businessName: detail.displayName, categoryHint: detail.primaryType, formattedAddress: detail.formattedAddress, addressComponents: detail.addressComponents, fieldSources: sources(detail), rawPayload: detail, status: "draft" }); return { importId: Number(created.insertId), status: "draft", reused: false, mapping: mapping ? { categoryId: mapping.category.id, subcategoryId: mapping.subcategory?.id ?? null } : null }; }),
+  draft: protectedProcedure.input(z.object({ importId: z.number().int().positive() })).query(async ({ ctx, input }) => { const db = await dbOrThrow(); const rows = await db.select().from(googleImports).where(and(eq(googleImports.id, input.importId), eq(googleImports.userId, ctx.user.id))).limit(1); if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "That import draft was not found." }); const mapping = await mappingFor(db, rows[0].categoryHint); const activeCategories = await db.select({ id: categories.id, name: categories.name }).from(categories).where(eq(categories.isActive, true)); const availableCities = await db.select({ id: cities.id, name: cities.name }).from(cities); return { import: rows[0], detail: rows[0].rawPayload as OfficialPlaceDetail | null, mapping: mapping ? { categoryId: mapping.category.id, subcategoryId: mapping.subcategory?.id ?? null } : null, categories: activeCategories, cities: availableCities }; }),
+  finalizeDraft: protectedProcedure.input(editableDraft).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const rows = await db.select().from(googleImports).where(and(eq(googleImports.id, input.importId), eq(googleImports.userId, ctx.user.id))).limit(1); const importDraft = rows[0]; if (!importDraft) throw new TRPCError({ code: "NOT_FOUND", message: "That import draft was not found." }); if (importDraft.businessId) return { businessId: importDraft.businessId, alreadyFinalized: true }; const [category] = await db.select().from(categories).where(and(eq(categories.id, input.categoryId), eq(categories.isActive, true))).limit(1); const [city] = await db.select().from(cities).where(eq(cities.id, input.cityId)).limit(1); if (!category || !city) throw new TRPCError({ code: "BAD_REQUEST", message: "Choose an active category and a valid city before continuing." }); if (input.subcategoryId) { const [subcategory] = await db.select().from(subcategories).where(and(eq(subcategories.id, input.subcategoryId), eq(subcategories.categoryId, input.categoryId))).limit(1); if (!subcategory) throw new TRPCError({ code: "BAD_REQUEST", message: "Choose a valid subcategory for the selected category." }); } const duplicate = await duplicateFor(db, { name: input.name, phone: input.phone ?? null, address: input.address, latitude: input.latitude ?? null, longitude: input.longitude ?? null, cityId: input.cityId }); if (duplicate?.match.classification === "likely") { await db.update(googleImports).set({ duplicateBusinessId: duplicate.business.id, status: "duplicate", updatedAt: new Date() }).where(eq(googleImports.id, importDraft.id)); throw new TRPCError({ code: "CONFLICT", message: `A likely duplicate already exists: ${duplicate.business.name}. Please request a claim instead of creating another listing.` }); } const slug = await uniqueSlug(db, input.name); const [created] = await db.insert(businesses).values({ ownerId: ctx.user.id, categoryId: input.categoryId, subcategoryId: input.subcategoryId ?? null, cityId: input.cityId, name: input.name, slug, address: input.address, phone: input.phone ?? null, website: input.website ?? null, latitude: input.latitude ?? null, longitude: input.longitude ?? null, status: "draft", onboardingStep: 1 }); const businessId = Number(created.insertId); const detail = importDraft.rawPayload as OfficialPlaceDetail | null; const hours = detail ? importedHours(detail, businessId) : []; if (hours.length) await db.insert(businessHours).values(hours); await db.update(googleImports).set({ businessId, businessName: input.name, duplicateBusinessId: duplicate?.business.id ?? null, status: "finalized", updatedAt: new Date() }).where(eq(googleImports.id, importDraft.id)); return { businessId, slug, alreadyFinalized: false, importedHours: hours.length, possibleDuplicate: duplicate ? { businessId: duplicate.business.id, name: duplicate.business.name, score: duplicate.match.score } : null }; }),
 });

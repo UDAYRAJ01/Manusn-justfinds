@@ -908,10 +908,34 @@ export const googleImports = mysqlTable("google_imports", {
   businessId: int("businessId").references(() => businesses.id),
   googleAccountId: varchar("googleAccountId", { length: 120 }),
   googleLocationId: varchar("googleLocationId", { length: 120 }).notNull(),
+  importSessionId: varchar("importSessionId", { length: 64 }),
   businessName: varchar("businessName", { length: 255 }).notNull(),
+  categoryHint: varchar("categoryHint", { length: 180 }),
+  formattedAddress: text("formattedAddress"),
+  addressComponents: json("addressComponents"),
+  fieldSources: json("fieldSources"),
+  duplicateBusinessId: int("duplicateBusinessId").references(() => businesses.id),
   rawPayload: json("rawPayload"),
-  status: mysqlEnum("status", ["pending_review", "imported", "duplicate", "error", "approved", "rejected"]).notNull().default("pending_review"),
+  status: mysqlEnum("status", ["draft", "pending_review", "imported", "duplicate", "error", "approved", "rejected", "finalized"]).notNull().default("draft"),
   errorMessage: text("errorMessage"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
-}, table => [index("google_imports_user_idx").on(table.userId), uniqueIndex("google_location_uidx").on(table.googleLocationId)]);
+}, table => [
+  index("google_imports_user_idx").on(table.userId),
+  index("google_imports_business_idx").on(table.businessId),
+  index("google_imports_duplicate_idx").on(table.duplicateBusinessId),
+  uniqueIndex("google_location_uidx").on(table.googleLocationId),
+]);
+
+export const googlePlaceCategoryMappings = mysqlTable("google_place_category_mappings", {
+  id: int("id").autoincrement().primaryKey(),
+  googlePrimaryType: varchar("googlePrimaryType", { length: 160 }).notNull(),
+  categoryId: int("categoryId").notNull().references(() => categories.id),
+  subcategoryId: int("subcategoryId").references(() => subcategories.id),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),
+}, table => [
+  uniqueIndex("google_place_type_uidx").on(table.googlePrimaryType),
+  index("google_place_category_idx").on(table.categoryId, table.isActive),
+]);

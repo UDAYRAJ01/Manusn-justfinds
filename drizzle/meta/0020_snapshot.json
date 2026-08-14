@@ -1,8 +1,8 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "b561f0ee-8c05-45ca-82bf-61662f9a553a",
-  "prevId": "f5a80f87-62c7-4656-b313-3f6335118dae",
+  "id": "300c75b5-311c-41ab-a2b8-f618e0472b35",
+  "prevId": "b561f0ee-8c05-45ca-82bf-61662f9a553a",
   "tables": {
     "ai_content_versions": {
       "name": "ai_content_versions",
@@ -3475,6 +3475,105 @@
       "compositePrimaryKeys": {
         "business_pages_id": {
           "name": "business_pages_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "business_profile_section_saves": {
+      "name": "business_profile_section_saves",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "businessId": {
+          "name": "businessId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "userId": {
+          "name": "userId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sectionKey": {
+          "name": "sectionKey",
+          "type": "varchar(40)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "savedAt": {
+          "name": "savedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "onUpdate": true,
+          "default": "(now())"
+        }
+      },
+      "indexes": {
+        "profile_section_business_user_uidx": {
+          "name": "profile_section_business_user_uidx",
+          "columns": [
+            "businessId",
+            "userId",
+            "sectionKey"
+          ],
+          "isUnique": true
+        },
+        "profile_section_business_idx": {
+          "name": "profile_section_business_idx",
+          "columns": [
+            "businessId",
+            "savedAt"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "business_profile_section_saves_businessId_businesses_id_fk": {
+          "name": "business_profile_section_saves_businessId_businesses_id_fk",
+          "tableFrom": "business_profile_section_saves",
+          "tableTo": "businesses",
+          "columnsFrom": [
+            "businessId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "business_profile_section_saves_userId_users_id_fk": {
+          "name": "business_profile_section_saves_userId_users_id_fk",
+          "tableFrom": "business_profile_section_saves",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "business_profile_section_saves_id": {
+          "name": "business_profile_section_saves_id",
           "columns": [
             "id"
           ]
