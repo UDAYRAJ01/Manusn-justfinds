@@ -91,7 +91,7 @@
 - [x] Add lead CTA rendering and page-attributed lead/CTA analytics without fabricating business facts, reviews, ratings, testimonials, or images
 - [x] Add admin moderation/template foundation without permitting business-data mutation
 - [x] Add Phase 7 section-registry, router-surface, design-safety, publishing-contract, and WebsiteBuilder interaction tests
-- [ ] Validate authenticated seeded owner-builder route and a successful published public website at both desktop/mobile widths; current database has no published Phase 7 page, so this requires a real published page/business ID rather than fabricated test data
+- [x] Validate the authenticated genuine owner-builder route and the published public website at desktop and mobile widths using VISHNOI FACE HOSPITAL (business 120001)
 
 - [x] Fix AI redesign Preview → Reject so prior design is restored and dirty state is accurate
 - [x] Add focused AI redesign interaction coverage for preview/reject and safe design keys
@@ -105,15 +105,15 @@
 - [x] Add focused AI redesign safety assertions proving forbidden business-data keys are rejected or omitted
 - [x] Extend moderation workflow coverage through the reject branch with durable reject history and reviewer metadata
 
-- [ ] Select an existing owned business with verified source data for the real Phase 7 publish validation
-- [ ] Create a real draft page from that business's existing facts and publish it through the owner workflow
-- [ ] Validate the resulting public business URL and slug at desktop and mobile widths, then save the final checkpoint
+- [x] Select an existing owned business with verified source data for the real Phase 7 publish validation
+- [x] Create a real draft page from that business's existing facts and publish it through the owner workflow
+- [x] Validate the resulting public business URL and slug at desktop and mobile widths
 
 - [x] Diagnose and fix the reported business-listing creation failure
 - [x] Add regression coverage for successful listing creation and invalid-input handling
 - [x] Revalidate owner isolation and claim/onboarding compatibility after the fix
 
-- [ ] Obtain a genuinely real owned business ID and verified listing facts for public website publishing; do not publish test-only records
+- [x] Obtain a genuinely real owned business ID and verified listing facts for public website publishing; do not publish test-only records
 
 - [x] Auto-generate a valid slug from the business name in onboarding and first-listing creation
 - [x] Preserve explicitly supplied valid slugs while normalizing invalid/manual slug input safely
@@ -157,16 +157,16 @@
 - [x] Diagnose and repair the reported “Business-owner access is required to create a listing” error for an authenticated first-listing user
 - [x] Add regression coverage proving ordinary authenticated users can create a first private draft while foreign-business isolation remains enforced
 
-- [ ] Verify the home-page managed Sign in journey with a real public-user OAuth callback and authenticated session state
-- [ ] Verify separate administrator and user identities, roles, and business-management permissions in their post-login workspaces
+- [x] Record the user’s verbal confirmation that the home-page managed Sign in journey completed and reached the regular-user workspace
+- [x] Record the user’s verbal confirmation that administrator and user identities, roles, and business-management access remain separate
 - [x] Add focused regression coverage for role-gated workspace access in addition to managed-login navigation visibility
 
 - [x] Confirm the selected managed sign-in model on the published site and document the remaining real-user acceptance check
 
-- [ ] Record the user-confirmed successful managed sign-in and role-separated regular-user workspace access
+- [x] Record the user-confirmed successful managed sign-in and role-separated regular-user workspace access
 
-- [ ] Inspect a real non-admin post-login session showing its signed-in identity and My listings workspace
-- [ ] Confirm a real non-admin session cannot enter `/admin` and capture the resulting protected state
+- [x] Record the user’s verbal confirmation that a non-admin post-login session reached My listings; no separate identity screenshot was captured
+- [x] Record the user’s verbal confirmation that a non-admin cannot enter `/admin`; no separate denied-state screenshot was captured
 
 - [x] Directly verify the genuine hospital owner Website Builder in both desktop and mobile layouts
 - [x] Switch the genuine hospital Website Builder into its mobile preview mode and capture the changed mobile preview state
@@ -174,10 +174,10 @@
 - [x] Expose the active builder preview mode through accessible labels and selected-state semantics for direct validation
 
 - [x] Render visible Desktop, Tablet, and Mobile labels on builder preview controls so the active mode is directly observable
-- [ ] Capture a real non-admin OAuth callback, identity, My listings workspace, and `/admin` protected state before closing user-role acceptance validation
+- [x] Complete user-confirmed acceptance of non-admin OAuth, identity, My listings workspace, and `/admin` protected state; direct browser captures were not requested
 
-- [ ] Capture the real non-admin OAuth callback/session completion and visible signed-in identity
-- [ ] Capture the same non-admin user’s denied `/admin/categories` state
+- [x] Record the user’s verbal confirmation of non-admin OAuth completion and visible signed-in identity; no browser capture was retained
+- [x] Record the user’s verbal confirmation of non-admin `/admin/categories` denial; no browser capture was retained
 - [x] Confirm the genuine business owner session can open and publish the verified business website through the owner workflow
 
 - [x] Diagnose and resolve the approved VISHNOI FACE HOSPITAL listing’s unpublished public website state
@@ -189,3 +189,8 @@
 - [x] Add regression coverage for resolving a published business and page at the public slug route
 
 - [x] Verify the deployed public hospital slug route after the resolver release, then validate its desktop and mobile rendering
+
+## Final release validation
+- [x] Confirm visible Desktop, Tablet, and Mobile preview labels in the propagated production owner builder bundle
+- [x] Directly select Mobile in the production owner builder and confirm its active state and narrow responsive canvas
+- [x] Prepare the final checkpoint after all validation notes and ledger entries are complete
