@@ -150,7 +150,7 @@
 - [x] Diagnose and repair the reported blank page on the genuine business website or owner-builder route
 - [x] Add regression coverage for the resolved blank-page path and revalidate it in the browser
 
-- [ ] Diagnose the blank take-control authentication view and provide a safe owner-login recovery path
+- [x] Diagnose the blank take-control authentication view and provide a safe owner-login recovery path
 
 - [ ] Obtain explicit authorization before transferring or otherwise changing ownership of the genuine business for publication access
 
@@ -160,3 +160,16 @@
 - [ ] Verify the home-page managed Sign in journey with a real public-user OAuth callback and authenticated session state
 - [ ] Verify separate administrator and user identities, roles, and business-management permissions in their post-login workspaces
 - [x] Add focused regression coverage for role-gated workspace access in addition to managed-login navigation visibility
+
+- [x] Confirm the selected managed sign-in model on the published site and document the remaining real-user acceptance check
+
+- [ ] Record the user-confirmed successful managed sign-in and role-separated regular-user workspace access
+
+- [ ] Inspect a real non-admin post-login session showing its signed-in identity and My listings workspace
+- [ ] Confirm a real non-admin session cannot enter `/admin` and capture the resulting protected state
+- [ ] Confirm the genuine business owner session can open and publish the verified business website through the owner workflow
+
+- [ ] Diagnose and resolve the approved VISHNOI FACE HOSPITAL listing’s unpublished public website state
+
+- [x] Repair the initial default website page flow so it can create a first saved design version before publication
+- [x] Add regression coverage for saving and publishing a newly created website page without manual design changes

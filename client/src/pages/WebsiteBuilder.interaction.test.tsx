@@ -24,13 +24,33 @@ vi.mock("@/lib/trpc", () => ({
   },
 }));
 
-import WebsiteBuilder, { restorePreviewDesign } from "./WebsiteBuilder";
+import WebsiteBuilder, { canSaveWebsiteDraft, restorePreviewDesign } from "./WebsiteBuilder";
 
 describe("WebsiteBuilder section interactions", () => {
   it("restores the exact pre-preview design and dirty state when rejecting", () => {
     const previous = { theme: "editorial", primary: "#123456" };
     expect(restorePreviewDesign(previous, true)).toEqual({ design: previous, dirty: true });
     expect(restorePreviewDesign(null, false)).toEqual({ design: null, dirty: false });
+  });
+  it("allows a default website page with no versions to create its first draft without a manual design edit", () => {
+    expect(canSaveWebsiteDraft(false, 0)).toBe(true);
+    expect(canSaveWebsiteDraft(false, 1)).toBe(false);
+    expect(canSaveWebsiteDraft(true, 1)).toBe(true);
+  });
+  it("submits the default sections and design when creating an initial draft", async () => {
+    (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    mocks.save.mockClear();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => { root.render(<WebsiteBuilder businessId={5} />); });
+    const createDraft = Array.from(container.querySelectorAll("button")).find(button => button.textContent === "Create first draft") as HTMLButtonElement;
+    expect(createDraft).toBeTruthy();
+    expect(createDraft.disabled).toBe(false);
+    await act(async () => { createDraft.click(); });
+    expect(mocks.save).toHaveBeenCalledWith(expect.objectContaining({ businessId: 5, sections: expect.arrayContaining([expect.objectContaining({ sectionType: "hero", enabled: true })]), designConfig: expect.objectContaining({ theme: "modern" }) }));
+    await act(async () => { root.unmount(); });
+    container.remove();
   });
   it("selects a section without toggling it and exposes an explicit hide action", async () => {
     (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

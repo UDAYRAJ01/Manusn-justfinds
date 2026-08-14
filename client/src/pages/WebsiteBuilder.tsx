@@ -12,6 +12,10 @@ export function restorePreviewDesign(previousDesign: Record<string, unknown> | n
 
 const modeWidth: Record<PreviewMode, string> = { desktop: "w-full", tablet: "max-w-2xl", mobile: "max-w-sm" };
 
+export function canSaveWebsiteDraft(dirty: boolean, savedVersionCount: number) {
+  return dirty || savedVersionCount === 0;
+}
+
 export default function WebsiteBuilder({ businessId }: { businessId: number }) {
   const builder = trpc.website.builder.useQuery({ businessId });
   const detail = trpc.business.businessDetail.useQuery({ businessId });
@@ -33,6 +37,8 @@ export default function WebsiteBuilder({ businessId }: { businessId: number }) {
   const sourceSections = builder.data?.sections ?? [];
   const currentSections = sections.length ? sections : sourceSections.map(section => ({ id: section.id, sectionType: section.sectionType, displayOrder: section.displayOrder, enabled: section.enabled, config: (section.config ?? {}) as Record<string, unknown> }));
   const currentDesign = design ?? (builder.data?.designConfig as Record<string, unknown> | undefined) ?? {};
+  const savedVersionCount = builder.data?.versions.length ?? 0;
+  const canSaveDraft = canSaveWebsiteDraft(dirty, savedVersionCount);
   const registry = builder.data?.registry ?? [];
   const move = (index: number, direction: -1 | 1) => {
     const next = [...currentSections];
@@ -60,7 +66,7 @@ export default function WebsiteBuilder({ businessId }: { businessId: number }) {
   return <div className="space-y-6">
     <div className="flex flex-col gap-4 rounded-3xl bg-slate-950 p-5 text-white sm:flex-row sm:items-center sm:justify-between">
       <div><p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-300">Phase 7 website builder</p><h2 className="mt-2 text-2xl font-semibold">Build a trustworthy website from verified business facts</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Design controls change layout and presentation only. Business facts, services, images, and reviews continue to come from the owner-scoped listing.</p></div>
-      <div className="flex flex-wrap gap-2"><Button variant="outline" disabled={suggestRedesign.isPending} className="border-white/20 bg-white/10 text-white hover:bg-white/20" onClick={() => suggestRedesign.mutate({ businessId })}><WandSparkles className="mr-2 size-4" />{suggestRedesign.isPending ? "Drafting…" : "AI redesign draft"}</Button><Button variant="outline" disabled={!dirty} className="border-white/20 bg-white/10 text-white hover:bg-white/20" onClick={() => { setSections([]); setDesign(null); setDirty(false); }}>Reset changes</Button><Button disabled={!dirty || save.isPending} className="bg-blue-500 hover:bg-blue-400" onClick={() => save.mutate({ businessId, sections: currentSections, designConfig: currentDesign, seoTitle: builder.data.page.seoTitle ?? undefined, metaDescription: builder.data.page.metaDescription ?? undefined })}>{save.isPending ? <Loader2 className="size-4 animate-spin" /> : "Save draft"}</Button><Button disabled={publish.isPending} className="bg-emerald-500 hover:bg-emerald-400" onClick={() => publish.mutate({ businessId })}>{publish.isPending ? <Loader2 className="size-4 animate-spin" /> : "Publish"}</Button><Button variant="outline" disabled={submitForReview.isPending || dirty} className="border-white/20 bg-white/10 text-white hover:bg-white/20" onClick={() => submitForReview.mutate({ businessId })}>{submitForReview.isPending ? <Loader2 className="size-4 animate-spin" /> : "Submit for review"}</Button></div>
+      <div className="flex flex-wrap gap-2"><Button variant="outline" disabled={suggestRedesign.isPending} className="border-white/20 bg-white/10 text-white hover:bg-white/20" onClick={() => suggestRedesign.mutate({ businessId })}><WandSparkles className="mr-2 size-4" />{suggestRedesign.isPending ? "Drafting…" : "AI redesign draft"}</Button><Button variant="outline" disabled={!dirty} className="border-white/20 bg-white/10 text-white hover:bg-white/20" onClick={() => { setSections([]); setDesign(null); setDirty(false); }}>Reset changes</Button><Button disabled={!canSaveDraft || save.isPending} className="bg-blue-500 hover:bg-blue-400" onClick={() => save.mutate({ businessId, sections: currentSections, designConfig: currentDesign, seoTitle: builder.data.page.seoTitle ?? undefined, metaDescription: builder.data.page.metaDescription ?? undefined })}>{save.isPending ? <Loader2 className="size-4 animate-spin" /> : savedVersionCount === 0 ? "Create first draft" : "Save draft"}</Button><Button disabled={publish.isPending} className="bg-emerald-500 hover:bg-emerald-400" onClick={() => publish.mutate({ businessId })}>{publish.isPending ? <Loader2 className="size-4 animate-spin" /> : "Publish"}</Button><Button variant="outline" disabled={submitForReview.isPending || dirty} className="border-white/20 bg-white/10 text-white hover:bg-white/20" onClick={() => submitForReview.mutate({ businessId })}>{submitForReview.isPending ? <Loader2 className="size-4 animate-spin" /> : "Submit for review"}</Button></div>
     </div>
     {save.error && <p className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{save.error.message}</p>}
     {suggestRedesign.error && <p className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">AI redesign is unavailable: {suggestRedesign.error.message}</p>}
