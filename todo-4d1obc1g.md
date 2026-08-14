@@ -260,3 +260,11 @@
 - [x] Redesign administrator workspace, moderation, category/city, and verification tools while retaining role gates
 - [x] Add or update targeted visual/component tests where shared markup changes require regression coverage
 - [x] Verify representative public, owner, administrator, desktop, and mobile experiences; run full tests and TypeScript checks; 177 tests across 61 files pass; publish the redesign
+
+## Marketplace-style app and software UI refinement
+- [x] Define an original Just Finds visual direction informed by clean marketplace discovery and premium software dashboards, without copying third-party brands
+- [x] Upgrade public home, search, category, and business-detail surfaces with marketplace browsing patterns and clearer conversion actions
+- [x] Add app-like mobile navigation, compact discovery cards, sticky mobile actions, and touch-first responsive behavior
+- [x] Refine owner dashboard, onboarding, and business tools into denser software-style operational surfaces
+- [x] Refine admin dashboard and governance screens into clear, data-first administration software surfaces
+- [x] Run targeted component coverage, TypeScript, full regression tests, desktop/mobile visual verification, and publish the refined interface; 179 tests across 61 files pass

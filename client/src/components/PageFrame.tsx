@@ -63,7 +63,7 @@ export function PageFrame({ children, className }: { children: React.ReactNode; 
         </div>}
       </header>
       <main id="main-content" tabIndex={-1}>{children}</main>
-      <nav className="fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-[420px] items-center justify-around rounded-2xl border border-white/50 bg-slate-950 px-2 py-2 shadow-[0_20px_45px_rgba(15,23,42,.32)] md:hidden" aria-label="Mobile navigation">
+      <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-w-[560px] items-center justify-around rounded-t-[26px] border-x border-t border-[#dce4f1] bg-white/95 px-2 pb-[max(.55rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_32px_rgba(14,27,61,.12)] backdrop-blur-xl md:hidden" aria-label="Mobile navigation">
         <MobileNav href="/" icon={Home} label="Home" active={location === "/"} />
         <MobileNav href="/search" icon={Search} label="Search" active={location.startsWith("/search")} />
         <MobileNav href="/saved" icon={Heart} label="Saved" active={location.startsWith("/saved")} />
@@ -82,7 +82,7 @@ export function PageFrame({ children, className }: { children: React.ReactNode; 
 }
 
 function MobileNav({ href, icon: Icon, label, active }: { href: string; icon: React.ElementType; label: string; active: boolean }) {
-  return <Link href={href} className={cn("flex min-w-12 flex-col items-center gap-1 rounded-xl px-2 py-1.5 text-[10px] font-medium", active ? "bg-white/15 text-white" : "text-slate-400")}><Icon className="size-[18px]" />{label}</Link>;
+  return <Link href={href} className={cn("flex min-w-[58px] flex-col items-center gap-1 rounded-2xl px-2 py-1.5 text-[10px] font-bold transition-colors", active ? "bg-[#eaf0ff] text-[#2559d6]" : "text-slate-500 hover:bg-slate-50 hover:text-[#0e1b3d]")}><span className={cn("grid size-7 place-items-center rounded-xl", active && "bg-[#2559d6] text-white shadow-[0_5px_10px_rgba(37,89,214,.23)]")}><Icon className="size-[17px]" /></span>{label}</Link>;
 }
 
 export function LocationPill({ city = "Kanpur" }: { city?: string }) {
