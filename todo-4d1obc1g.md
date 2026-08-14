@@ -243,3 +243,11 @@
 - [x] Preserve clear source labels and an owner review/change option for both imported values
 - [x] Add focused category, description, and fallback-mapping regression coverage
 - [x] Validate responsive desktop/mobile import entry behavior and the editable review contract without creating fabricated listings; prepare the prefill enhancement for publishing
+
+## Google Category, City, and About import prefill
+- [x] Inspect official Google address components and the approved Just Finds city/category resolution rules
+- [x] Resolve the selected Google business locality into an existing active Just Finds city without creating a new city automatically
+- [x] Prefill editable Category, City, and About fields with clear Google source labels and preserve owner overrides
+- [x] Add city-match and unmatched-city fallbacks with no manual-slug requirement
+- [x] Add focused category, city, and About-field mapping regression coverage
+- [x] Validate responsive owner import review behavior; capture desktop/mobile findings in google-city-prefill-validation.md; 174 tests across 60 files pass; prepare the expanded Google prefill release for publishing
