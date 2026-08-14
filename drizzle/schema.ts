@@ -792,3 +792,16 @@ export const userNotificationPreferences = mysqlTable("user_notification_prefere
   notifyReviews: boolean("notifyReviews").default(true).notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
+export const googleImports = mysqlTable("google_imports", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id),
+  businessId: int("businessId").references(() => businesses.id),
+  googleAccountId: varchar("googleAccountId", { length: 120 }),
+  googleLocationId: varchar("googleLocationId", { length: 120 }).notNull(),
+  businessName: varchar("businessName", { length: 255 }).notNull(),
+  rawPayload: json("rawPayload"),
+  status: mysqlEnum("status", ["pending_review", "imported", "duplicate", "error", "approved", "rejected"]).notNull().default("pending_review"),
+  errorMessage: text("errorMessage"),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+}, table => [index("google_imports_user_idx").on(table.userId), uniqueIndex("google_location_uidx").on(table.googleLocationId)]);

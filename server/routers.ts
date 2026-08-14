@@ -11,6 +11,7 @@ import { workspaceRouter } from "./routers/workspaces";
 import { websiteRouter } from "./routers/website";
 import { domainRouter } from "./routers/domain";
 import { notificationRouter } from "./routers/notifications";
+import { googleImportRouter } from "./routers/googleImport";
 
 export const appRouter = router({
   system: systemRouter,
@@ -31,6 +32,7 @@ export const appRouter = router({
   website: websiteRouter,
   domain: domainRouter,
   notification: notificationRouter,
+  googleImport: googleImportRouter,
 });
 
 export type AppRouter = typeof appRouter;
