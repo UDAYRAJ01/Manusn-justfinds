@@ -255,6 +255,48 @@ export const businessLeadNotes = mysqlTable("business_lead_notes", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, table => [index("lead_note_lead_created_idx").on(table.leadId, table.createdAt), index("lead_note_business_idx").on(table.businessId)]);
 
+export const businessAppointmentSettings = mysqlTable("business_appointment_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  isEnabled: boolean("isEnabled").default(false).notNull(),
+  timeZone: varchar("timeZone", { length: 64 }).default("Asia/Kolkata").notNull(),
+  slotDurationMinutes: int("slotDurationMinutes").default(30).notNull(),
+  minimumNoticeMinutes: int("minimumNoticeMinutes").default(120).notNull(),
+  maximumAdvanceDays: int("maximumAdvanceDays").default(30).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [uniqueIndex("appt_settings_business_uidx").on(table.businessId)]);
+
+export const businessAppointmentWindows = mysqlTable("business_appointment_windows", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  dayOfWeek: int("dayOfWeek").notNull(),
+  startsAt: varchar("startsAt", { length: 5 }).notNull(),
+  endsAt: varchar("endsAt", { length: 5 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [index("appt_window_business_day_idx").on(table.businessId, table.dayOfWeek)]);
+
+export const businessAppointmentBlackouts = mysqlTable("business_appointment_blackouts", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  localDate: varchar("localDate", { length: 10 }).notNull(),
+  reason: varchar("reason", { length: 240 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [uniqueIndex("appt_blackout_business_date_uidx").on(table.businessId, table.localDate)]);
+
+export const businessAppointmentRequests = mysqlTable("business_appointment_requests", {
+  id: int("id").autoincrement().primaryKey(),
+  businessId: int("businessId").notNull().references(() => businesses.id),
+  leadId: int("leadId").notNull().references(() => businessLeads.id),
+  startsAt: timestamp("startsAt").notNull(),
+  endsAt: timestamp("endsAt").notNull(),
+  timeZone: varchar("timeZone", { length: 64 }).notNull(),
+  status: mysqlEnum("status", ["requested", "confirmed", "declined", "cancelled"]).default("requested").notNull(),
+  ownerNote: text("ownerNote"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [index("appt_request_business_start_idx").on(table.businessId, table.startsAt), index("appt_request_lead_idx").on(table.leadId)]);
+
 export const businessAiContent = mysqlTable("business_ai_content", {
   id: int("id").autoincrement().primaryKey(),
   businessId: int("businessId").notNull().references(() => businesses.id),

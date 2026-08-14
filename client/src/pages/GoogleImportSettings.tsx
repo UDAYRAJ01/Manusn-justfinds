@@ -49,7 +49,7 @@ export default function GoogleImportSettings() {
   };
 
   const locations = locationsQuery.data?.locations || [];
-  const isConfigured = locationsQuery.data?.configured ?? false;
+  const isConfigured = statusQuery.data?.isConfigured ?? false;
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto py-6 px-4">

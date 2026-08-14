@@ -94,6 +94,7 @@ export const googleImportRouter = router({
     website: z.string().optional(),
     categoryName: z.string().optional(),
     cityName: z.string().optional(),
+    photoUrl: z.string().url().optional(),
     rawPayload: z.record(z.string(), z.any()).optional(),
   })).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
@@ -133,7 +134,7 @@ export const googleImportRouter = router({
       try {
         const photoRes = await fetch(cachedPhotoUrl);
         if (photoRes.ok) {
-          const buffer = await photoRes.buffer();
+          const buffer = Buffer.from(await photoRes.arrayBuffer());
           const contentType = photoRes.headers.get("content-type") || "image/jpeg";
           const ext = contentType.includes("png") ? "png" : "jpg";
           const s3Result = await storagePut(`gbp-imports/${businessId}/cover_${Date.now()}.${ext}`, buffer, contentType);
@@ -158,13 +159,13 @@ export const googleImportRouter = router({
   }),
 
   syncGoogleImports: protectedProcedure.mutation(async ({ ctx }) => {
-    const db = await getDb();
+    const db = await dbOrThrow();
     const imports = await db.select().from(googleImports).where(eq(googleImports.userId, ctx.user.id));
     
     let synced = 0;
     for (const item of imports) {
       await db.update(googleImports)
-        .set({ lastSyncedAt: new Date(), status: "synced" })
+        .set({ status: "imported" })
         .where(eq(googleImports.id, item.id));
       synced++;
     }

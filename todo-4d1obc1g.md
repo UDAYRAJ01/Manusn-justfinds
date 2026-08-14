@@ -204,3 +204,13 @@
 - [x] Build administrator interfaces for verification review and clear approve/changes-requested decisions
 - [x] Add focused tests for ownership isolation, review authorization, duplicate matching, and lead lifecycle transitions
 - [x] Validate desktop/mobile critical paths and prepare the completed conversion release for publishing
+
+## Appointment availability calendar and booking requests
+- [x] Inspect existing hours, public website CTA, Lead CRM, and owner-tool extension points
+- [x] Add appointment schedule, availability exception, and appointment-request data models with UTC-safe timestamps
+- [x] Add owner-scoped calendar configuration, availability retrieval, request management, and schedule conflict safeguards
+- [x] Add public appointment-request creation that produces a source-attributed Lead CRM record without auto-confirming an appointment
+- [x] Build responsive owner calendar controls for weekly availability, slot duration, blackout dates, and booking-request review
+- [x] Build public availability and appointment-request UI on published appointment-based business websites
+- [x] Add regression tests for ownership isolation, slot conflict prevention, public-request validation, and CRM integration
+- [x] Validate desktop/mobile booking paths and prepare the booking-calendar release for publishing

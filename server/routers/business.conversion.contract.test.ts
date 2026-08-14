@@ -26,4 +26,18 @@ describe("conversion workflow boundaries", () => {
     expect(statuses).toContain("converted");
     expect(statuses).not.toContain("auto-converted");
   });
+
+  it("exposes only the availability lookup and consented request form publicly while retaining owner schedule control", () => {
+    expect(procedures).toEqual(expect.arrayContaining([
+      "appointmentSettings",
+      "saveAppointmentSettings",
+      "addAppointmentBlackout",
+      "removeAppointmentBlackout",
+      "updateAppointmentRequest",
+      "publicAppointmentAvailability",
+      "requestAppointment",
+    ]));
+    expect(procedures).not.toContain("publicAppointmentSettings");
+    expect(procedures).not.toContain("publicUpdateAppointmentRequest");
+  });
 });

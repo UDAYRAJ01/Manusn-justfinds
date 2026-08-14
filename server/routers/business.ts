@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, like, or, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { inArray } from "drizzle-orm";
 import {
   businessAiContent,
   businessCertificates,
@@ -13,6 +14,10 @@ import {
   businessItems,
   businessLeadNotes,
   businessLeads,
+  businessAppointmentBlackouts,
+  businessAppointmentRequests,
+  businessAppointmentSettings,
+  businessAppointmentWindows,
   businessNotifications,
   businessOffers,
   businessReviewReports,
@@ -31,14 +36,17 @@ import {
 } from "../../drizzle/schema";
 import { canManageBusiness, canModerate } from "../domain/permissions";
 import { getDb } from "../db";
-import { protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storageGetSignedUrl, storagePut } from "../storage";
 import { numberedSlug, preferredBusinessSlug } from "../domain/slug";
 import { scoreDuplicateCandidate } from "../domain/duplicateCheck";
+import { assertTimeZone, isValidIsoDate, isValidTime, slotsForAvailability } from "../domain/appointmentAvailability";
 
 const roleSchema = z.enum(["user", "business_owner", "admin", "super_admin"]);
 const businessIdInput = z.object({ businessId: z.number().int().positive() });
 const urlOrEmpty = z.string().max(500).refine(value => value === "" || /^https?:\/\//i.test(value), "Enter a valid URL.");
+const appointmentWindowInput = z.object({ dayOfWeek: z.number().int().min(0).max(6), startsAt: z.string().refine(isValidTime, "Use HH:MM time."), endsAt: z.string().refine(isValidTime, "Use HH:MM time.") }).refine(value => value.startsAt < value.endsAt, "Availability must end after it starts.");
+const appointmentStatusInput = z.enum(["requested", "confirmed", "declined", "cancelled"]);
 
 async function dbOrThrow() {
   const db = await getDb();
@@ -54,6 +62,27 @@ async function ownedBusinessOrThrow(businessId: number, userId: number, role: z.
   const canFinishNewDraft = role === "user" && business.ownerId === userId && business.status === "draft";
   if (!canManageBusiness(role, userId, business.ownerId) && !canFinishNewDraft) throw new TRPCError({ code: "FORBIDDEN", message: "You cannot access this business." });
   return { db, business };
+}
+
+async function availableAppointmentSlots(db: Awaited<ReturnType<typeof dbOrThrow>>, businessId: number) {
+  const settings = await db.select().from(businessAppointmentSettings).where(eq(businessAppointmentSettings.businessId, businessId)).limit(1);
+  const setting = settings[0];
+  if (!setting?.isEnabled) return null;
+  const [windows, blackouts, requests] = await Promise.all([
+    db.select().from(businessAppointmentWindows).where(eq(businessAppointmentWindows.businessId, businessId)),
+    db.select().from(businessAppointmentBlackouts).where(eq(businessAppointmentBlackouts.businessId, businessId)),
+    db.select({ startsAt: businessAppointmentRequests.startsAt }).from(businessAppointmentRequests).where(and(eq(businessAppointmentRequests.businessId, businessId), inArray(businessAppointmentRequests.status, ["requested", "confirmed"]))),
+  ]);
+  return {
+    setting,
+    windows,
+    blackouts,
+    slots: slotsForAvailability({
+      now: new Date(), timeZone: setting.timeZone, windows, slotDurationMinutes: setting.slotDurationMinutes,
+      minimumNoticeMinutes: setting.minimumNoticeMinutes, maximumAdvanceDays: setting.maximumAdvanceDays,
+      blackoutDates: blackouts.map(value => value.localDate), unavailableStartsAt: requests.map(value => value.startsAt),
+    }),
+  };
 }
 
 const profileInput = z.object({
@@ -176,6 +205,71 @@ export const businessRouter = router({
       .sort((a, b) => b.match.score - a.match.score)
       .slice(0, 8)
       .map(({ candidate, match }) => ({ id: candidate.id, name: candidate.name, slug: candidate.slug, address: candidate.address, phone: candidate.phone, score: match.score, classification: match.classification, reasons: match.reasons }));
+  }),
+
+  appointmentSettings: protectedProcedure.input(businessIdInput).query(async ({ ctx, input }) => {
+    const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
+    const [settings, windows, blackouts, requests] = await Promise.all([
+      db.select().from(businessAppointmentSettings).where(eq(businessAppointmentSettings.businessId, input.businessId)).limit(1),
+      db.select().from(businessAppointmentWindows).where(eq(businessAppointmentWindows.businessId, input.businessId)).orderBy(businessAppointmentWindows.dayOfWeek, businessAppointmentWindows.startsAt),
+      db.select().from(businessAppointmentBlackouts).where(eq(businessAppointmentBlackouts.businessId, input.businessId)).orderBy(desc(businessAppointmentBlackouts.localDate)),
+      db.select({ request: businessAppointmentRequests, lead: businessLeads }).from(businessAppointmentRequests).innerJoin(businessLeads, eq(businessAppointmentRequests.leadId, businessLeads.id)).where(eq(businessAppointmentRequests.businessId, input.businessId)).orderBy(desc(businessAppointmentRequests.startsAt)).limit(60),
+    ]);
+    return { settings: settings[0] ?? { isEnabled: false, timeZone: "Asia/Kolkata", slotDurationMinutes: 30, minimumNoticeMinutes: 120, maximumAdvanceDays: 30 }, windows, blackouts, requests };
+  }),
+
+  saveAppointmentSettings: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), isEnabled: z.boolean(), timeZone: z.string().min(1).max(64), slotDurationMinutes: z.number().int().min(10).max(240), minimumNoticeMinutes: z.number().int().min(0).max(10_080), maximumAdvanceDays: z.number().int().min(1).max(180), windows: z.array(appointmentWindowInput).max(28) })).mutation(async ({ ctx, input }) => {
+    const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
+    try { assertTimeZone(input.timeZone); } catch (error) { throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Choose a valid time zone." }); }
+    if (input.isEnabled && !input.windows.length) throw new TRPCError({ code: "BAD_REQUEST", message: "Add at least one weekly availability window before enabling bookings." });
+    await db.insert(businessAppointmentSettings).values({ businessId: input.businessId, isEnabled: input.isEnabled, timeZone: input.timeZone, slotDurationMinutes: input.slotDurationMinutes, minimumNoticeMinutes: input.minimumNoticeMinutes, maximumAdvanceDays: input.maximumAdvanceDays }).onDuplicateKeyUpdate({ set: { isEnabled: input.isEnabled, timeZone: input.timeZone, slotDurationMinutes: input.slotDurationMinutes, minimumNoticeMinutes: input.minimumNoticeMinutes, maximumAdvanceDays: input.maximumAdvanceDays } });
+    await db.delete(businessAppointmentWindows).where(eq(businessAppointmentWindows.businessId, input.businessId));
+    if (input.windows.length) await db.insert(businessAppointmentWindows).values(input.windows.map(window => ({ businessId: input.businessId, ...window })));
+    return { success: true };
+  }),
+
+  addAppointmentBlackout: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), localDate: z.string().refine(isValidIsoDate, "Use YYYY-MM-DD."), reason: z.string().trim().max(240).optional() })).mutation(async ({ ctx, input }) => {
+    const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
+    await db.insert(businessAppointmentBlackouts).values({ businessId: input.businessId, localDate: input.localDate, reason: input.reason || null }).onDuplicateKeyUpdate({ set: { reason: input.reason || null } });
+    return { success: true };
+  }),
+
+  removeAppointmentBlackout: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), blackoutId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
+    await db.delete(businessAppointmentBlackouts).where(and(eq(businessAppointmentBlackouts.id, input.blackoutId), eq(businessAppointmentBlackouts.businessId, input.businessId)));
+    return { success: true };
+  }),
+
+  updateAppointmentRequest: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), requestId: z.number().int().positive(), status: appointmentStatusInput, ownerNote: z.string().trim().max(2000).optional() })).mutation(async ({ ctx, input }) => {
+    const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
+    const existing = await db.select().from(businessAppointmentRequests).where(and(eq(businessAppointmentRequests.id, input.requestId), eq(businessAppointmentRequests.businessId, input.businessId))).limit(1);
+    if (!existing[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Booking request not found." });
+    await db.update(businessAppointmentRequests).set({ status: input.status, ownerNote: input.ownerNote || null }).where(eq(businessAppointmentRequests.id, input.requestId));
+    return { success: true };
+  }),
+
+  publicAppointmentAvailability: publicProcedure.input(businessIdInput).query(async ({ input }) => {
+    const db = await dbOrThrow();
+    const business = await db.select({ id: businesses.id, status: businesses.status }).from(businesses).where(eq(businesses.id, input.businessId)).limit(1);
+    if (!business[0] || !["approved", "published"].includes(business[0].status)) return { enabled: false as const, timeZone: null, slots: [] };
+    const availability = await availableAppointmentSlots(db, input.businessId);
+    if (!availability) return { enabled: false as const, timeZone: null, slots: [] };
+    return { enabled: true as const, timeZone: availability.setting.timeZone, slots: availability.slots.slice(0, 160) };
+  }),
+
+  requestAppointment: publicProcedure.input(z.object({ businessId: z.number().int().positive(), startsAt: z.string().datetime(), name: z.string().trim().min(2).max(160), phone: z.string().trim().max(32).optional(), email: z.string().trim().email().max(320).optional(), message: z.string().trim().max(2000).optional(), consentGiven: z.literal(true) })).mutation(async ({ input }) => {
+    const db = await dbOrThrow();
+    const business = await db.select({ id: businesses.id, status: businesses.status }).from(businesses).where(eq(businesses.id, input.businessId)).limit(1);
+    if (!business[0] || !["approved", "published"].includes(business[0].status)) throw new TRPCError({ code: "NOT_FOUND", message: "Booking is unavailable for this business." });
+    const availability = await availableAppointmentSlots(db, input.businessId);
+    if (!availability) throw new TRPCError({ code: "BAD_REQUEST", message: "This business is not accepting appointment requests." });
+    const startsAt = new Date(input.startsAt);
+    const slot = availability.slots.find(value => value.startAt.getTime() === startsAt.getTime());
+    if (!slot) throw new TRPCError({ code: "CONFLICT", message: "That time is no longer available. Please choose another slot." });
+    const leadResult = await db.insert(businessLeads).values({ businessId: input.businessId, name: input.name, phone: input.phone || null, email: input.email || null, message: input.message || null, source: "appointment-request", sourceDetail: `Appointment request · ${availability.setting.timeZone}`, page: "appointment-calendar", consentGiven: true, consentAt: new Date() });
+    const leadId = Number(leadResult[0].insertId);
+    await db.insert(businessAppointmentRequests).values({ businessId: input.businessId, leadId, startsAt: slot.startAt, endsAt: slot.endAt, timeZone: availability.setting.timeZone, status: "requested" });
+    return { success: true, requestStatus: "requested" as const };
   }),
 
   verificationStatus: protectedProcedure.input(businessIdInput).query(async ({ ctx, input }) => {
