@@ -193,3 +193,7 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 
 ## Attached Platform Brief Review
 - [x] Review the attached brief, summarize its proposals, and map actionable requirements against the current Just Finds implementation without changing product behavior.
+
+## Category Result Isolation Fix
+- [x] Ensure category, subcategory, and business-type browse pages pass taxonomy filters correctly and return only businesses assigned to the selected taxonomy level.
+- [x] Add regression coverage for category, subcategory, and business-type result isolation; validate TypeScript and the full test suite before publishing.

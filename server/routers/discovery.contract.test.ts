@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 
 const dbMocks = vi.hoisted(() => ({
   getActiveCategories: vi.fn(async () => []),
+  getPublicCategoryBySlug: vi.fn(async () => undefined),
+  getPublicSubcategories: vi.fn(async () => []),
+  getPublicBusinessTypes: vi.fn(async () => []),
   getPublicBusinessByRoute: vi.fn(async () => null),
   getPublicBusinesses: vi.fn(async () => []),
   getPublicSearchPage: vi.fn(async () => ({ total: 0, items: [], nextOffset: null })),
@@ -28,10 +31,23 @@ describe("public discovery contract", () => {
 
   it("forwards bounded taxonomy, location, sort, and session context to the database search contract", async () => {
     const caller = discoveryRouter.createCaller({ user: { id: 7 } } as never);
-    const results = await caller.search({ query: "dentist near Mall Road", city: "kanpur", locality: "mall-road", category: "healthcare", subcategory: "dentists", latitude: 26.45, longitude: 80.33, sort: "nearby", verified: true, sessionId: "browser-session", limit: 10, offset: 0 });
+    const results = await caller.search({ query: "dentist near Mall Road", city: "kanpur", locality: "mall-road", category: "healthcare", subcategory: "dentists", businessType: "dental-clinic", latitude: 26.45, longitude: 80.33, sort: "nearby", verified: true, sessionId: "browser-session", limit: 10, offset: 0 });
     expect(results).toEqual(expect.objectContaining({ total: 0, items: [], nextOffset: null, sort: "nearby", intent: expect.objectContaining({ searchTerm: "dentist", locationTerm: "Mall Road" }) }));
-    expect(dbMocks.getPublicSearchPage).toHaveBeenCalledWith(expect.objectContaining({ query: "dentist", citySlug: "kanpur", localitySlug: "mall-road", categorySlug: "healthcare", subcategorySlug: "dentists", sort: "nearby", verified: true, limit: 10, offset: 0 }));
+    expect(dbMocks.getPublicSearchPage).toHaveBeenCalledWith(expect.objectContaining({ query: "dentist", citySlug: "kanpur", localitySlug: "mall-road", categorySlug: "healthcare", subcategorySlug: "dentists", businessTypeSlug: "dental-clinic", sort: "nearby", verified: true, limit: 10, offset: 0 }));
     expect(dbMocks.logPublicSearch).toHaveBeenCalledWith(expect.objectContaining({ userId: 7, sessionId: "browser-session", resultCount: 0, intent: "nearby" }));
+  });
+
+  it("exposes only the taxonomy entries supplied by the published-listing data layer", async () => {
+    dbMocks.getActiveCategories.mockResolvedValueOnce([{ id: 10, name: "Healthcare", slug: "healthcare" }]);
+    dbMocks.getPublicSubcategories.mockResolvedValueOnce([{ id: 20, name: "Dentists", slug: "dentists" }]);
+    dbMocks.getPublicBusinessTypes.mockResolvedValueOnce([{ id: 30, name: "Dental clinics", slug: "dental-clinic" }]);
+    const caller = discoveryRouter.createCaller({} as never);
+
+    await expect(caller.categories()).resolves.toEqual([{ id: 10, name: "Healthcare", slug: "healthcare" }]);
+    await expect(caller.subcategories({ category: "healthcare" })).resolves.toEqual([{ id: 20, name: "Dentists", slug: "dentists" }]);
+    await expect(caller.businessTypes({ category: "healthcare", subcategory: "dentists" })).resolves.toEqual([{ id: 30, name: "Dental clinics", slug: "dental-clinic" }]);
+    expect(dbMocks.getPublicSubcategories).toHaveBeenCalledWith("healthcare");
+    expect(dbMocks.getPublicBusinessTypes).toHaveBeenCalledWith("healthcare", "dentists");
   });
 
   it("records listing engagement without requiring an authenticated session", async () => {

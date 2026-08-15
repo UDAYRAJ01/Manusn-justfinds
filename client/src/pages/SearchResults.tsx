@@ -4,6 +4,7 @@ import { SearchHero } from "@/components/SearchHero";
 import { SearchResultsMap } from "@/components/SearchResultsMap";
 import { Button } from "@/components/ui/button";
 import { formatDistance, useUserLocation } from "@/hooks/useUserLocation";
+import { getSearchQueryParams } from "@/lib/searchQuery";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { CircleAlert, Map, SearchX, SlidersHorizontal } from "lucide-react";
@@ -24,7 +25,10 @@ function getSessionId() {
 
 export default function SearchResults() {
   const [location, setLocation] = useLocation();
-  const params = useMemo(() => new URLSearchParams(location.split("?")[1] ?? ""), [location]);
+  const params = useMemo(
+    () => getSearchQueryParams(location, typeof window === "undefined" ? "" : window.location.search),
+    [location],
+  );
   const query = params.get("q") ?? "";
   const city = params.get("city") ?? undefined;
   const locality = params.get("locality") ?? undefined;

@@ -87,7 +87,24 @@ export async function getUserByOpenId(openId: string) {
 export async function getActiveCategories() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(categories).where(eq(categories.isActive, true)).orderBy(categories.sortOrder, categories.name);
+  return db.select({
+    id: categories.id,
+    name: categories.name,
+    slug: categories.slug,
+    description: categories.description,
+    icon: categories.icon,
+    imageUrl: categories.imageUrl,
+    sortOrder: categories.sortOrder,
+    isActive: categories.isActive,
+    status: categories.status,
+    createdAt: categories.createdAt,
+    updatedAt: categories.updatedAt,
+  })
+    .from(categories)
+    .innerJoin(businesses, and(eq(businesses.categoryId, categories.id), eq(businesses.status, "published")))
+    .where(eq(categories.isActive, true))
+    .groupBy(categories.id, categories.name, categories.slug, categories.description, categories.icon, categories.imageUrl, categories.sortOrder, categories.isActive, categories.status, categories.createdAt, categories.updatedAt)
+    .orderBy(categories.sortOrder, categories.name);
 }
 
 export async function getActiveCities() {
@@ -99,7 +116,24 @@ export async function getActiveCities() {
 export async function getPublicCategoryBySlug(slug: string) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(categories).where(and(eq(categories.slug, slug), eq(categories.isActive, true))).limit(1);
+  const result = await db.select({
+    id: categories.id,
+    name: categories.name,
+    slug: categories.slug,
+    description: categories.description,
+    icon: categories.icon,
+    imageUrl: categories.imageUrl,
+    sortOrder: categories.sortOrder,
+    isActive: categories.isActive,
+    status: categories.status,
+    createdAt: categories.createdAt,
+    updatedAt: categories.updatedAt,
+  })
+    .from(categories)
+    .innerJoin(businesses, and(eq(businesses.categoryId, categories.id), eq(businesses.status, "published")))
+    .where(and(eq(categories.slug, slug), eq(categories.isActive, true)))
+    .groupBy(categories.id, categories.name, categories.slug, categories.description, categories.icon, categories.imageUrl, categories.sortOrder, categories.isActive, categories.status, categories.createdAt, categories.updatedAt)
+    .limit(1);
   return result[0];
 }
 
@@ -109,7 +143,9 @@ export async function getPublicSubcategories(categorySlug: string) {
   return db.select({ id: subcategories.id, name: subcategories.name, slug: subcategories.slug, description: subcategories.description, icon: subcategories.icon })
     .from(subcategories)
     .innerJoin(categories, eq(subcategories.categoryId, categories.id))
+    .innerJoin(businesses, and(eq(businesses.subcategoryId, subcategories.id), eq(businesses.status, "published")))
     .where(and(eq(categories.slug, categorySlug), eq(categories.isActive, true), eq(subcategories.isActive, true)))
+    .groupBy(subcategories.id, subcategories.name, subcategories.slug, subcategories.description, subcategories.icon)
     .orderBy(subcategories.sortOrder, subcategories.name);
 }
 
@@ -127,6 +163,7 @@ export async function getPublicBusinessTypes(categorySlug: string, subcategorySl
     .from(businessTypes)
     .innerJoin(subcategories, eq(businessTypes.subcategoryId, subcategories.id))
     .innerJoin(categories, eq(subcategories.categoryId, categories.id))
+    .innerJoin(businesses, and(eq(businesses.businessTypeId, businessTypes.id), eq(businesses.status, "published")))
     .where(and(
       eq(categories.slug, categorySlug),
       eq(categories.isActive, true),
@@ -134,6 +171,7 @@ export async function getPublicBusinessTypes(categorySlug: string, subcategorySl
       eq(subcategories.isActive, true),
       eq(businessTypes.isActive, true),
     ))
+    .groupBy(businessTypes.id, businessTypes.name, businessTypes.slug, businessTypes.description, businessTypes.icon)
     .orderBy(businessTypes.sortOrder, businessTypes.name);
 }
 
