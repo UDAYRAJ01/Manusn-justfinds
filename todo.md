@@ -209,3 +209,4 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 ## High-Volume Bulk Import
 - [x] Choose and implement a reliable 100,000-listing import architecture with durable file staging, asynchronous processing, progress visibility, retry controls, and administrator-only security.
 - [x] Implement the selected always-on high-volume importer with a 100,000-listing limit, chunked processing, and recovery controls.
+- [x] Increase the staged upload limit from 100 MB to 500 MB and validate the administrator-facing guardrail and background-processing compatibility.
