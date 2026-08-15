@@ -416,6 +416,7 @@ export const bulkImports = mysqlTable("bulk_imports", {
   sourceFileKey: varchar("sourceFileKey", { length: 1000 }),
   sourceFileContentType: varchar("sourceFileContentType", { length: 120 }),
   sourceFileSize: int("sourceFileSize"),
+  sourceUploadedAt: timestamp("sourceUploadedAt"),
   scheduleCronTaskUid: varchar("scheduleCronTaskUid", { length: 65 }),
   totalRows: int("totalRows").default(0).notNull(),
   validRows: int("validRows").default(0).notNull(),

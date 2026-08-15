@@ -12,7 +12,7 @@ import { findApprovedIndiaCity } from "../domain/approvedIndiaCities";
 import { normalizeBulkListingRow, parseImportedFaqs, parseImportedHours, type NormalizedBulkListing } from "../domain/bulkListingImport";
 import { validateBulkListingRow, type ImportRow } from "../domain/importValidation";
 import { normalizeDuplicateText, scoreDuplicateCandidate } from "../domain/duplicateCheck";
-import { HIGH_VOLUME_FILE_LIMIT, HIGH_VOLUME_IMPORT_CHUNK, HIGH_VOLUME_ROW_LIMIT, HIGH_VOLUME_VALIDATION_CHUNK, highVolumeProgress, isSupportedImportFilename } from "../domain/highVolumeImportPolicy";
+import { HIGH_VOLUME_FILE_LIMIT, HIGH_VOLUME_IMPORT_CHUNK, HIGH_VOLUME_ROW_LIMIT, HIGH_VOLUME_VALIDATION_CHUNK, highVolumeProgress, isSupportedImportFilename, sourceQueueIssue } from "../domain/highVolumeImportPolicy";
 import { HIGH_VOLUME_IMPORT_CALLBACK_PATH, HIGH_VOLUME_IMPORT_CRON } from "../domain/highVolumeImportSchedule";
 import { heartbeatSessionFromHeaders } from "../domain/heartbeatSession";
 import { protectedProcedure, router } from "../_core/trpc";
@@ -446,6 +446,8 @@ export const workspaceRouter = router({
     if (!job) throw new TRPCError({ code: "NOT_FOUND", message: "Staged import not found." });
     if (job.initiatedById !== ctx.user.id && ctx.user.role !== "super_admin") throw new TRPCError({ code: "FORBIDDEN", message: "Only the initiating administrator may queue this import." });
     if (job.phase !== "staged") return { importId: job.id, status: job.status, phase: job.phase, alreadyQueued: true };
+    const stagingIssue = sourceQueueIssue(job.sourceUploadedAt);
+    if (stagingIssue) throw new TRPCError({ code: "PRECONDITION_FAILED", message: stagingIssue });
     const scheduleCronTaskUid = await enableHighVolumeImportSchedule(input.importId, job.scheduleCronTaskUid, heartbeatSessionFromHeaders(ctx.req.headers.cookie, ctx.req.headers.authorization, COOKIE_NAME));
     await db.update(bulkImports).set({ scheduleCronTaskUid, status: "queued", phase: "validating", validationCursor: 0, progressPercent: 0, attempts: 0, errorMessage: null, errorCategory: null, finishedAt: null }).where(eq(bulkImports.id, input.importId));
     return { importId: input.importId, status: "queued" as const, phase: "validating" as const, alreadyQueued: false };
@@ -555,6 +557,6 @@ export const workspaceRouter = router({
     requireModerator(ctx.user.role);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The import service is temporarily unavailable." });
-    return db.select({ id: bulkImports.id, filename: bulkImports.filename, status: bulkImports.status, phase: bulkImports.phase, totalRows: bulkImports.totalRows, validRows: bulkImports.validRows, failedRows: bulkImports.failedRows, validationCursor: bulkImports.validationCursor, processedRows: bulkImports.processedRows, progressPercent: bulkImports.progressPercent, errorMessage: bulkImports.errorMessage, errorCategory: bulkImports.errorCategory, createdAt: bulkImports.createdAt, updatedAt: bulkImports.updatedAt }).from(bulkImports).where(eq(bulkImports.initiatedById, ctx.user.id)).orderBy(desc(bulkImports.createdAt)).limit(20);
+    return db.select({ id: bulkImports.id, filename: bulkImports.filename, status: bulkImports.status, phase: bulkImports.phase, totalRows: bulkImports.totalRows, validRows: bulkImports.validRows, failedRows: bulkImports.failedRows, validationCursor: bulkImports.validationCursor, processedRows: bulkImports.processedRows, progressPercent: bulkImports.progressPercent, errorMessage: bulkImports.errorMessage, errorCategory: bulkImports.errorCategory, sourceUploadedAt: bulkImports.sourceUploadedAt, createdAt: bulkImports.createdAt, updatedAt: bulkImports.updatedAt }).from(bulkImports).where(eq(bulkImports.initiatedById, ctx.user.id)).orderBy(desc(bulkImports.createdAt)).limit(20);
   }),
 });

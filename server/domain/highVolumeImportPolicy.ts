@@ -14,3 +14,9 @@ export function highVolumeProgress(phase: "validating" | "importing", completed:
     ? Math.floor(ratio * 45)
     : Math.min(99, 45 + Math.floor(ratio * 55));
 }
+
+export function sourceQueueIssue(sourceUploadedAt: Date | null): string | null {
+  return sourceUploadedAt
+    ? null
+    : "This historical staged file was not confirmed in secure storage. Please upload the spreadsheet again to start a new background import.";
+}

@@ -216,3 +216,6 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 
 ## Stalled High-Volume Import Repair
 - [x] Diagnose and correct the staged import lifecycle so uploaded files can transition into queued validation and completed processing.
+
+## Persistent Pending-Import Recovery
+- [x] Diagnose the remaining live scheduled-import failure and recover staged or queued jobs without losing uploaded source files; classify historical uploads that never reached secure storage as requiring re-upload.

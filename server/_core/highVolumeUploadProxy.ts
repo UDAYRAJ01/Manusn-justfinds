@@ -60,7 +60,7 @@ export function registerHighVolumeUploadProxy(app: Express) {
 
       const contentType = job.sourceFileContentType || req.header("content-type") || "application/octet-stream";
       const stored = await storagePut(job.sourceFileKey, bytes, contentType);
-      await db.update(bulkImports).set({ sourceFileKey: stored.key, sourceFileSize: bytes.length, sourceFileContentType: contentType, errorCategory: null, errorMessage: null }).where(eq(bulkImports.id, importId));
+      await db.update(bulkImports).set({ sourceFileKey: stored.key, sourceFileSize: bytes.length, sourceFileContentType: contentType, sourceUploadedAt: new Date(), errorCategory: null, errorMessage: null }).where(eq(bulkImports.id, importId));
 
       return res.status(201).json({ ok: true, importId, bytes: bytes.length });
     } catch (error) {

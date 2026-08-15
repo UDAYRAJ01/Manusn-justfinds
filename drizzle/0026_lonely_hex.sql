@@ -1,0 +1,1 @@
+ALTER TABLE `bulk_imports` ADD `sourceUploadedAt` timestamp;
