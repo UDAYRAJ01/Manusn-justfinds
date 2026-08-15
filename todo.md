@@ -190,3 +190,6 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Implement the 3-level taxonomy (main category → subcategory → business type) in the schema and seed the 12-category master list from the user's file.
 - [x] Build the browse flow: main category page → subcategory page → business-type listing page → business detail page, with SEO-friendly slugs.
 - [x] Validate with the full test suite and TypeScript, then save a checkpoint.
+
+## Attached Platform Brief Review
+- [x] Review the attached brief, summarize its proposals, and map actionable requirements against the current Just Finds implementation without changing product behavior.
