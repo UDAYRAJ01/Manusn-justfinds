@@ -435,6 +435,18 @@ export const bulkImports = mysqlTable("bulk_imports", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, table => [index("bulk_import_status_idx").on(table.status, table.createdAt), index("bulk_import_phase_progress_idx").on(table.phase, table.status, table.updatedAt), index("bulk_import_schedule_cron_idx").on(table.scheduleCronTaskUid)]);
 
+export const bulkImportSourceChunks = mysqlTable("bulk_import_source_chunks", {
+  id: int("id").autoincrement().primaryKey(),
+  importId: int("importId").notNull().references(() => bulkImports.id),
+  partNumber: int("partNumber").notNull(),
+  storageKey: varchar("storageKey", { length: 1000 }).notNull(),
+  byteSize: int("byteSize").notNull(),
+  uploadedAt: timestamp("uploadedAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("bulk_import_source_part_uidx").on(table.importId, table.partNumber),
+  index("bulk_import_source_import_idx").on(table.importId, table.partNumber),
+]);
+
 export const bulkImportRows = mysqlTable("bulk_import_rows", {
   id: int("id").autoincrement().primaryKey(),
   importId: int("importId").notNull().references(() => bulkImports.id),

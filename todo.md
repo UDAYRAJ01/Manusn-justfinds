@@ -223,3 +223,8 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 ## Secure-Storage Import Read Repair
 - [x] Trace and repair the high-volume processor's secure-storage read failure by blocking legacy imports whose spreadsheet was never confirmed in storage, and clearly require a new secure upload instead of an invalid retry.
 - [ ] Verify a newly confirmed spreadsheet progresses through background validation after the release.
+
+## Secure-Staging Upload Failure
+- [x] Diagnose and repair the production large-file secure-staging endpoint failure with authenticated, exact-size 5 MB storage chunks that avoid the gateway request-size limit.
+- [x] Apply the additive chunk-metadata migration required by the repaired staging protocol.
+- [ ] Validate the repaired production upload with the user's spreadsheet through automatic background validation.

@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray, lt, or } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { approvalQueue, businesses, businessAiContent, businessFieldValues, businessHours, businessNotifications, businessTypes, bulkImportRows, bulkImports, categories, categoryFields, cities, localities, subcategories, users } from "../../drizzle/schema";
+import { approvalQueue, businesses, businessAiContent, businessFieldValues, businessHours, businessNotifications, businessTypes, bulkImportRows, bulkImports, bulkImportSourceChunks, categories, categoryFields, cities, localities, subcategories, users } from "../../drizzle/schema";
 import { deleteInternalValidationBusiness, getAdminCounts, getCategorySchemas, getDb, getInternalValidationBusinesses, getOwnerBusinesses, getPendingBusinesses } from "../db";
 import { canManageAdmins, canManageBusiness, canModerate } from "../domain/permissions";
 import { buildVoiceIntroductionScript } from "../domain/voiceScript";
@@ -13,6 +13,7 @@ import { normalizeBulkListingRow, parseImportedFaqs, parseImportedHours, type No
 import { validateBulkListingRow, type ImportRow } from "../domain/importValidation";
 import { normalizeDuplicateText, scoreDuplicateCandidate } from "../domain/duplicateCheck";
 import { HIGH_VOLUME_FILE_LIMIT, HIGH_VOLUME_IMPORT_CHUNK, HIGH_VOLUME_ROW_LIMIT, HIGH_VOLUME_VALIDATION_CHUNK, highVolumeProgress, isSupportedImportFilename, sourceQueueIssue } from "../domain/highVolumeImportPolicy";
+import { highVolumeUploadPartBytes, highVolumeUploadPartCount } from "../domain/highVolumeUploadPolicy";
 import { HIGH_VOLUME_IMPORT_CALLBACK_PATH, HIGH_VOLUME_IMPORT_CRON } from "../domain/highVolumeImportSchedule";
 import { heartbeatSessionFromHeaders } from "../domain/heartbeatSession";
 import { protectedProcedure, router } from "../_core/trpc";
@@ -191,11 +192,27 @@ function importPayload(row: ReturnType<typeof validateImportListing>) {
 async function validateHighVolumeChunk(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, job: typeof bulkImports.$inferSelect) {
   const stagingIssue = sourceQueueIssue(job.sourceUploadedAt);
   if (stagingIssue) throw new Error(stagingIssue);
-  if (!job.sourceFileKey) throw new Error("The staged source file is missing.");
-  const signedUrl = await storageGetSignedUrl(job.sourceFileKey);
-  const response = await fetch(signedUrl);
-  if (!response.ok) throw new Error("The staged spreadsheet could not be read from secure storage.");
-  const sourceRows = spreadsheetRowsFromBuffer(Buffer.from(await response.arrayBuffer()));
+  const parts = await db.select().from(bulkImportSourceChunks).where(eq(bulkImportSourceChunks.importId, job.id)).orderBy(asc(bulkImportSourceChunks.partNumber));
+  let sourceBuffer: Buffer;
+  if (parts.length) {
+    const totalParts = highVolumeUploadPartCount(job.sourceFileSize);
+    if (!totalParts || parts.length !== totalParts || parts.some(part => part.byteSize !== highVolumeUploadPartBytes(job.sourceFileSize, part.partNumber))) throw new Error("The staged spreadsheet is incomplete. Upload the file again to create a new import.");
+    const buffers = await Promise.all(parts.map(async part => {
+      const response = await fetch(await storageGetSignedUrl(part.storageKey));
+      if (!response.ok) throw new Error("A staged spreadsheet chunk could not be read from secure storage.");
+      const bytes = Buffer.from(await response.arrayBuffer());
+      if (bytes.length !== part.byteSize) throw new Error("A staged spreadsheet chunk is incomplete. Upload the file again to create a new import.");
+      return bytes;
+    }));
+    sourceBuffer = Buffer.concat(buffers);
+    if (sourceBuffer.length !== job.sourceFileSize) throw new Error("The staged spreadsheet size could not be verified. Upload the file again to create a new import.");
+  } else {
+    if (!job.sourceFileKey) throw new Error("The staged source file is missing.");
+    const response = await fetch(await storageGetSignedUrl(job.sourceFileKey));
+    if (!response.ok) throw new Error("The staged spreadsheet could not be read from secure storage.");
+    sourceBuffer = Buffer.from(await response.arrayBuffer());
+  }
+  const sourceRows = spreadsheetRowsFromBuffer(sourceBuffer);
   const totalRows = sourceRows.length;
   const offset = Math.min(job.validationCursor, totalRows);
   const slice = sourceRows.slice(offset, offset + HIGH_VOLUME_VALIDATION_CHUNK);

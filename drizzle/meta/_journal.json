@@ -190,6 +190,13 @@
       "when": 1786806630353,
       "tag": "0026_lonely_hex",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "5",
+      "when": 1786813367609,
+      "tag": "0027_bouncy_kid_colt",
+      "breakpoints": true
     }
   ]
 }
