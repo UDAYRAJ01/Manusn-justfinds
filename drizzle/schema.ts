@@ -13,7 +13,9 @@ import {
 
 export const userRoleValues = ["user", "business_owner", "admin", "super_admin"] as const;
 export const businessStatusValues = ["draft", "submitted", "under_review", "approved", "published", "rejected", "suspended"] as const;
-export const importStatusValues = ["pending", "processing", "completed", "failed"] as const;
+export const importStatusValues = ["pending", "queued", "processing", "completed", "failed", "retrying", "cancelled"] as const;
+export const bulkImportPhaseValues = ["staged", "validating", "ready", "importing", "completed", "failed", "cancelled"] as const;
+export const businessAiContentStatusValues = ["pending", "processing", "completed", "failed"] as const;
 export const aiContentTypeValues = [
   "short_description",
   "about_business",
@@ -344,7 +346,7 @@ export const businessAiContent = mysqlTable("business_ai_content", {
   about: text("about"),
   faqs: json("faqs"),
   sourceHash: varchar("sourceHash", { length: 128 }),
-  status: mysqlEnum("status", importStatusValues).default("pending").notNull(),
+  status: mysqlEnum("status", businessAiContentStatusValues).default("pending").notNull(),
   generatedAt: timestamp("generatedAt"),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, table => [uniqueIndex("ai_content_business_uidx").on(table.businessId)]);
@@ -410,12 +412,26 @@ export const bulkImports = mysqlTable("bulk_imports", {
   initiatedById: int("initiatedById").notNull().references(() => users.id),
   filename: varchar("filename", { length: 255 }).notNull(),
   status: mysqlEnum("status", importStatusValues).default("pending").notNull(),
+  phase: mysqlEnum("phase", bulkImportPhaseValues).default("staged").notNull(),
+  sourceFileKey: varchar("sourceFileKey", { length: 1000 }),
+  sourceFileContentType: varchar("sourceFileContentType", { length: 120 }),
+  sourceFileSize: int("sourceFileSize"),
   totalRows: int("totalRows").default(0).notNull(),
   validRows: int("validRows").default(0).notNull(),
   failedRows: int("failedRows").default(0).notNull(),
+  validationCursor: int("validationCursor").default(0).notNull(),
+  processedRows: int("processedRows").default(0).notNull(),
+  progressPercent: int("progressPercent").default(0).notNull(),
+  attempts: int("attempts").default(0).notNull(),
+  maxAttempts: int("maxAttempts").default(3).notNull(),
+  errorCategory: varchar("errorCategory", { length: 80 }),
+  errorMessage: text("errorMessage"),
+  startedAt: timestamp("startedAt"),
+  finishedAt: timestamp("finishedAt"),
+  cancelledAt: timestamp("cancelledAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, table => [index("bulk_import_status_idx").on(table.status, table.createdAt)]);
+}, table => [index("bulk_import_status_idx").on(table.status, table.createdAt), index("bulk_import_phase_progress_idx").on(table.phase, table.status, table.updatedAt)]);
 
 export const bulkImportRows = mysqlTable("bulk_import_rows", {
   id: int("id").autoincrement().primaryKey(),
@@ -424,8 +440,9 @@ export const bulkImportRows = mysqlTable("bulk_import_rows", {
   data: json("data").notNull(),
   validationErrors: json("validationErrors"),
   duplicateCandidateId: int("duplicateCandidateId").references(() => businesses.id),
-  status: mysqlEnum("status", ["pending", "valid", "invalid", "imported", "duplicate"]).default("pending").notNull(),
-}, table => [uniqueIndex("import_row_number_uidx").on(table.importId, table.rowNumber), index("import_row_status_idx").on(table.importId, table.status)]);
+  fingerprint: varchar("fingerprint", { length: 260 }),
+  status: mysqlEnum("status", ["pending", "valid", "invalid", "imported", "duplicate", "processing"]).default("pending").notNull(),
+}, table => [uniqueIndex("import_row_number_uidx").on(table.importId, table.rowNumber), uniqueIndex("import_row_fingerprint_uidx").on(table.importId, table.fingerprint), index("import_row_status_idx").on(table.importId, table.status)]);
 
 export const businessFacilities = mysqlTable("business_facilities", {
   id: int("id").autoincrement().primaryKey(),

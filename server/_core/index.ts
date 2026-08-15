@@ -7,7 +7,9 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { generateRobotsTxt, generateSitemapXml } from "../domain/seo/sitemap";
 import { appRouter } from "../routers";
+import { processNextHighVolumeImportChunk } from "../routers/workspaces";
 import { createContext } from "./context";
+import { sdk } from "./sdk";
 import { serveStatic, setupVite } from "./vite";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -37,6 +39,19 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
+
+  app.post("/api/scheduled/process-high-volume-imports", async (req, res) => {
+    try {
+      const user = await sdk.authenticateRequest(req);
+      if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only" });
+      const result = await processNextHighVolumeImportChunk();
+      return res.json({ ok: true, result, timestamp: new Date().toISOString() });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "The import processor failed.";
+      console.error("[HighVolumeImport] scheduled processor failed", error);
+      return res.status(500).json({ error: detail, timestamp: new Date().toISOString(), context: { url: req.originalUrl } });
+    }
+  });
 
   app.get("/robots.txt", async (_, res) => {
     res.type("text/plain");

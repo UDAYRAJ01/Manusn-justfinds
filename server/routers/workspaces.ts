@@ -1,18 +1,20 @@
-import { and, desc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lt, or } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { approvalQueue, businesses, businessAiContent, businessFieldValues, businessHours, businessNotifications, businessTypes, bulkImportRows, bulkImports, categories, categoryFields, cities, localities, subcategories, users } from "../../drizzle/schema";
 import { deleteInternalValidationBusiness, getAdminCounts, getCategorySchemas, getDb, getInternalValidationBusinesses, getOwnerBusinesses, getPendingBusinesses } from "../db";
 import { canManageAdmins, canManageBusiness, canModerate } from "../domain/permissions";
 import { buildVoiceIntroductionScript } from "../domain/voiceScript";
-import { storagePut } from "../storage";
+import { storageCreatePresignedUpload, storageGetSignedUrl, storagePut } from "../storage";
 import { numberedSlug, preferredBusinessSlug } from "../domain/slug";
 import { normalizeCategorySlug } from "../domain/categorySlug";
 import { findApprovedIndiaCity } from "../domain/approvedIndiaCities";
 import { normalizeBulkListingRow, parseImportedFaqs, parseImportedHours, type NormalizedBulkListing } from "../domain/bulkListingImport";
 import { validateBulkListingRow, type ImportRow } from "../domain/importValidation";
 import { normalizeDuplicateText, scoreDuplicateCandidate } from "../domain/duplicateCheck";
+import { HIGH_VOLUME_FILE_LIMIT, HIGH_VOLUME_IMPORT_CHUNK, HIGH_VOLUME_ROW_LIMIT, HIGH_VOLUME_VALIDATION_CHUNK, highVolumeProgress, isSupportedImportFilename } from "../domain/highVolumeImportPolicy";
 import { protectedProcedure, router } from "../_core/trpc";
+import * as XLSX from "xlsx";
 
 type JustFindsRole = "user" | "business_owner" | "admin" | "super_admin";
 
@@ -74,7 +76,7 @@ function subcategoryKey(categoryId: number, name: string) { return `${categoryId
 function businessTypeKey(subcategoryId: number, name: string) { return `${subcategoryId}:${lookupName(name)}`; }
 function localityKey(cityId: number, name: string) { return `${cityId}:${lookupName(name)}`; }
 
-async function importTaxonomyLookup(db: Awaited<ReturnType<typeof getDb>> & {}, rows: ImportRow[]): Promise<TaxonomyLookup> {
+async function importTaxonomyLookup(db: Awaited<ReturnType<typeof getDb>> & {}, rows: ImportRow[], includeDuplicateCandidates = true): Promise<TaxonomyLookup> {
   const normalized = rows.map(normalizeBulkListingRow);
   const cityNames = Array.from(new Set(normalized.flatMap(row => {
     const approved = findApprovedIndiaCity(row.city);
@@ -89,7 +91,7 @@ async function importTaxonomyLookup(db: Awaited<ReturnType<typeof getDb>> & {}, 
   const cityIds = supportedCities.map(city => city.id);
   const [supportedLocalities, candidates] = await Promise.all([
     cityIds.length ? db.select({ id: localities.id, cityId: localities.cityId, name: localities.name }).from(localities).where(inArray(localities.cityId, cityIds)) : Promise.resolve([]),
-    cityIds.length ? db.select({ id: businesses.id, name: businesses.name, phone: businesses.phone, email: businesses.email, address: businesses.address, cityId: businesses.cityId, latitude: businesses.latitude, longitude: businesses.longitude }).from(businesses).where(inArray(businesses.cityId, cityIds)) : Promise.resolve([]),
+    includeDuplicateCandidates && cityIds.length ? db.select({ id: businesses.id, name: businesses.name, phone: businesses.phone, email: businesses.email, address: businesses.address, cityId: businesses.cityId, latitude: businesses.latitude, longitude: businesses.longitude }).from(businesses).where(inArray(businesses.cityId, cityIds)) : Promise.resolve([]),
   ]);
   return {
     categoriesByName: new Map(activeCategories.map(category => [lookupName(category.name), category])),
@@ -127,7 +129,7 @@ function validateImportListing(raw: ImportRow, rowNumber: number, lookup: Taxono
   const faq = parseImportedFaqs(listing.faqs);
   if (faq.warning) warnings.push(faq.warning);
   if (listing.rating || listing.totalReviews) warnings.push("Rating and Total Reviews are retained only in the private import audit; they are not published or converted into customer reviews.");
-  const fileDuplicateKey = `${lookupName(listing.businessName)}:${city?.id ?? "unknown"}:${lookupName(listing.phone || listing.email || listing.address)}`;
+  const fileDuplicateKey = importRowFingerprint(listing, city?.id);
   const earlierRow = seenRows.get(fileDuplicateKey);
   if (earlierRow) errors.push(`Duplicate of spreadsheet row ${earlierRow}.`); else seenRows.set(fileDuplicateKey, rowNumber);
   const candidates = city ? lookup.candidatesByCity.get(city.id) ?? [] : [];
@@ -140,6 +142,10 @@ function validateImportListing(raw: ImportRow, rowNumber: number, lookup: Taxono
   return { rowNumber, raw, listing, category, subcategory: subcategory ?? null, businessType: businessType ?? null, city: city ?? null, locality: locality ?? null, hours: hours.days, faqs: faq.faqs, errors, warnings, duplicateCandidateId: duplicate?.candidate.id ?? null, valid: errors.length === 0 };
 }
 
+function importRowFingerprint(listing: NormalizedBulkListing, cityId: number | null | undefined) {
+  return `${lookupName(listing.businessName)}:${cityId ?? "unknown"}:${lookupName(listing.phone || listing.email || listing.address)}`.slice(0, 260);
+}
+
 function nextImportSlug(name: string, usedSlugs: Set<string>) {
   const base = preferredBusinessSlug(name);
   for (let suffix = 1; suffix <= 500; suffix += 1) {
@@ -147,6 +153,121 @@ function nextImportSlug(name: string, usedSlugs: Set<string>) {
     if (!usedSlugs.has(candidate)) { usedSlugs.add(candidate); return candidate; }
   }
   throw new TRPCError({ code: "CONFLICT", message: `Could not create a unique listing URL for ${name}.` });
+}
+
+function spreadsheetRowsFromBuffer(buffer: Buffer): ImportRow[] {
+  const workbook = XLSX.read(buffer, { type: "buffer", cellDates: false });
+  const firstSheet = workbook.SheetNames[0];
+  if (!firstSheet) throw new Error("The spreadsheet does not contain a readable sheet.");
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[firstSheet], { defval: "", raw: false });
+  if (!rows.length) throw new Error("No business rows were found below the header row.");
+  if (rows.length > HIGH_VOLUME_ROW_LIMIT) throw new Error(`This import contains ${rows.length.toLocaleString()} rows. The maximum is ${HIGH_VOLUME_ROW_LIMIT.toLocaleString()}.`);
+  return rows.map(row => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, value === undefined ? null : typeof value === "string" || typeof value === "number" || typeof value === "boolean" || value === null ? value : String(value)])) as ImportRow);
+}
+
+function importPayload(row: ReturnType<typeof validateImportListing>) {
+  return { raw: row.raw, normalized: row.listing, warnings: row.warnings, hours: row.hours, faqs: row.faqs, categoryId: row.category?.id ?? null, subcategoryId: row.subcategory?.id ?? null, businessTypeId: row.businessType?.id ?? null, cityId: row.city?.id ?? null, localityId: row.locality?.id ?? null };
+}
+
+async function validateHighVolumeChunk(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, job: typeof bulkImports.$inferSelect) {
+  if (!job.sourceFileKey) throw new Error("The staged source file is missing.");
+  const signedUrl = await storageGetSignedUrl(job.sourceFileKey);
+  const response = await fetch(signedUrl);
+  if (!response.ok) throw new Error("The staged spreadsheet could not be read from secure storage.");
+  const sourceRows = spreadsheetRowsFromBuffer(Buffer.from(await response.arrayBuffer()));
+  const totalRows = sourceRows.length;
+  const offset = Math.min(job.validationCursor, totalRows);
+  const slice = sourceRows.slice(offset, offset + HIGH_VOLUME_VALIDATION_CHUNK);
+  if (!slice.length) {
+    await db.update(bulkImports).set({ status: "pending", phase: "ready", totalRows, progressPercent: 100, finishedAt: new Date(), errorMessage: null, errorCategory: null }).where(eq(bulkImports.id, job.id));
+    return { importId: job.id, phase: "ready", processed: 0, totalRows };
+  }
+  const lookup = await importTaxonomyLookup(db, slice);
+  const priorRows = offset
+    ? await db.select({ rowNumber: bulkImportRows.rowNumber, fingerprint: bulkImportRows.fingerprint }).from(bulkImportRows).where(and(eq(bulkImportRows.importId, job.id), lt(bulkImportRows.rowNumber, offset + 2)))
+    : [];
+  const seenRows = new Map(priorRows.flatMap(row => row.fingerprint ? [[row.fingerprint, row.rowNumber] as [string, number]] : []));
+  const prepared = slice.map((raw, index) => validateImportListing(raw, offset + index + 2, lookup, seenRows));
+  const rowsToInsert = prepared.map(row => ({
+    importId: job.id,
+    rowNumber: row.rowNumber,
+    fingerprint: row.errors.some(error => error.startsWith("Duplicate of spreadsheet row")) ? null : importRowFingerprint(row.listing, row.city?.id),
+    data: importPayload(row),
+    validationErrors: row.errors.length ? row.errors : null,
+    duplicateCandidateId: row.duplicateCandidateId,
+    status: row.valid ? "valid" as const : row.duplicateCandidateId && row.errors.some(error => error.startsWith("Likely duplicate")) ? "duplicate" as const : "invalid" as const,
+  }));
+  if (rowsToInsert.length) await db.insert(bulkImportRows).values(rowsToInsert);
+  const validAdded = prepared.filter(row => row.valid).length;
+  const invalidAdded = prepared.length - validAdded;
+  const nextCursor = offset + prepared.length;
+  const ready = nextCursor >= totalRows;
+  await db.update(bulkImports).set({
+    status: ready ? "pending" : "queued",
+    phase: ready ? "ready" : "validating",
+    totalRows,
+    validationCursor: nextCursor,
+    validRows: job.validRows + validAdded,
+    failedRows: job.failedRows + invalidAdded,
+    progressPercent: highVolumeProgress("validating", nextCursor, totalRows),
+    finishedAt: ready ? new Date() : null,
+    errorMessage: null,
+    errorCategory: null,
+  }).where(eq(bulkImports.id, job.id));
+  return { importId: job.id, phase: ready ? "ready" : "validating", processed: prepared.length, totalRows };
+}
+
+async function importHighVolumeChunk(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, job: typeof bulkImports.$inferSelect) {
+  const readyRows = await db.select().from(bulkImportRows).where(and(eq(bulkImportRows.importId, job.id), eq(bulkImportRows.status, "valid"))).orderBy(asc(bulkImportRows.rowNumber)).limit(HIGH_VOLUME_IMPORT_CHUNK);
+  if (!readyRows.length) {
+    await db.update(bulkImports).set({ status: "completed", phase: "completed", progressPercent: 100, finishedAt: new Date(), errorMessage: null, errorCategory: null }).where(eq(bulkImports.id, job.id));
+    return { importId: job.id, phase: "completed", processed: 0 };
+  }
+  const existingSlugs = new Set((await db.select({ slug: businesses.slug }).from(businesses)).map(row => row.slug));
+  let created = 0;
+  let failed = 0;
+  for (const row of readyRows) {
+    const payload = row.data as { normalized?: NormalizedBulkListing; categoryId?: number | null; subcategoryId?: number | null; businessTypeId?: number | null; cityId?: number | null; localityId?: number | null; hours?: ReturnType<typeof parseImportedHours>["days"]; faqs?: ReturnType<typeof parseImportedFaqs>["faqs"] } | null;
+    const listing = payload?.normalized;
+    if (!listing || !payload?.categoryId || !payload.cityId) {
+      failed += 1;
+      await db.update(bulkImportRows).set({ status: "invalid", validationErrors: ["Import audit data is incomplete. Re-upload this row."] }).where(eq(bulkImportRows.id, row.id));
+      continue;
+    }
+    try {
+      const createdBusiness = await db.insert(businesses).values({ ownerId: job.initiatedById, categoryId: payload.categoryId, subcategoryId: payload.subcategoryId ?? null, businessTypeId: payload.businessTypeId ?? null, cityId: payload.cityId, localityId: payload.localityId ?? null, name: listing.businessName, slug: nextImportSlug(listing.businessName, existingSlugs), address: listing.address, shortDescription: listing.description || null, aboutDescription: listing.description || null, phone: listing.phone || null, email: listing.email || null, website: listing.website || null, latitude: listing.latitude || null, longitude: listing.longitude || null, status: "submitted", onboardingStep: 1 });
+      const businessId = Number(createdBusiness[0].insertId);
+      if (payload.hours?.length === 7) await db.insert(businessHours).values(payload.hours.map(day => ({ ...day, businessId })));
+      if (payload.faqs?.length) await db.insert(businessAiContent).values({ businessId, about: listing.description || null, faqs: payload.faqs, status: "pending" });
+      await db.insert(approvalQueue).values({ entityType: "business", businessId, submittedById: job.initiatedById, status: "pending" });
+      await db.update(bulkImportRows).set({ status: "imported" }).where(eq(bulkImportRows.id, row.id));
+      created += 1;
+    } catch (error) {
+      failed += 1;
+      await db.update(bulkImportRows).set({ status: "invalid", validationErrors: [error instanceof Error ? error.message.slice(0, 500) : "The row could not be imported."] }).where(eq(bulkImportRows.id, row.id));
+    }
+  }
+  const processedRows = job.processedRows + readyRows.length;
+  await db.update(bulkImports).set({ status: "queued", phase: "importing", processedRows, validRows: Math.max(0, job.validRows - failed), failedRows: job.failedRows + failed, progressPercent: highVolumeProgress("importing", processedRows, Math.max(1, job.validRows + job.failedRows)), errorMessage: null, errorCategory: null }).where(eq(bulkImports.id, job.id));
+  return { importId: job.id, phase: "importing", processed: readyRows.length, created, failed };
+}
+
+export async function processNextHighVolumeImportChunk() {
+  const db = await getDb();
+  if (!db) throw new Error("The import database is unavailable.");
+  const staleBefore = new Date(Date.now() - 3 * 60_000);
+  const [job] = await db.select().from(bulkImports).where(and(or(inArray(bulkImports.status, ["queued", "retrying"]), and(eq(bulkImports.status, "processing"), lt(bulkImports.updatedAt, staleBefore))), inArray(bulkImports.phase, ["validating", "importing"]))).orderBy(asc(bulkImports.updatedAt)).limit(1);
+  if (!job) return { processed: false, reason: "no_queued_import" as const };
+  await db.update(bulkImports).set({ status: "processing", startedAt: job.startedAt ?? new Date(), attempts: job.attempts + 1 }).where(eq(bulkImports.id, job.id));
+  try {
+    const result = job.phase === "validating" ? await validateHighVolumeChunk(db, job) : await importHighVolumeChunk(db, job);
+    return { workerRan: true, ...result };
+  } catch (error) {
+    const message = error instanceof Error ? error.message.slice(0, 1000) : "The background import processor failed.";
+    const exhausted = job.attempts + 1 >= job.maxAttempts;
+    await db.update(bulkImports).set({ status: exhausted ? "failed" : "retrying", errorCategory: "processor", errorMessage: message, finishedAt: exhausted ? new Date() : null }).where(eq(bulkImports.id, job.id));
+    throw error;
+  }
 }
 
 export const workspaceRouter = router({
@@ -287,6 +408,61 @@ export const workspaceRouter = router({
     }
     return { status: input.decision };
   }),
+  beginHighVolumeImport: protectedProcedure.input(z.object({ filename: z.string().min(1).max(255), contentType: z.string().max(120).optional(), fileSize: z.number().int().positive().max(HIGH_VOLUME_FILE_LIMIT) })).mutation(async ({ ctx, input }) => {
+    requireModerator(ctx.user.role);
+    if (!isSupportedImportFilename(input.filename)) throw new TRPCError({ code: "BAD_REQUEST", message: "Choose a CSV, XLS, or XLSX file." });
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The import service is temporarily unavailable." });
+    const safeFilename = input.filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const { key, uploadUrl } = await storageCreatePresignedUpload(`bulk-imports/${ctx.user.id}/${Date.now()}-${crypto.randomUUID()}-${safeFilename}`);
+    const created = await db.insert(bulkImports).values({ initiatedById: ctx.user.id, filename: input.filename, status: "pending", phase: "staged", sourceFileKey: key, sourceFileContentType: input.contentType || null, sourceFileSize: input.fileSize, maxAttempts: 3 });
+    return { importId: Number(created[0].insertId), uploadUrl, fileKey: key, maxRows: HIGH_VOLUME_ROW_LIMIT, maxBytes: HIGH_VOLUME_FILE_LIMIT };
+  }),
+  queueHighVolumeValidation: protectedProcedure.input(z.object({ importId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    requireModerator(ctx.user.role);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The import service is temporarily unavailable." });
+    const [job] = await db.select().from(bulkImports).where(eq(bulkImports.id, input.importId)).limit(1);
+    if (!job) throw new TRPCError({ code: "NOT_FOUND", message: "Staged import not found." });
+    if (job.initiatedById !== ctx.user.id && ctx.user.role !== "super_admin") throw new TRPCError({ code: "FORBIDDEN", message: "Only the initiating administrator may queue this import." });
+    if (job.phase !== "staged") return { importId: job.id, status: job.status, phase: job.phase, alreadyQueued: true };
+    await db.update(bulkImports).set({ status: "queued", phase: "validating", validationCursor: 0, progressPercent: 0, attempts: 0, errorMessage: null, errorCategory: null, finishedAt: null }).where(eq(bulkImports.id, input.importId));
+    return { importId: input.importId, status: "queued" as const, phase: "validating" as const, alreadyQueued: false };
+  }),
+  startHighVolumeImport: protectedProcedure.input(z.object({ importId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    requireModerator(ctx.user.role);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The import service is temporarily unavailable." });
+    const [job] = await db.select().from(bulkImports).where(eq(bulkImports.id, input.importId)).limit(1);
+    if (!job) throw new TRPCError({ code: "NOT_FOUND", message: "Import not found." });
+    if (job.initiatedById !== ctx.user.id && ctx.user.role !== "super_admin") throw new TRPCError({ code: "FORBIDDEN", message: "Only the initiating administrator may start this import." });
+    if (job.phase !== "ready") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Wait for validation to finish before creating submitted listings." });
+    if (!job.validRows) throw new TRPCError({ code: "BAD_REQUEST", message: "This import has no valid rows to create." });
+    await db.update(bulkImports).set({ status: "queued", phase: "importing", processedRows: 0, progressPercent: 45, attempts: 0, errorMessage: null, errorCategory: null, finishedAt: null }).where(eq(bulkImports.id, input.importId));
+    return { importId: input.importId, status: "queued" as const, phase: "importing" as const };
+  }),
+  retryHighVolumeImport: protectedProcedure.input(z.object({ importId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    requireModerator(ctx.user.role);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The import service is temporarily unavailable." });
+    const [job] = await db.select().from(bulkImports).where(eq(bulkImports.id, input.importId)).limit(1);
+    if (!job) throw new TRPCError({ code: "NOT_FOUND", message: "Import not found." });
+    if (job.initiatedById !== ctx.user.id && ctx.user.role !== "super_admin") throw new TRPCError({ code: "FORBIDDEN", message: "Only the initiating administrator may retry this import." });
+    if (!["failed", "retrying"].includes(job.status) || !["validating", "importing"].includes(job.phase)) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Only a failed background import can be retried." });
+    await db.update(bulkImports).set({ status: "queued", attempts: 0, errorMessage: null, errorCategory: null, finishedAt: null }).where(eq(bulkImports.id, input.importId));
+    return { importId: input.importId, status: "queued" as const, phase: job.phase };
+  }),
+  cancelHighVolumeImport: protectedProcedure.input(z.object({ importId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    requireModerator(ctx.user.role);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The import service is temporarily unavailable." });
+    const [job] = await db.select().from(bulkImports).where(eq(bulkImports.id, input.importId)).limit(1);
+    if (!job) throw new TRPCError({ code: "NOT_FOUND", message: "Import not found." });
+    if (job.initiatedById !== ctx.user.id && ctx.user.role !== "super_admin") throw new TRPCError({ code: "FORBIDDEN", message: "Only the initiating administrator may cancel this import." });
+    if (["completed", "cancelled"].includes(job.status)) return { importId: input.importId, status: job.status, alreadyFinal: true };
+    await db.update(bulkImports).set({ status: "cancelled", phase: "cancelled", cancelledAt: new Date(), finishedAt: new Date() }).where(eq(bulkImports.id, input.importId));
+    return { importId: input.importId, status: "cancelled" as const, alreadyFinal: false };
+  }),
   bulkImportPreview: protectedProcedure.input(z.object({ filename: z.string().min(1).max(255), rows: spreadsheetRowsInput })).mutation(async ({ ctx, input }) => {
     requireModerator(ctx.user.role);
     const db = await getDb();
@@ -355,6 +531,6 @@ export const workspaceRouter = router({
     requireModerator(ctx.user.role);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The import service is temporarily unavailable." });
-    return db.select({ id: bulkImports.id, filename: bulkImports.filename, status: bulkImports.status, totalRows: bulkImports.totalRows, validRows: bulkImports.validRows, failedRows: bulkImports.failedRows, createdAt: bulkImports.createdAt, updatedAt: bulkImports.updatedAt }).from(bulkImports).where(eq(bulkImports.initiatedById, ctx.user.id)).orderBy(desc(bulkImports.createdAt)).limit(20);
+    return db.select({ id: bulkImports.id, filename: bulkImports.filename, status: bulkImports.status, phase: bulkImports.phase, totalRows: bulkImports.totalRows, validRows: bulkImports.validRows, failedRows: bulkImports.failedRows, validationCursor: bulkImports.validationCursor, processedRows: bulkImports.processedRows, progressPercent: bulkImports.progressPercent, errorMessage: bulkImports.errorMessage, errorCategory: bulkImports.errorCategory, createdAt: bulkImports.createdAt, updatedAt: bulkImports.updatedAt }).from(bulkImports).where(eq(bulkImports.initiatedById, ctx.user.id)).orderBy(desc(bulkImports.createdAt)).limit(20);
   }),
 });

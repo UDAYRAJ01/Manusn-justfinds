@@ -24,9 +24,16 @@ export function BulkImportManager() {
   const [filename, setFilename] = useState("");
   const [rows, setRows] = useState<SpreadsheetRow[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [highVolumeFile, setHighVolumeFile] = useState<File | null>(null);
+  const [highVolumeError, setHighVolumeError] = useState<string | null>(null);
   const preview = trpc.workspace.bulkImportPreview.useMutation();
   const commit = trpc.workspace.commitBulkImport.useMutation({ onSuccess: () => { void utils.workspace.bulkImportHistory.invalidate(); } });
-  const { data: history = [] } = trpc.workspace.bulkImportHistory.useQuery();
+  const beginHighVolume = trpc.workspace.beginHighVolumeImport.useMutation();
+  const queueHighVolume = trpc.workspace.queueHighVolumeValidation.useMutation({ onSuccess: () => { void utils.workspace.bulkImportHistory.invalidate(); } });
+  const startHighVolume = trpc.workspace.startHighVolumeImport.useMutation({ onSuccess: () => { void utils.workspace.bulkImportHistory.invalidate(); } });
+  const retryHighVolume = trpc.workspace.retryHighVolumeImport.useMutation({ onSuccess: () => { void utils.workspace.bulkImportHistory.invalidate(); } });
+  const cancelHighVolume = trpc.workspace.cancelHighVolumeImport.useMutation({ onSuccess: () => { void utils.workspace.bulkImportHistory.invalidate(); } });
+  const { data: history = [] } = trpc.workspace.bulkImportHistory.useQuery(undefined, { refetchInterval: 5_000 });
   const staged = preview.data;
 
   async function readSpreadsheet(file: File | undefined) {
@@ -50,6 +57,24 @@ export function BulkImportManager() {
     }
   }
 
+  async function stageHighVolumeFile(file: File | undefined) {
+    setHighVolumeError(null);
+    setHighVolumeFile(file ?? null);
+    if (!file) return;
+    if (!/\.(csv|xls|xlsx)$/i.test(file.name)) { setHighVolumeError("Use a CSV, XLS, or XLSX file."); return; }
+    if (file.size > 100 * 1024 * 1024) { setHighVolumeError("Choose a file below 100 MB."); return; }
+    try {
+      const stagedUpload = await beginHighVolume.mutateAsync({ filename: file.name, contentType: file.type || undefined, fileSize: file.size });
+      const uploaded = await fetch(stagedUpload.uploadUrl, { method: "PUT", headers: file.type ? { "Content-Type": file.type } : undefined, body: file });
+      if (!uploaded.ok) throw new Error("The spreadsheet could not be staged in secure storage. Please try again.");
+      await queueHighVolume.mutateAsync({ importId: stagedUpload.importId });
+      await utils.workspace.bulkImportHistory.invalidate();
+      setHighVolumeFile(null);
+    } catch (error) {
+      setHighVolumeError(error instanceof Error ? error.message : "The large import could not be queued.");
+    }
+  }
+
   return <section className="mt-8 grid gap-5 xl:grid-cols-[1.05fr_.95fr]">
     <div className="space-y-5">
       <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm">
@@ -61,13 +86,19 @@ export function BulkImportManager() {
         {preview.error && <p className="mt-3 rounded-xl bg-rose-50 p-3 text-xs leading-5 text-rose-700">{preview.error.message}</p>}
       </div>
       <div className="rounded-[24px] border border-slate-200 bg-white p-6"><div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 size-5 text-[#1f51c8]" /><div><h2 className="font-semibold text-slate-900">Import rules</h2><p className="mt-1 text-xs leading-5 text-slate-500">Main Category must match an active category. Subcategory and Business Type are validated against that category hierarchy. City must match an active Indian city in the platform catalogue; common city aliases are also recognised.</p></div></div><p className="mt-4 text-xs font-semibold uppercase tracking-[.12em] text-slate-500">Supported columns</p><div className="mt-3 flex flex-wrap gap-2">{expectedColumns.map(column => <span key={column} className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600">{column}</span>)}</div><p className="mt-4 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">**Rating**, **Total Reviews**, and **FAQs** are never turned into customer reviews. Ratings and totals stay only in the private import audit; FAQs are held for administrator review.</p></div>
+      <div className="rounded-[24px] border border-indigo-100 bg-indigo-50/30 p-6 shadow-sm">
+        <div className="flex items-start gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-indigo-100 text-indigo-700"><UploadCloud className="size-5" /></span><div><h2 className="font-semibold text-slate-900">Large file import</h2><p className="mt-1 text-xs leading-5 text-slate-600">For up to <strong>100,000 listings</strong>. The source file is securely staged and processed in background chunks, so this page can be closed safely.</p></div></div>
+        <label className="mt-5 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-indigo-200 bg-white/80 px-4 py-7 text-center transition hover:border-indigo-500"><FileSpreadsheet className="size-7 text-indigo-600" /><span className="mt-3 text-sm font-semibold text-slate-700">{highVolumeFile?.name || "Choose a large CSV or Excel file"}</span><span className="mt-1 text-xs text-slate-500">Maximum 100,000 rows and 100 MB</span><input className="sr-only" type="file" accept=".csv,.xlsx,.xls" disabled={beginHighVolume.isPending || queueHighVolume.isPending} onChange={event => void stageHighVolumeFile(event.target.files?.[0])} /></label>
+        {(beginHighVolume.isPending || queueHighVolume.isPending) && <p className="mt-3 flex items-center gap-2 text-xs text-indigo-700"><LoaderCircle className="size-4 animate-spin" />Staging the file and placing the validation job in the background queue…</p>}
+        {highVolumeError && <p className="mt-3 rounded-xl bg-rose-50 p-3 text-xs leading-5 text-rose-700">{highVolumeError}</p>}
+      </div>
     </div>
     <div className="space-y-5">
       <div className="rounded-[24px] border border-slate-200 bg-white p-6">
         <h2 className="font-semibold text-slate-900">Validation preview</h2>
         {!staged ? <p className="mt-3 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-500">Upload a spreadsheet to see row-level category, city, location, duplicate, and field validation here.</p> : <><p className="mt-2 text-xs leading-5 text-slate-500">{staged.message}</p><div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4"><Summary label="Rows" value={staged.summary.totalRows} /><Summary label="Ready" value={staged.summary.validRows} tone="green" /><Summary label="Corrections" value={staged.summary.invalidRows} tone="red" /><Summary label="Warnings" value={staged.summary.warningRows} tone="amber" /></div><div className="mt-5 max-h-[420px] space-y-2 overflow-auto pr-1">{staged.rows.map(row => <div key={row.rowNumber} className="rounded-xl border border-slate-100 p-3"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-slate-800">#{row.rowNumber} · {row.businessName}</p><p className="mt-1 text-xs text-slate-500">{row.category}{row.subcategory ? ` · ${row.subcategory}` : ""} · {row.city}{row.locality ? ` · ${row.locality}` : ""}</p></div><StatusPill valid={row.valid} /></div>{row.errors.map(error => <p className="mt-2 text-xs leading-5 text-rose-700" key={error}>• {error}</p>)}{row.warnings.map(warning => <p className="mt-2 text-xs leading-5 text-amber-700" key={warning}>• {warning}</p>)}</div>)}</div><Button disabled={!staged.summary.validRows || commit.isPending || Boolean(commit.data?.alreadyCompleted)} onClick={() => commit.mutate({ importId: staged.importId })} className="mt-5 w-full rounded-xl">{commit.isPending ? <><LoaderCircle className="mr-2 size-4 animate-spin" />Creating submitted listings…</> : commit.data?.alreadyCompleted ? "Import already completed" : <>Create {staged.summary.validRows} submitted listing{staged.summary.validRows === 1 ? "" : "s"}</>}</Button>{commit.data && <p className="mt-3 rounded-xl bg-emerald-50 p-3 text-xs leading-5 text-emerald-800">Created {commit.data.createdRows} submitted listing{commit.data.createdRows === 1 ? "" : "s"}; {commit.data.skippedRows} row{commit.data.skippedRows === 1 ? "" : "s"} skipped. Review them in Approvals before publishing.</p>}{commit.error && <p className="mt-3 rounded-xl bg-rose-50 p-3 text-xs leading-5 text-rose-700">{commit.error.message}</p>}</>}
       </div>
-      <div className="rounded-[24px] border border-slate-200 bg-white p-6"><h2 className="font-semibold text-slate-900">Recent imports</h2><div className="mt-4 space-y-2">{history.length ? history.map(item => <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-3"><div><p className="text-sm font-semibold text-slate-800">{item.filename}</p><p className="mt-1 text-xs text-slate-500">{item.validRows} ready/imported · {item.failedRows} invalid/skipped · {item.totalRows} total</p></div><span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold capitalize text-slate-600">{item.status}</span></div>) : <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No imports have been created yet.</p>}</div></div>
+      <div className="rounded-[24px] border border-slate-200 bg-white p-6"><h2 className="font-semibold text-slate-900">Recent imports</h2><div className="mt-4 space-y-2">{history.length ? history.map(item => <div key={item.id} className="rounded-xl bg-slate-50 p-3"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-slate-800">{item.filename}</p><p className="mt-1 text-xs text-slate-500">{item.validRows} ready/imported · {item.failedRows} invalid/skipped · {item.totalRows} total</p>{item.phase !== "staged" && <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-indigo-600 transition-all" style={{ width: `${item.progressPercent}%` }} /></div>}<p className="mt-1 text-[11px] text-slate-500 capitalize">{item.phase} · {item.progressPercent}% complete</p>{item.errorMessage && <p className="mt-2 text-xs text-rose-700">{item.errorMessage}</p>}</div><span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold capitalize text-slate-600">{item.status}</span></div>{item.phase === "ready" && <Button size="sm" className="mt-3 rounded-lg" disabled={startHighVolume.isPending} onClick={() => startHighVolume.mutate({ importId: item.id })}>Create submitted listings</Button>}{item.status === "failed" && <Button size="sm" variant="outline" className="mt-3 rounded-lg" disabled={retryHighVolume.isPending} onClick={() => retryHighVolume.mutate({ importId: item.id })}>Retry background import</Button>}{["queued", "processing", "retrying"].includes(item.status) && <Button size="sm" variant="ghost" className="mt-3 rounded-lg text-rose-700" disabled={cancelHighVolume.isPending} onClick={() => cancelHighVolume.mutate({ importId: item.id })}>Cancel import</Button>}</div>) : <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No imports have been created yet.</p>}</div></div>
     </div>
   </section>;
 }

@@ -169,6 +169,13 @@
       "when": 1786779645227,
       "tag": "0023_wide_rachel_grey",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1786781714589,
+      "tag": "0024_modern_rachel_grey",
+      "breakpoints": true
     }
   ]
 }
