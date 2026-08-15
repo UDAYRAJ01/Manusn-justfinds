@@ -6,8 +6,10 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { generateRobotsTxt, generateSitemapXml } from "../domain/seo/sitemap";
+import { shouldPauseHighVolumeImportSchedule } from "../domain/highVolumeImportSchedule";
 import { appRouter } from "../routers";
 import { processNextHighVolumeImportChunk } from "../routers/workspaces";
+import { updateHeartbeatJob } from "./heartbeat";
 import { createContext } from "./context";
 import { sdk } from "./sdk";
 import { serveStatic, setupVite } from "./vite";
@@ -44,7 +46,14 @@ async function startServer() {
     try {
       const user = await sdk.authenticateRequest(req);
       if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only" });
-      const result = await processNextHighVolumeImportChunk();
+      const result = await processNextHighVolumeImportChunk(user.taskUid);
+      if ("workerRan" in result && shouldPauseHighVolumeImportSchedule(result.phase)) {
+        try {
+          await updateHeartbeatJob(user.taskUid, { enable: false }, "");
+        } catch (pauseError) {
+          console.warn("[HighVolumeImport] could not pause completed task", pauseError);
+        }
+      }
       return res.json({ ok: true, result, timestamp: new Date().toISOString() });
     } catch (error) {
       const detail = error instanceof Error ? error.message : "The import processor failed.";

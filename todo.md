@@ -204,8 +204,8 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Add automated coverage for the new Excel mapping and administrator import flow; validate TypeScript and the full test suite before publishing.
 
 ## Administrator Bulk-Import Access Repair
-- [ ] Diagnose and correct the reported failure to open the deployed administrator bulk-import route while preserving administrator-only access control.
+- [x] Diagnose and correct the reported failure to open the deployed administrator bulk-import route while preserving administrator-only access control.
 
 ## High-Volume Bulk Import
-- [ ] Choose and implement a reliable 100,000-listing import architecture with durable file staging, asynchronous processing, progress visibility, retry controls, and administrator-only security.
-- [ ] Implement the selected always-on high-volume importer with a 100,000-listing limit, chunked processing, and recovery controls.
+- [x] Choose and implement a reliable 100,000-listing import architecture with durable file staging, asynchronous processing, progress visibility, retry controls, and administrator-only security.
+- [x] Implement the selected always-on high-volume importer with a 100,000-listing limit, chunked processing, and recovery controls.
