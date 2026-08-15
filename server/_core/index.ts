@@ -5,6 +5,7 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
+import { registerHighVolumeUploadProxy } from "./highVolumeUploadProxy";
 import { generateRobotsTxt, generateSitemapXml } from "../domain/seo/sitemap";
 import { shouldPauseHighVolumeImportSchedule } from "../domain/highVolumeImportSchedule";
 import { appRouter } from "../routers";
@@ -41,6 +42,7 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
+  registerHighVolumeUploadProxy(app);
 
   app.post("/api/scheduled/process-high-volume-imports", async (req, res) => {
     try {

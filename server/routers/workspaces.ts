@@ -5,7 +5,7 @@ import { approvalQueue, businesses, businessAiContent, businessFieldValues, busi
 import { deleteInternalValidationBusiness, getAdminCounts, getCategorySchemas, getDb, getInternalValidationBusinesses, getOwnerBusinesses, getPendingBusinesses } from "../db";
 import { canManageAdmins, canManageBusiness, canModerate } from "../domain/permissions";
 import { buildVoiceIntroductionScript } from "../domain/voiceScript";
-import { storageCreatePresignedUpload, storageGetSignedUrl, storagePut } from "../storage";
+import { storageGetSignedUrl, storagePut } from "../storage";
 import { numberedSlug, preferredBusinessSlug } from "../domain/slug";
 import { normalizeCategorySlug } from "../domain/categorySlug";
 import { findApprovedIndiaCity } from "../domain/approvedIndiaCities";
@@ -437,9 +437,10 @@ export const workspaceRouter = router({
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The import service is temporarily unavailable." });
     const safeFilename = input.filename.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const { key, uploadUrl } = await storageCreatePresignedUpload(`bulk-imports/${ctx.user.id}/${Date.now()}-${crypto.randomUUID()}-${safeFilename}`);
+    const key = `bulk-imports/${ctx.user.id}/${Date.now()}-${crypto.randomUUID()}-${safeFilename}`;
     const created = await db.insert(bulkImports).values({ initiatedById: ctx.user.id, filename: input.filename, status: "pending", phase: "staged", sourceFileKey: key, sourceFileContentType: input.contentType || null, sourceFileSize: input.fileSize, maxAttempts: 3 });
-    return { importId: Number(created[0].insertId), uploadUrl, fileKey: key, maxRows: HIGH_VOLUME_ROW_LIMIT, maxBytes: HIGH_VOLUME_FILE_LIMIT };
+    const importId = Number(created[0].insertId);
+    return { importId, uploadPath: `/api/admin/bulk-imports/${importId}/upload`, fileKey: key, maxRows: HIGH_VOLUME_ROW_LIMIT, maxBytes: HIGH_VOLUME_FILE_LIMIT };
   }),
   queueHighVolumeValidation: protectedProcedure.input(z.object({ importId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     requireModerator(ctx.user.role);

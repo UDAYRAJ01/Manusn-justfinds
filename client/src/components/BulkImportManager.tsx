@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
+import { COOKIE_NAME } from "@shared/const";
 import { AlertCircle, CheckCircle2, FileSpreadsheet, LoaderCircle, Send, ShieldCheck, UploadCloud } from "lucide-react";
 import { useState } from "react";
 import * as XLSX from "xlsx";
@@ -19,6 +20,17 @@ function normalizeRows(source: Record<string, unknown>[]): SpreadsheetRow[] {
 
 function StatusPill({ valid }: { valid: boolean }) {
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${valid ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>{valid ? "Ready" : "Needs correction"}</span>;
+}
+
+function previewSessionHeaders(): Record<string, string> {
+  try {
+    const raw = sessionStorage.getItem("manus-cookie");
+    const prefix = `${COOKIE_NAME}=`;
+    const token = raw?.split(";").find(value => value.trim().startsWith(prefix))?.trim().slice(prefix.length);
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  } catch {
+    return {};
+  }
 }
 
 export function BulkImportManager() {
@@ -67,8 +79,16 @@ export function BulkImportManager() {
     if (file.size > HIGH_VOLUME_FILE_LIMIT) { setHighVolumeError(`Choose a file below ${HIGH_VOLUME_FILE_LIMIT_LABEL}.`); return; }
     try {
       const stagedUpload = await beginHighVolume.mutateAsync({ filename: file.name, contentType: file.type || undefined, fileSize: file.size });
-      const uploaded = await fetch(stagedUpload.uploadUrl, { method: "PUT", headers: file.type ? { "Content-Type": file.type } : undefined, body: file });
-      if (!uploaded.ok) throw new Error("The spreadsheet could not be staged in secure storage. Please try again.");
+      const uploaded = await fetch(stagedUpload.uploadPath, {
+        method: "PUT",
+        credentials: "include",
+        headers: { ...previewSessionHeaders(), ...(file.type ? { "Content-Type": file.type } : {}) },
+        body: file,
+      });
+      if (!uploaded.ok) {
+        const payload = await uploaded.json().catch(() => null) as { error?: string } | null;
+        throw new Error(payload?.error || "The spreadsheet could not be staged in secure storage. Please try again.");
+      }
       await queueHighVolume.mutateAsync({ importId: stagedUpload.importId });
       await utils.workspace.bulkImportHistory.invalidate();
       setHighVolumeFile(null);
