@@ -30,6 +30,7 @@ export default function SearchResults() {
   const locality = params.get("locality") ?? undefined;
   const category = params.get("category") ?? undefined;
   const subcategory = params.get("subcategory") ?? undefined;
+  const businessType = params.get("businessType") ?? undefined;
   const { coordinates, status: locationStatus, message: locationMessage, request: requestLocation } = useUserLocation();
   const urlLatitude = params.get("lat") ? Number(params.get("lat")) : undefined;
   const urlLongitude = params.get("lng") ? Number(params.get("lng")) : undefined;
@@ -43,11 +44,11 @@ export default function SearchResults() {
   const [total, setTotal] = useState<number | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | undefined>();
-  const input = useMemo(() => ({ query, city, locality, category, subcategory, latitude, longitude, sort, verified: verified || undefined, sessionId, offset, limit: 10 }), [query, city, locality, category, subcategory, latitude, longitude, sort, verified, sessionId, offset]);
+  const input = useMemo(() => ({ query, city, locality, category, subcategory, businessType, latitude, longitude, sort, verified: verified || undefined, sessionId, offset, limit: 10 }), [query, city, locality, category, subcategory, businessType, latitude, longitude, sort, verified, sessionId, offset]);
   const { data, isLoading, isFetching, error } = trpc.discovery.search.useQuery(input);
   const interaction = trpc.discovery.interaction.useMutation();
 
-  useEffect(() => { setOffset(0); setItems([]); setTotal(null); setSelectedId(undefined); }, [query, city, locality, category, subcategory, latitude, longitude, sort, verified]);
+  useEffect(() => { setOffset(0); setItems([]); setTotal(null); setSelectedId(undefined); }, [query, city, locality, category, subcategory, businessType, latitude, longitude, sort, verified]);
   useEffect(() => {
     if (!data) return;
     setItems(previous => offset === 0 ? data.items : [...previous, ...data.items.filter(item => !previous.some(existing => existing.id === item.id))] as SearchResultItem[]);

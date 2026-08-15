@@ -23,6 +23,7 @@ export function SearchHero({ compact = false, initialQuery = "", initialCity, in
   const [open, setOpen] = useState(false);
   const [debounced, setDebounced] = useState(initialQuery);
   const { coordinates: gps, status: locationStatus, message: locationError, request: requestLocation } = useUserLocation();
+  const trpcUtils = trpc.useUtils();
   const [recents, setRecents] = useState<RecentSearch[]>(readRecentSearches);
   useEffect(() => { const timer = window.setTimeout(() => setDebounced(query), 220); return () => window.clearTimeout(timer); }, [query]);
   useEffect(() => { window.sessionStorage.setItem(locationKey, JSON.stringify({ city: city || undefined, locality: locality || undefined })); }, [city, locality]);
@@ -31,15 +32,17 @@ export function SearchHero({ compact = false, initialQuery = "", initialCity, in
   const { data: suggestions } = trpc.discovery.suggestions.useQuery(suggestionInput);
   const { data: cities } = trpc.discovery.locations.useQuery();
   const { data: localities } = trpc.discovery.localities.useQuery(localityInput, { enabled: Boolean(city) });
-  const submit = (value = query, coordinates = gps) => {
+  const submit = (value = query, coordinates = gps, locationOverride?: { city?: string; locality?: string }) => {
     const normalized = value.trim();
     const params = new URLSearchParams();
+    const selectedCity = locationOverride?.city ?? city;
+    const selectedLocality = locationOverride?.locality ?? locality;
     if (normalized) params.set("q", normalized);
-    if (city) params.set("city", city);
-    if (locality) params.set("locality", locality);
+    if (selectedCity) params.set("city", selectedCity);
+    if (selectedLocality) params.set("locality", selectedLocality);
     if (coordinates) { params.set("lat", coordinates.latitude.toString()); params.set("lng", coordinates.longitude.toString()); params.set("sort", "nearby"); }
     if (normalized) {
-      const next = [{ query: normalized, city: city || undefined, locality: locality || undefined }, ...recents.filter(item => item.query.toLowerCase() !== normalized.toLowerCase())].slice(0, 6);
+      const next = [{ query: normalized, city: selectedCity || undefined, locality: selectedLocality || undefined }, ...recents.filter(item => item.query.toLowerCase() !== normalized.toLowerCase())].slice(0, 6);
       setRecents(next);
       window.sessionStorage.setItem(recentKey, JSON.stringify(next));
     }
@@ -47,7 +50,16 @@ export function SearchHero({ compact = false, initialQuery = "", initialCity, in
   };
   const useMyLocation = async () => {
     const resolved = await requestLocation();
-    if (resolved) submit(query, resolved);
+    if (!resolved) return;
+    try {
+      const detected = await trpcUtils.discovery.detectLocality.fetch({ latitude: resolved.latitude, longitude: resolved.longitude });
+      const nextLocation = detected ? { city: detected.citySlug, locality: detected.slug } : undefined;
+      if (nextLocation?.city) setCity(nextLocation.city);
+      if (nextLocation?.locality) setLocality(nextLocation.locality);
+      submit(query, resolved, nextLocation);
+    } catch {
+      submit(query, resolved);
+    }
   };
   const visibleSuggestions = (suggestions ?? []).map(suggestion => ({ label: suggestion.label, detail: suggestion.detail, kind: suggestion.kind }));
   const fallbackRecents = !debounced ? recents.map(item => ({ label: item.query, detail: [item.locality, item.city].filter(Boolean).join(" · ") || "Recent search", kind: "Recent" })) : [];

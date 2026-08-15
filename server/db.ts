@@ -18,6 +18,7 @@ import {
   businesses,
   businessServices,
   businessSpecialHours,
+  businessTypes,
   businessOffers,
   businessVerifications,
   approvalQueue,
@@ -110,6 +111,30 @@ export async function getPublicSubcategories(categorySlug: string) {
     .innerJoin(categories, eq(subcategories.categoryId, categories.id))
     .where(and(eq(categories.slug, categorySlug), eq(categories.isActive, true), eq(subcategories.isActive, true)))
     .orderBy(subcategories.sortOrder, subcategories.name);
+}
+
+/** Public third-level taxonomy browse, always scoped through its parent category and subcategory. */
+export async function getPublicBusinessTypes(categorySlug: string, subcategorySlug: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    id: businessTypes.id,
+    name: businessTypes.name,
+    slug: businessTypes.slug,
+    description: businessTypes.description,
+    icon: businessTypes.icon,
+  })
+    .from(businessTypes)
+    .innerJoin(subcategories, eq(businessTypes.subcategoryId, subcategories.id))
+    .innerJoin(categories, eq(subcategories.categoryId, categories.id))
+    .where(and(
+      eq(categories.slug, categorySlug),
+      eq(categories.isActive, true),
+      eq(subcategories.slug, subcategorySlug),
+      eq(subcategories.isActive, true),
+      eq(businessTypes.isActive, true),
+    ))
+    .orderBy(businessTypes.sortOrder, businessTypes.name);
 }
 
 export async function getPublicCityBySlug(slug: string) {
@@ -260,6 +285,7 @@ export type PublicSearchInput = {
   localitySlug?: string;
   categorySlug?: string;
   subcategorySlug?: string;
+  businessTypeSlug?: string;
   verified?: boolean;
   latitude?: number;
   longitude?: number;
@@ -283,6 +309,7 @@ export async function getPublicSearchPage(input: PublicSearchInput) {
   if (input.localitySlug) conditions.push(eq(localities.slug, input.localitySlug));
   if (input.categorySlug) conditions.push(eq(categories.slug, input.categorySlug));
   if (input.subcategorySlug) conditions.push(eq(subcategories.slug, input.subcategorySlug));
+  if (input.businessTypeSlug) conditions.push(eq(businessTypes.slug, input.businessTypeSlug));
   if (input.verified) conditions.push(eq(businesses.isVerified, true));
 
   const hasCoordinates = input.latitude !== undefined && input.longitude !== undefined;
@@ -302,11 +329,11 @@ export async function getPublicSearchPage(input: PublicSearchInput) {
       : [desc(businesses.manualPriority), desc(businesses.recommendationScore), desc(businesses.reputationScore)];
 
   const [rows, countRows] = await Promise.all([
-    db.select({ id: businesses.id, name: businesses.name, slug: businesses.slug, shortDescription: businesses.shortDescription, address: businesses.address, phone: businesses.phone, whatsapp: businesses.whatsapp, website: businesses.website, latitude: businesses.latitude, longitude: businesses.longitude, isVerified: businesses.isVerified, profileCompleteness: businesses.profileCompleteness, recommendationScore: businesses.recommendationScore, reputationScore: businesses.reputationScore, category: categories.name, categorySlug: categories.slug, subcategory: subcategories.name, subcategorySlug: subcategories.slug, city: cities.name, citySlug: cities.slug, locality: localities.name, localitySlug: localities.slug, distanceKm }).from(businesses)
-      .innerJoin(categories, eq(businesses.categoryId, categories.id)).innerJoin(cities, eq(businesses.cityId, cities.id)).leftJoin(subcategories, eq(businesses.subcategoryId, subcategories.id)).leftJoin(localities, eq(businesses.localityId, localities.id))
+    db.select({ id: businesses.id, name: businesses.name, slug: businesses.slug, shortDescription: businesses.shortDescription, address: businesses.address, phone: businesses.phone, whatsapp: businesses.whatsapp, website: businesses.website, latitude: businesses.latitude, longitude: businesses.longitude, isVerified: businesses.isVerified, profileCompleteness: businesses.profileCompleteness, recommendationScore: businesses.recommendationScore, reputationScore: businesses.reputationScore, category: categories.name, categorySlug: categories.slug, subcategory: subcategories.name, subcategorySlug: subcategories.slug, businessType: businessTypes.name, businessTypeSlug: businessTypes.slug, city: cities.name, citySlug: cities.slug, locality: localities.name, localitySlug: localities.slug, distanceKm }).from(businesses)
+      .innerJoin(categories, eq(businesses.categoryId, categories.id)).innerJoin(cities, eq(businesses.cityId, cities.id)).leftJoin(subcategories, eq(businesses.subcategoryId, subcategories.id)).leftJoin(businessTypes, eq(businesses.businessTypeId, businessTypes.id)).leftJoin(localities, eq(businesses.localityId, localities.id))
       .where(and(...conditions)).orderBy(...ordering).limit(input.limit + 1).offset(input.offset),
     input.includeTotal
-      ? db.select({ value: count() }).from(businesses).innerJoin(categories, eq(businesses.categoryId, categories.id)).innerJoin(cities, eq(businesses.cityId, cities.id)).leftJoin(subcategories, eq(businesses.subcategoryId, subcategories.id)).leftJoin(localities, eq(businesses.localityId, localities.id)).where(and(...conditions))
+      ? db.select({ value: count() }).from(businesses).innerJoin(categories, eq(businesses.categoryId, categories.id)).innerJoin(cities, eq(businesses.cityId, cities.id)).leftJoin(subcategories, eq(businesses.subcategoryId, subcategories.id)).leftJoin(businessTypes, eq(businesses.businessTypeId, businessTypes.id)).leftJoin(localities, eq(businesses.localityId, localities.id)).where(and(...conditions))
       : Promise.resolve([]),
   ]);
 

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createPublicBusinessReview, getActiveCategories, getActiveCities, getPublicBusinessByRoute, getPublicBusinesses, getPublicCategoryBySlug, getPublicCategoryFields, getPublicCityBySlug, getPublicLocalities, getPublicSavedBusiness, getPublicSearchPage, getPublicSubcategories, getPublicCertificateVerification, logPublicInteraction, logPublicSearch, reportPublicBusinessReview, togglePublicSavedBusiness } from "../db";
+import { createPublicBusinessReview, findNearestLocality, getActiveCategories, getActiveCities, getPublicBusinessByRoute, getPublicBusinesses, getPublicCategoryBySlug, getPublicCategoryFields, getPublicCityBySlug, getPublicLocalities, getPublicSavedBusiness, getPublicSearchPage, getPublicSubcategories, getPublicBusinessTypes, getPublicCertificateVerification, logPublicInteraction, logPublicSearch, reportPublicBusinessReview, searchCities, searchLocalities, togglePublicSavedBusiness } from "../db";
 import { parseSearchIntent } from "../domain/searchIntent";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 
@@ -9,6 +9,7 @@ const searchInput = z.object({
   locality: z.string().max(180).optional(),
   category: z.string().max(120).optional(),
   subcategory: z.string().max(120).optional(),
+  businessType: z.string().max(120).optional(),
   verified: z.boolean().optional(),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
@@ -29,8 +30,21 @@ export const discoveryRouter = router({
   locations: publicProcedure.query(() => getActiveCities()),
   category: publicProcedure.input(z.object({ slug: z.string().min(1).max(120) })).query(({ input }) => getPublicCategoryBySlug(input.slug)),
   subcategories: publicProcedure.input(z.object({ category: z.string().min(1).max(120) })).query(({ input }) => getPublicSubcategories(input.category)),
+  businessTypes: publicProcedure.input(z.object({ category: z.string().min(1).max(120), subcategory: z.string().min(1).max(120) })).query(({ input }) => getPublicBusinessTypes(input.category, input.subcategory)),
   city: publicProcedure.input(z.object({ slug: z.string().min(1).max(140) })).query(({ input }) => getPublicCityBySlug(input.slug)),
   localities: publicProcedure.input(z.object({ city: z.string().min(1).max(140) })).query(({ input }) => getPublicLocalities(input.city)),
+  citySearch: publicProcedure.input(z.object({ query: z.string().trim().min(1).max(140), limit: z.number().int().min(1).max(20).optional() })).query(({ input }) => searchCities(input.query, input.limit)),
+  localitySearch: publicProcedure.input(z.object({ query: z.string().trim().min(1).max(180), cityId: z.number().int().positive().optional(), limit: z.number().int().min(1).max(20).optional() })).query(({ input }) => searchLocalities(input.query, { cityId: input.cityId, limit: input.limit })),
+  detectLocality: publicProcedure.input(z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) })).query(async ({ input }) => {
+    const locality = await findNearestLocality(input.latitude, input.longitude);
+    if (!locality) return null;
+    return {
+      ...locality,
+      latitude: locality.latitude === null ? null : Number(locality.latitude),
+      longitude: locality.longitude === null ? null : Number(locality.longitude),
+      distanceKm: Number(locality.distanceKm),
+    };
+  }),
   categoryFields: publicProcedure.input(z.object({ categoryId: z.number().int().positive() })).query(({ input }) => getPublicCategoryFields(input.categoryId)),
   suggestions: publicProcedure.input(z.object({ query: z.string().max(100).default("") })).query(async ({ input }) => {
     const term = input.query.trim().toLowerCase();
@@ -49,6 +63,7 @@ export const discoveryRouter = router({
       localitySlug: input.locality,
       categorySlug: input.category,
       subcategorySlug: input.subcategory,
+      businessTypeSlug: input.businessType,
       verified: input.verified,
       latitude: input.latitude,
       longitude: input.longitude,
