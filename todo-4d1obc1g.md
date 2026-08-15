@@ -275,3 +275,9 @@
 - [x] Rebuild search results, category browsing, and business-detail composition while preserving actual data availability and existing result/filter behavior
 - [x] Refine authenticated user, owner, and administrator workspace presentation without changing authentication, role gates, routes, actions, or business logic
 - [x] Validate desktop and mobile layouts, run targeted and full regression checks, and publish only the non-disruptive presentation update; 179 tests across 61 files pass and TypeScript is clean
+
+## Product capability audit and implementation walkthrough
+- [x] Inventory current Just Finds features, routes, data models, tests, and production readiness against the supplied platform vision
+- [x] Identify missing, partial, deprecated, and high-risk capabilities without changing existing product behavior
+- [x] Prepare a priority-ordered implementation walkthrough with dependencies, scope boundaries, and acceptance criteria
+- [x] Deliver a concise audit report and recommend Milestone A: discovery reliability, open-now truthfulness, and transparent ranking v1 as the next safe implementation milestone
