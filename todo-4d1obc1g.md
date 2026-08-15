@@ -284,7 +284,7 @@
 
 ## Supplied full UI/UX design-system specification
 - [x] Map the supplied design-system specification to current shared components and existing page families without changing product logic
-- [ ] Establish reusable tokens for color, typography, 8px spacing, restrained radius/shadows, form controls, badges, tabs, tables, feedback states, and desktop/mobile navigation
-- [ ] Apply the shared design system to public header, search experience, homepage, category/subcategory, results, listing cards, business detail, and footer patterns
-- [ ] Apply the shared design system to authenticated user, owner, and administrator workspaces while retaining all current role gates and operational workflows
-- [ ] Validate key desktop/mobile paths, keyboard/focus states, loading/empty/error states, TypeScript, and full regressions before publishing the presentation-only update
+- [x] Establish reusable tokens for color, typography, 8px spacing, restrained radius/shadows, form controls, badges, tabs, tables, feedback states, and desktop/mobile navigation
+- [x] Apply the shared design system to public header, search experience, homepage, category/subcategory, results, listing cards, business detail, and footer patterns
+- [x] Apply the shared design system to authenticated user, owner, and administrator workspaces while retaining all current role gates and operational workflows
+- [x] Validate key desktop/mobile paths, keyboard/focus states, loading/empty/error states, TypeScript, and full regressions before publishing the presentation-only update; 180 tests across 62 files pass
