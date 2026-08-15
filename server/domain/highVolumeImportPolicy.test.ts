@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HIGH_VOLUME_FILE_LIMIT, HIGH_VOLUME_ROW_LIMIT, highVolumeProgress, isSupportedImportFilename } from "./highVolumeImportPolicy";
+import { HIGH_VOLUME_FILE_LIMIT, HIGH_VOLUME_ROW_LIMIT, highVolumeProgress, isSupportedImportFilename, sourceQueueIssue } from "./highVolumeImportPolicy";
 
 describe("high-volume import policy", () => {
   it("supports the promised 100,000-row and 500 MB limits", () => {
@@ -18,5 +18,10 @@ describe("high-volume import policy", () => {
     expect(highVolumeProgress("validating", 50_000, 100_000)).toBe(22);
     expect(highVolumeProgress("importing", 0, 100_000)).toBe(45);
     expect(highVolumeProgress("importing", 100_000, 100_000)).toBe(99);
+  });
+
+  it("blocks validation and retries when a staged source was never confirmed", () => {
+    expect(sourceQueueIssue(null)).toContain("not confirmed in secure storage");
+    expect(sourceQueueIssue(new Date("2026-08-15T00:00:00Z"))).toBeNull();
   });
 });

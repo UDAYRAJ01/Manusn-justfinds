@@ -189,6 +189,8 @@ function importPayload(row: ReturnType<typeof validateImportListing>) {
 }
 
 async function validateHighVolumeChunk(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, job: typeof bulkImports.$inferSelect) {
+  const stagingIssue = sourceQueueIssue(job.sourceUploadedAt);
+  if (stagingIssue) throw new Error(stagingIssue);
   if (!job.sourceFileKey) throw new Error("The staged source file is missing.");
   const signedUrl = await storageGetSignedUrl(job.sourceFileKey);
   const response = await fetch(signedUrl);
@@ -473,6 +475,8 @@ export const workspaceRouter = router({
     if (!job) throw new TRPCError({ code: "NOT_FOUND", message: "Import not found." });
     if (job.initiatedById !== ctx.user.id && ctx.user.role !== "super_admin") throw new TRPCError({ code: "FORBIDDEN", message: "Only the initiating administrator may retry this import." });
     if (!["failed", "retrying"].includes(job.status) || !["validating", "importing"].includes(job.phase)) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Only a failed background import can be retried." });
+    const stagingIssue = sourceQueueIssue(job.sourceUploadedAt);
+    if (stagingIssue) throw new TRPCError({ code: "PRECONDITION_FAILED", message: stagingIssue });
     const scheduleCronTaskUid = await enableHighVolumeImportSchedule(input.importId, job.scheduleCronTaskUid, heartbeatSessionFromHeaders(ctx.req.headers.cookie, ctx.req.headers.authorization, COOKIE_NAME));
     await db.update(bulkImports).set({ scheduleCronTaskUid, status: "queued", attempts: 0, errorMessage: null, errorCategory: null, finishedAt: null }).where(eq(bulkImports.id, input.importId));
     return { importId: input.importId, status: "queued" as const, phase: job.phase };

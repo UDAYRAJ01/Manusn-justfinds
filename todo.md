@@ -219,3 +219,7 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 
 ## Persistent Pending-Import Recovery
 - [x] Diagnose the remaining live scheduled-import failure and recover staged or queued jobs without losing uploaded source files; classify historical uploads that never reached secure storage as requiring re-upload.
+
+## Secure-Storage Import Read Repair
+- [x] Trace and repair the high-volume processor's secure-storage read failure by blocking legacy imports whose spreadsheet was never confirmed in storage, and clearly require a new secure upload instead of an invalid retry.
+- [ ] Verify a newly confirmed spreadsheet progresses through background validation after the release.
