@@ -18,6 +18,7 @@ import {
   businesses,
   businessServices,
   businessSpecialHours,
+  businessTypes,
   businessOffers,
   businessVerifications,
   approvalQueue,
@@ -112,6 +113,30 @@ export async function getPublicSubcategories(categorySlug: string) {
     .orderBy(subcategories.sortOrder, subcategories.name);
 }
 
+/** Public third-level taxonomy browse, always scoped through its parent category and subcategory. */
+export async function getPublicBusinessTypes(categorySlug: string, subcategorySlug: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    id: businessTypes.id,
+    name: businessTypes.name,
+    slug: businessTypes.slug,
+    description: businessTypes.description,
+    icon: businessTypes.icon,
+  })
+    .from(businessTypes)
+    .innerJoin(subcategories, eq(businessTypes.subcategoryId, subcategories.id))
+    .innerJoin(categories, eq(subcategories.categoryId, categories.id))
+    .where(and(
+      eq(categories.slug, categorySlug),
+      eq(categories.isActive, true),
+      eq(subcategories.slug, subcategorySlug),
+      eq(subcategories.isActive, true),
+      eq(businessTypes.isActive, true),
+    ))
+    .orderBy(businessTypes.sortOrder, businessTypes.name);
+}
+
 export async function getPublicCityBySlug(slug: string) {
   const db = await getDb();
   if (!db) return undefined;
@@ -127,6 +152,85 @@ export async function getPublicLocalities(citySlug: string) {
     .innerJoin(cities, eq(localities.cityId, cities.id))
     .where(and(eq(cities.slug, citySlug), eq(cities.isActive, true)))
     .orderBy(localities.name);
+}
+
+/** Type-ahead city search. Required because the directory now holds thousands of Indian cities. */
+export async function searchCities(term: string, limit = 20) {
+  const db = await getDb();
+  if (!db) return [];
+  const cleaned = term.trim();
+  if (!cleaned) return [];
+  return db.select({ id: cities.id, name: cities.name, slug: cities.slug, state: cities.state, latitude: cities.latitude, longitude: cities.longitude })
+    .from(cities)
+    .where(and(eq(cities.isActive, true), like(cities.name, `${cleaned}%`)))
+    .orderBy(cities.name)
+    .limit(limit);
+}
+
+/** Type-ahead locality search, optionally scoped to a city, matching name or pincode. */
+export async function searchLocalities(term: string, options: { cityId?: number; limit?: number } = {}) {
+  const db = await getDb();
+  if (!db) return [];
+  const cleaned = term.trim();
+  if (!cleaned) return [];
+  const conditions = [or(like(localities.name, `${cleaned}%`), like(localities.pincode, `${cleaned}%`))!];
+  if (options.cityId) conditions.push(eq(localities.cityId, options.cityId));
+  return db.select({
+    id: localities.id,
+    name: localities.name,
+    slug: localities.slug,
+    pincode: localities.pincode,
+    latitude: localities.latitude,
+    longitude: localities.longitude,
+    cityId: localities.cityId,
+    cityName: cities.name,
+    citySlug: cities.slug,
+    state: cities.state,
+  })
+    .from(localities)
+    .innerJoin(cities, eq(localities.cityId, cities.id))
+    .where(and(...conditions, eq(cities.isActive, true)))
+    .orderBy(localities.name)
+    .limit(options.limit ?? 20);
+}
+
+/**
+ * Resolve the closest seeded locality (and its city) for a coordinate pair.
+ * Uses a bounding box first so the query stays index friendly across ~155k rows,
+ * then ranks candidates by true great-circle distance.
+ */
+export async function findNearestLocality(latitude: number, longitude: number, radiusKm = 25) {
+  const db = await getDb();
+  if (!db) return undefined;
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return undefined;
+  const latDelta = radiusKm / 111;
+  const lngDelta = radiusKm / Math.max(1, 111 * Math.cos((latitude * Math.PI) / 180));
+  const distance = sql<number>`(6371 * ACOS(LEAST(1, COS(RADIANS(${latitude})) * COS(RADIANS(CAST(${localities.latitude} AS DECIMAL(10,6)))) * COS(RADIANS(CAST(${localities.longitude} AS DECIMAL(10,6))) - RADIANS(${longitude})) + SIN(RADIANS(${latitude})) * SIN(RADIANS(CAST(${localities.latitude} AS DECIMAL(10,6)))))))`;
+  const rows = await db.select({
+    id: localities.id,
+    name: localities.name,
+    slug: localities.slug,
+    pincode: localities.pincode,
+    latitude: localities.latitude,
+    longitude: localities.longitude,
+    cityId: localities.cityId,
+    cityName: cities.name,
+    citySlug: cities.slug,
+    state: cities.state,
+    distanceKm: distance,
+  })
+    .from(localities)
+    .innerJoin(cities, eq(localities.cityId, cities.id))
+    .where(and(
+      eq(cities.isActive, true),
+      isNotNull(localities.latitude),
+      isNotNull(localities.longitude),
+      sql`CAST(${localities.latitude} AS DECIMAL(10,6)) BETWEEN ${latitude - latDelta} AND ${latitude + latDelta}`,
+      sql`CAST(${localities.longitude} AS DECIMAL(10,6)) BETWEEN ${longitude - lngDelta} AND ${longitude + lngDelta}`,
+    ))
+    .orderBy(distance)
+    .limit(1);
+  return rows[0];
 }
 
 export async function getPublicCategoryFields(categoryId: number) {
@@ -181,6 +285,7 @@ export type PublicSearchInput = {
   localitySlug?: string;
   categorySlug?: string;
   subcategorySlug?: string;
+  businessTypeSlug?: string;
   verified?: boolean;
   latitude?: number;
   longitude?: number;
@@ -204,27 +309,31 @@ export async function getPublicSearchPage(input: PublicSearchInput) {
   if (input.localitySlug) conditions.push(eq(localities.slug, input.localitySlug));
   if (input.categorySlug) conditions.push(eq(categories.slug, input.categorySlug));
   if (input.subcategorySlug) conditions.push(eq(subcategories.slug, input.subcategorySlug));
+  if (input.businessTypeSlug) conditions.push(eq(businessTypes.slug, input.businessTypeSlug));
   if (input.verified) conditions.push(eq(businesses.isVerified, true));
 
   const hasCoordinates = input.latitude !== undefined && input.longitude !== undefined;
   const validCoordinates = and(isNotNull(businesses.latitude), isNotNull(businesses.longitude), ne(businesses.latitude, ""), ne(businesses.longitude, ""));
-  if (hasCoordinates && input.sort === "nearby") conditions.push(validCoordinates!);
+  // Nearby search must not hide published listings that have no verified coordinates yet.
+  // They are ranked after the located ones instead of being filtered out, so nearby
+  // search always returns the same result set as the other sort options.
+  const hasGeoPoint = hasCoordinates ? sql<number>`case when ${validCoordinates} then 1 else 0 end` : sql<number>`0`;
 
   const distanceKm = hasCoordinates
     ? sql<number>`6371 * acos(least(1, greatest(-1, cos(radians(${input.latitude})) * cos(radians(cast(${businesses.latitude} as decimal(10,7)))) * cos(radians(cast(${businesses.longitude} as decimal(10,7))) - radians(${input.longitude})) + sin(radians(${input.latitude})) * sin(radians(cast(${businesses.latitude} as decimal(10,7)))))))`
     : sql<number | null>`null`;
   const ordering = input.sort === "nearby" && hasCoordinates
-    ? [asc(distanceKm), desc(businesses.manualPriority), desc(businesses.recommendationScore)]
+    ? [desc(hasGeoPoint), asc(distanceKm), desc(businesses.manualPriority), desc(businesses.recommendationScore)]
     : input.sort === "rating"
       ? [desc(businesses.reputationScore), desc(businesses.manualPriority), desc(businesses.recommendationScore)]
       : [desc(businesses.manualPriority), desc(businesses.recommendationScore), desc(businesses.reputationScore)];
 
   const [rows, countRows] = await Promise.all([
-    db.select({ id: businesses.id, name: businesses.name, slug: businesses.slug, shortDescription: businesses.shortDescription, address: businesses.address, phone: businesses.phone, whatsapp: businesses.whatsapp, website: businesses.website, latitude: businesses.latitude, longitude: businesses.longitude, isVerified: businesses.isVerified, profileCompleteness: businesses.profileCompleteness, recommendationScore: businesses.recommendationScore, reputationScore: businesses.reputationScore, category: categories.name, categorySlug: categories.slug, subcategory: subcategories.name, subcategorySlug: subcategories.slug, city: cities.name, citySlug: cities.slug, locality: localities.name, localitySlug: localities.slug, distanceKm }).from(businesses)
-      .innerJoin(categories, eq(businesses.categoryId, categories.id)).innerJoin(cities, eq(businesses.cityId, cities.id)).leftJoin(subcategories, eq(businesses.subcategoryId, subcategories.id)).leftJoin(localities, eq(businesses.localityId, localities.id))
+    db.select({ id: businesses.id, name: businesses.name, slug: businesses.slug, shortDescription: businesses.shortDescription, address: businesses.address, phone: businesses.phone, whatsapp: businesses.whatsapp, website: businesses.website, latitude: businesses.latitude, longitude: businesses.longitude, isVerified: businesses.isVerified, profileCompleteness: businesses.profileCompleteness, recommendationScore: businesses.recommendationScore, reputationScore: businesses.reputationScore, category: categories.name, categorySlug: categories.slug, subcategory: subcategories.name, subcategorySlug: subcategories.slug, businessType: businessTypes.name, businessTypeSlug: businessTypes.slug, city: cities.name, citySlug: cities.slug, locality: localities.name, localitySlug: localities.slug, distanceKm }).from(businesses)
+      .innerJoin(categories, eq(businesses.categoryId, categories.id)).innerJoin(cities, eq(businesses.cityId, cities.id)).leftJoin(subcategories, eq(businesses.subcategoryId, subcategories.id)).leftJoin(businessTypes, eq(businesses.businessTypeId, businessTypes.id)).leftJoin(localities, eq(businesses.localityId, localities.id))
       .where(and(...conditions)).orderBy(...ordering).limit(input.limit + 1).offset(input.offset),
     input.includeTotal
-      ? db.select({ value: count() }).from(businesses).innerJoin(categories, eq(businesses.categoryId, categories.id)).innerJoin(cities, eq(businesses.cityId, cities.id)).leftJoin(subcategories, eq(businesses.subcategoryId, subcategories.id)).leftJoin(localities, eq(businesses.localityId, localities.id)).where(and(...conditions))
+      ? db.select({ value: count() }).from(businesses).innerJoin(categories, eq(businesses.categoryId, categories.id)).innerJoin(cities, eq(businesses.cityId, cities.id)).leftJoin(subcategories, eq(businesses.subcategoryId, subcategories.id)).leftJoin(businessTypes, eq(businesses.businessTypeId, businessTypes.id)).leftJoin(localities, eq(businesses.localityId, localities.id)).where(and(...conditions))
       : Promise.resolve([]),
   ]);
 

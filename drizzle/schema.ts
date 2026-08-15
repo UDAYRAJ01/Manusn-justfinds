@@ -75,10 +75,11 @@ export const localities = mysqlTable("localities", {
   cityId: int("cityId").notNull().references(() => cities.id),
   name: varchar("name", { length: 160 }).notNull(),
   slug: varchar("slug", { length: 180 }).notNull(),
+  pincode: varchar("pincode", { length: 12 }),
   latitude: varchar("latitude", { length: 24 }),
   longitude: varchar("longitude", { length: 24 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-}, table => [uniqueIndex("locality_city_slug_uidx").on(table.cityId, table.slug), index("locality_city_idx").on(table.cityId)]);
+}, table => [uniqueIndex("locality_city_slug_uidx").on(table.cityId, table.slug), index("locality_city_idx").on(table.cityId), index("locality_name_idx").on(table.name), index("locality_pincode_idx").on(table.pincode)]);
 
 export const categories = mysqlTable("categories", {
   id: int("id").autoincrement().primaryKey(),
@@ -107,6 +108,19 @@ export const subcategories = mysqlTable("subcategories", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, table => [uniqueIndex("subcategory_category_slug_uidx").on(table.categoryId, table.slug), index("subcategory_category_idx").on(table.categoryId)]);
 
+export const businessTypes = mysqlTable("business_types", {
+  id: int("id").autoincrement().primaryKey(),
+  subcategoryId: int("subcategoryId").notNull().references(() => subcategories.id),
+  name: varchar("name", { length: 120 }).notNull(),
+  slug: varchar("slug", { length: 140 }).notNull(),
+  description: text("description"),
+  icon: varchar("icon", { length: 100 }),
+  sortOrder: int("sortOrder").default(0).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  status: mysqlEnum("status", ["active", "inactive"]).default("active").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [uniqueIndex("business_type_subcategory_slug_uidx").on(table.subcategoryId, table.slug), index("business_type_subcategory_idx").on(table.subcategoryId)]);
+
 export const categoryFields = mysqlTable("category_fields", {
   id: int("id").autoincrement().primaryKey(),
   categoryId: int("categoryId").notNull().references(() => categories.id),
@@ -128,6 +142,7 @@ export const businesses = mysqlTable("businesses", {
   ownerId: int("ownerId").references(() => users.id),
   categoryId: int("categoryId").notNull().references(() => categories.id),
   subcategoryId: int("subcategoryId").references(() => subcategories.id),
+  businessTypeId: int("businessTypeId").references(() => businessTypes.id),
   cityId: int("cityId").notNull().references(() => cities.id),
   localityId: int("localityId").references(() => localities.id),
   name: varchar("name", { length: 220 }).notNull(),
@@ -165,6 +180,7 @@ export const businesses = mysqlTable("businesses", {
   publishedAt: timestamp("publishedAt"),
 }, table => [
   index("business_public_search_idx").on(table.status, table.categoryId, table.cityId),
+  index("business_taxonomy_idx").on(table.status, table.categoryId, table.subcategoryId, table.businessTypeId),
   index("business_geo_idx").on(table.latitude, table.longitude),
   index("business_owner_idx").on(table.ownerId),
   index("business_rank_idx").on(table.status, table.manualPriority, table.recommendationScore),

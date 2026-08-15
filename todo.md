@@ -181,3 +181,12 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Add an AI image suggestion feature that recommends relevant photos for generated sections from owner-uploaded listing media.
 - [x] Allow prompt-driven regeneration of individual sections with custom owner instructions and clear retry states.
 - [x] Validate all changes with the full test suite and TypeScript, then save a checkpoint.
+
+## Nearby Search, Location Data, and Category Taxonomy
+- [x] Diagnose why nearby/GPS search returns no or incorrect results and fix the geolocation-to-query pipeline.
+- [x] Compute and display each business's distance from the user's current position in search results, nearby results, and the business detail page.
+- [x] Seed a comprehensive Indian city dataset (states, major cities, districts) with coordinates for city-scoped search.
+- [x] Seed localities per city and auto-detect the user's locality from GPS coordinates (reverse geocoding with graceful fallback).
+- [x] Implement the 3-level taxonomy (main category → subcategory → business type) in the schema and seed the 12-category master list from the user's file.
+- [x] Build the browse flow: main category page → subcategory page → business-type listing page → business detail page, with SEO-friendly slugs.
+- [x] Validate with the full test suite and TypeScript, then save a checkpoint.

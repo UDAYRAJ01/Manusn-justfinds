@@ -29,6 +29,7 @@ function Router() {
     <Route path="/" component={Home} />
     <Route path="/search" component={SearchResults} />
     <Route path="/categories" component={Categories} />
+    <Route path="/category/:category/:subcategory/:businessType" component={CategoryLanding} />
     <Route path="/category/:category/:subcategory" component={CategoryLanding} />
     <Route path="/category/:category" component={CategoryLanding} />
     <Route path="/city/:city/:locality" component={CityLanding} />
