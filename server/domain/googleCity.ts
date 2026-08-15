@@ -1,4 +1,4 @@
-export type ExistingCity = { id: number; name: string };
+export type ExistingCity = { id: number; name: string; slug?: string; country?: string | null; tier?: string | null; isActive?: boolean };
 
 const preferredGoogleCityTypes = ["locality", "postal_town", "administrative_area_level_3", "administrative_area_level_2"];
 
@@ -28,7 +28,8 @@ export function googleCityCandidates(addressComponents: unknown): string[] {
 }
 
 export function resolveGoogleCity(addressComponents: unknown, cities: ExistingCity[]) {
-  const cityByName = new Map(cities.map(city => [normalized(city.name), city]));
+  const approvedCities = cities.filter(city => city.isActive !== false && (city.country === undefined || city.country === "IN") && (city.tier === undefined || city.tier === "tier1" || city.tier === "tier2"));
+  const cityByName = new Map(approvedCities.map(city => [normalized(city.name), city]));
   for (const candidate of googleCityCandidates(addressComponents)) {
     const city = cityByName.get(normalized(candidate));
     if (city) return { ...city, googleLocality: candidate };

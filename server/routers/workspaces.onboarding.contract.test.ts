@@ -23,6 +23,7 @@ describe("guided owner onboarding moderation contract", () => {
     const setUpdate = vi.fn(() => ({ where: whereUpdate }));
     const update = vi.fn(() => ({ set: setUpdate }));
     const limit = vi.fn()
+      .mockResolvedValueOnce([{ id: 1 }])
       .mockResolvedValueOnce([])
       .mockResolvedValue([{ id: 44, ownerId: 7, status: "draft" }]);
     const whereSelect = vi.fn(() => ({ limit }));
@@ -58,7 +59,7 @@ describe("guided owner onboarding moderation contract", () => {
   it("generates later numeric suffixes when legacy createBusiness encounters occupied slugs", async () => {
     const values = vi.fn().mockResolvedValueOnce([{ insertId: 45 }]);
     const insert = vi.fn(() => ({ values }));
-    const occupiedRows = [[{ id: 1 }], [{ id: 2 }], []] as Array<Array<{ id: number }>>;
+    const occupiedRows = [[{ id: 1 }], [{ id: 1 }], [{ id: 2 }], []] as Array<Array<{ id: number }>>;
     const limit = vi.fn(async () => occupiedRows.shift() ?? []);
     const whereSelect = vi.fn(() => ({ limit }));
     const from = vi.fn(() => ({ where: whereSelect }));
@@ -87,7 +88,9 @@ describe("guided owner onboarding moderation contract", () => {
     const roleWhere = vi.fn(async () => undefined);
     const roleSet = vi.fn(() => ({ where: roleWhere }));
     const update = vi.fn(() => ({ set: roleSet }));
-    const limit = vi.fn(async () => []);
+    const limit = vi.fn()
+      .mockResolvedValueOnce([{ id: 1 }])
+      .mockResolvedValue([]);
     const whereSelect = vi.fn(() => ({ limit }));
     const from = vi.fn(() => ({ where: whereSelect }));
     const select = vi.fn(() => ({ from }));

@@ -293,3 +293,10 @@
 - [x] Trace the Create manually action from the Add Business choice into the manual onboarding route
 - [x] Repair the manual-listing navigation without changing the existing Google import or ownership workflows
 - [x] Add focused regression coverage and validate the repaired manual entry path on desktop/mobile before publishing
+
+## India Tier-1 and Tier-2 city discovery
+- [x] Inspect current city records, search city selection, browser location resolution, and Google import locality mapping
+- [x] Define an approved India-only Tier-1 and Tier-2 city catalogue and prevent unapproved/locality-only cities from being selected automatically
+- [x] Update search and location-driven city suggestion/selection so only matching approved Indian cities are offered
+- [x] Preserve owner-editable city review in manual/Google import flows while rejecting unsupported city creation through public selection paths
+- [x] Add regression coverage, validate public/owner mobile and desktop flows, and publish the India-only city experience

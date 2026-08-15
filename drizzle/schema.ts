@@ -64,11 +64,13 @@ export const cities = mysqlTable("cities", {
   name: varchar("name", { length: 120 }).notNull(),
   slug: varchar("slug", { length: 140 }).notNull().unique(),
   state: varchar("state", { length: 120 }),
+  country: varchar("country", { length: 2 }).notNull().default("IN"),
+  tier: mysqlEnum("tier", ["tier1", "tier2"]).notNull().default("tier2"),
   latitude: varchar("latitude", { length: 24 }),
   longitude: varchar("longitude", { length: 24 }),
   isActive: boolean("isActive").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-}, table => [index("cities_name_idx").on(table.name)]);
+}, table => [index("cities_name_idx").on(table.name), index("cities_catalogue_idx").on(table.country, table.tier, table.isActive, table.name)]);
 
 export const localities = mysqlTable("localities", {
   id: int("id").autoincrement().primaryKey(),

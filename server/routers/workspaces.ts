@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { approvalQueue, businesses, businessFieldValues, businessNotifications, categories, categoryFields, cities, users } from "../../drizzle/schema";
@@ -8,6 +8,7 @@ import { buildVoiceIntroductionScript } from "../domain/voiceScript";
 import { storagePut } from "../storage";
 import { numberedSlug, preferredBusinessSlug } from "../domain/slug";
 import { normalizeCategorySlug } from "../domain/categorySlug";
+import { findApprovedIndiaCity } from "../domain/approvedIndiaCities";
 import { protectedProcedure, router } from "../_core/trpc";
 
 type JustFindsRole = "user" | "business_owner" | "admin" | "super_admin";
@@ -18,6 +19,11 @@ function requireModerator(role: JustFindsRole) {
 
 function requireSuperAdmin(role: JustFindsRole) {
   if (!canManageAdmins(role)) throw new TRPCError({ code: "FORBIDDEN", message: "Super-administrator access is required." });
+}
+
+async function approvedCityOrThrow(db: Awaited<ReturnType<typeof getDb>> & {}, cityId: number) {
+  const rows = await db.select({ id: cities.id }).from(cities).where(and(eq(cities.id, cityId), eq(cities.isActive, true), eq(cities.country, "IN"), or(eq(cities.tier, "tier1"), eq(cities.tier, "tier2")))).limit(1);
+  if (!rows[0]) throw new TRPCError({ code: "BAD_REQUEST", message: "Choose a supported India Tier-1 or Tier-2 city." });
 }
 
 const businessInput = z.object({
@@ -83,9 +89,11 @@ export const workspaceRouter = router({
     requireSuperAdmin(ctx.user.role);
     const citySlug = normalizeCategorySlug(input.name);
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(citySlug)) throw new TRPCError({ code: "BAD_REQUEST", message: "City name must produce a valid URL slug." });
+    const approvedCity = findApprovedIndiaCity(citySlug);
+    if (!approvedCity) throw new TRPCError({ code: "BAD_REQUEST", message: "Just Finds currently supports only the approved India Tier-1 and Tier-2 city catalogue." });
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The location service is temporarily unavailable." });
-    const result = await db.insert(cities).values({ ...input, slug: citySlug, isActive: true });
+    const result = await db.insert(cities).values({ name: approvedCity.name, slug: approvedCity.slug, state: approvedCity.state, country: approvedCity.country, tier: approvedCity.tier, latitude: approvedCity.latitude, longitude: approvedCity.longitude, isActive: true });
     return { cityId: Number(result[0].insertId) };
   }),
   createCategoryField: protectedProcedure.input(z.object({ categoryId: z.number().int().positive(), fieldKey: z.string().min(2).max(80).regex(/^[a-z][a-z0-9_]*$/), label: z.string().min(2).max(120), fieldType: z.enum(["text", "textarea", "number", "currency", "boolean", "select", "multiselect", "multi_select", "date", "time", "image", "url", "phone", "email"]), placeholder: z.string().max(240).optional(), options: z.array(z.string().max(100)).max(50).optional(), isRequired: z.boolean().default(false), isPublic: z.boolean().default(true), sortOrder: z.number().int().min(0).default(0) })).mutation(async ({ ctx, input }) => {
@@ -99,6 +107,7 @@ export const workspaceRouter = router({
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The business workspace is temporarily unavailable." });
     const { dynamicValues, slug: requestedSlug, ...business } = input;
+    await approvedCityOrThrow(db, business.cityId);
     const baseSlug = preferredBusinessSlug(business.name, requestedSlug);
     let slug = baseSlug;
     let available = false;
@@ -116,6 +125,7 @@ export const workspaceRouter = router({
   }),
   updateBusiness: protectedProcedure.input(businessInput.partial().extend({ businessId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
+    if (input.cityId !== undefined) await approvedCityOrThrow(db, input.cityId);
     const update: Partial<typeof businesses.$inferInsert> = {};
     if (input.name !== undefined) update.name = input.name;
     if (input.slug !== undefined) update.slug = input.slug;

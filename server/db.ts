@@ -40,6 +40,14 @@ import { internalValidationCategorySlug, isInternalValidationBusiness } from "./
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
+function activeApprovedIndiaCity() {
+  return and(
+    eq(cities.isActive, true),
+    eq(cities.country, "IN"),
+    or(eq(cities.tier, "tier1"), eq(cities.tier, "tier2")),
+  );
+}
+
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
@@ -110,7 +118,7 @@ export async function getActiveCategories() {
 export async function getActiveCities() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(cities).where(eq(cities.isActive, true)).orderBy(cities.name);
+  return db.select().from(cities).where(activeApprovedIndiaCity()).orderBy(cities.name);
 }
 
 export async function getPublicCategoryBySlug(slug: string) {
@@ -178,7 +186,7 @@ export async function getPublicBusinessTypes(categorySlug: string, subcategorySl
 export async function getPublicCityBySlug(slug: string) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(cities).where(and(eq(cities.slug, slug), eq(cities.isActive, true))).limit(1);
+  const result = await db.select().from(cities).where(and(eq(cities.slug, slug), activeApprovedIndiaCity())).limit(1);
   return result[0];
 }
 
@@ -188,7 +196,7 @@ export async function getPublicLocalities(citySlug: string) {
   return db.select({ id: localities.id, name: localities.name, slug: localities.slug, latitude: localities.latitude, longitude: localities.longitude })
     .from(localities)
     .innerJoin(cities, eq(localities.cityId, cities.id))
-    .where(and(eq(cities.slug, citySlug), eq(cities.isActive, true)))
+    .where(and(eq(cities.slug, citySlug), activeApprovedIndiaCity()))
     .orderBy(localities.name);
 }
 
@@ -200,7 +208,7 @@ export async function searchCities(term: string, limit = 20) {
   if (!cleaned) return [];
   return db.select({ id: cities.id, name: cities.name, slug: cities.slug, state: cities.state, latitude: cities.latitude, longitude: cities.longitude })
     .from(cities)
-    .where(and(eq(cities.isActive, true), like(cities.name, `${cleaned}%`)))
+    .where(and(activeApprovedIndiaCity(), like(cities.name, `${cleaned}%`)))
     .orderBy(cities.name)
     .limit(limit);
 }
@@ -227,7 +235,7 @@ export async function searchLocalities(term: string, options: { cityId?: number;
   })
     .from(localities)
     .innerJoin(cities, eq(localities.cityId, cities.id))
-    .where(and(...conditions, eq(cities.isActive, true)))
+    .where(and(...conditions, activeApprovedIndiaCity()))
     .orderBy(localities.name)
     .limit(options.limit ?? 20);
 }
@@ -260,11 +268,41 @@ export async function findNearestLocality(latitude: number, longitude: number, r
     .from(localities)
     .innerJoin(cities, eq(localities.cityId, cities.id))
     .where(and(
-      eq(cities.isActive, true),
+      activeApprovedIndiaCity(),
       isNotNull(localities.latitude),
       isNotNull(localities.longitude),
       sql`CAST(${localities.latitude} AS DECIMAL(10,6)) BETWEEN ${latitude - latDelta} AND ${latitude + latDelta}`,
       sql`CAST(${localities.longitude} AS DECIMAL(10,6)) BETWEEN ${longitude - lngDelta} AND ${longitude + lngDelta}`,
+    ))
+    .orderBy(distance)
+    .limit(1);
+  return rows[0];
+}
+
+/** Resolve the closest approved city when there is no more specific seeded locality nearby. */
+export async function findNearestApprovedCity(latitude: number, longitude: number, radiusKm = 80) {
+  const db = await getDb();
+  if (!db) return undefined;
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return undefined;
+  const latDelta = radiusKm / 111;
+  const lngDelta = radiusKm / Math.max(1, 111 * Math.cos((latitude * Math.PI) / 180));
+  const distance = sql<number>`(6371 * ACOS(LEAST(1, COS(RADIANS(${latitude})) * COS(RADIANS(CAST(${cities.latitude} AS DECIMAL(10,6)))) * COS(RADIANS(CAST(${cities.longitude} AS DECIMAL(10,6))) - RADIANS(${longitude})) + SIN(RADIANS(${latitude})) * SIN(RADIANS(CAST(${cities.latitude} AS DECIMAL(10,6)))))))`;
+  const rows = await db.select({
+    id: cities.id,
+    name: cities.name,
+    slug: cities.slug,
+    state: cities.state,
+    latitude: cities.latitude,
+    longitude: cities.longitude,
+    distanceKm: distance,
+  })
+    .from(cities)
+    .where(and(
+      activeApprovedIndiaCity(),
+      isNotNull(cities.latitude),
+      isNotNull(cities.longitude),
+      sql`CAST(${cities.latitude} AS DECIMAL(10,6)) BETWEEN ${latitude - latDelta} AND ${latitude + latDelta}`,
+      sql`CAST(${cities.longitude} AS DECIMAL(10,6)) BETWEEN ${longitude - lngDelta} AND ${longitude + lngDelta}`,
     ))
     .orderBy(distance)
     .limit(1);

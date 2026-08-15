@@ -28,4 +28,11 @@ describe("Google Places city resolution", () => {
 
     expect(resolveGoogleCity(addressComponents, cities)).toBeNull();
   });
+
+  it("rejects a non-Indian or inactive matching city record", () => {
+    const addressComponents = [{ longText: "Kanpur", shortText: "Kanpur", types: ["locality"] }];
+
+    expect(resolveGoogleCity(addressComponents, [{ id: 1, name: "Kanpur", country: "US", tier: "tier2", isActive: true }])).toBeNull();
+    expect(resolveGoogleCity(addressComponents, [{ id: 1, name: "Kanpur", country: "IN", tier: "tier2", isActive: false }])).toBeNull();
+  });
 });
