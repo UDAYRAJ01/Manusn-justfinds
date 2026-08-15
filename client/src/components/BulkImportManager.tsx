@@ -1,0 +1,75 @@
+import { Button } from "@/components/ui/button";
+import { trpc } from "@/lib/trpc";
+import { AlertCircle, CheckCircle2, FileSpreadsheet, LoaderCircle, Send, ShieldCheck, UploadCloud } from "lucide-react";
+import { useState } from "react";
+import * as XLSX from "xlsx";
+
+type SpreadsheetCell = string | number | boolean | null;
+type SpreadsheetRow = Record<string, SpreadsheetCell>;
+
+const expectedColumns = [
+  "Business Name", "Main Category", "Subcategory", "Business Type", "Description (About)", "Address", "City", "Locality", "State", "Country", "Latitude", "Longitude", "Phone", "Email", "Website", "Hours", "Rating", "Total Reviews", "FAQs",
+];
+
+function normalizeRows(source: Record<string, unknown>[]): SpreadsheetRow[] {
+  return source.map(row => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, value === undefined ? null : typeof value === "string" || typeof value === "number" || typeof value === "boolean" || value === null ? value : String(value)])));
+}
+
+function StatusPill({ valid }: { valid: boolean }) {
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${valid ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>{valid ? "Ready" : "Needs correction"}</span>;
+}
+
+export function BulkImportManager() {
+  const utils = trpc.useUtils();
+  const [filename, setFilename] = useState("");
+  const [rows, setRows] = useState<SpreadsheetRow[]>([]);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const preview = trpc.workspace.bulkImportPreview.useMutation();
+  const commit = trpc.workspace.commitBulkImport.useMutation({ onSuccess: () => { void utils.workspace.bulkImportHistory.invalidate(); } });
+  const { data: history = [] } = trpc.workspace.bulkImportHistory.useQuery();
+  const staged = preview.data;
+
+  async function readSpreadsheet(file: File | undefined) {
+    setParseError(null);
+    setRows([]);
+    preview.reset();
+    commit.reset();
+    if (!file) { setFilename(""); return; }
+    setFilename(file.name);
+    if (file.size > 8 * 1024 * 1024) { setParseError("Please select a file below 8 MB."); return; }
+    try {
+      const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: false });
+      const sheetName = workbook.SheetNames[0];
+      if (!sheetName) throw new Error("The spreadsheet does not contain a readable sheet.");
+      const parsed = normalizeRows(XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[sheetName], { defval: "", raw: false }));
+      if (!parsed.length) throw new Error("No business rows were found below the header row.");
+      if (parsed.length > 500) throw new Error("A single import may contain up to 500 rows. Split the file and upload it in batches.");
+      setRows(parsed);
+    } catch (error) {
+      setParseError(error instanceof Error ? error.message : "This spreadsheet could not be read. Use CSV, XLS, or XLSX.");
+    }
+  }
+
+  return <section className="mt-8 grid gap-5 xl:grid-cols-[1.05fr_.95fr]">
+    <div className="space-y-5">
+      <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-start gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-[#1f51c8]"><FileSpreadsheet className="size-5" /></span><div><h2 className="font-semibold text-slate-900">Upload business spreadsheet</h2><p className="mt-1 text-xs leading-5 text-slate-500">CSV, XLS, and XLSX are read in this browser for preview. Valid rows become **submitted**, private listings—never public listings.</p></div></div>
+        <label className="mt-5 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-9 text-center transition hover:border-[#1f51c8] hover:bg-blue-50/40"><UploadCloud className="size-7 text-[#1f51c8]" /><span className="mt-3 text-sm font-semibold text-slate-700">{filename || "Choose a CSV or Excel file"}</span><span className="mt-1 text-xs text-slate-500">Maximum 500 rows and 8 MB per import</span><input className="sr-only" type="file" accept=".csv,.xlsx,.xls" onChange={event => void readSpreadsheet(event.target.files?.[0])} /></label>
+        {parseError && <p className="mt-4 flex gap-2 rounded-xl border border-rose-100 bg-rose-50 p-3 text-xs leading-5 text-rose-700"><AlertCircle className="mt-0.5 size-4 shrink-0" />{parseError}</p>}
+        {rows.length > 0 && <p className="mt-4 flex gap-2 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-xs leading-5 text-emerald-800"><CheckCircle2 className="mt-0.5 size-4 shrink-0" /><strong>{rows.length} rows</strong> are ready for validation. Review the server-side preview before creating anything.</p>}
+        <Button disabled={!rows.length || preview.isPending} onClick={() => preview.mutate({ filename, rows })} className="mt-4 w-full rounded-xl">{preview.isPending ? <><LoaderCircle className="mr-2 size-4 animate-spin" />Validating spreadsheet…</> : <><Send className="mr-2 size-4" />Validate & preview import</>}</Button>
+        {preview.error && <p className="mt-3 rounded-xl bg-rose-50 p-3 text-xs leading-5 text-rose-700">{preview.error.message}</p>}
+      </div>
+      <div className="rounded-[24px] border border-slate-200 bg-white p-6"><div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 size-5 text-[#1f51c8]" /><div><h2 className="font-semibold text-slate-900">Import rules</h2><p className="mt-1 text-xs leading-5 text-slate-500">Main Category must match an active category. Subcategory and Business Type are validated against that category hierarchy. City must match an active Indian city in the platform catalogue; common city aliases are also recognised.</p></div></div><p className="mt-4 text-xs font-semibold uppercase tracking-[.12em] text-slate-500">Supported columns</p><div className="mt-3 flex flex-wrap gap-2">{expectedColumns.map(column => <span key={column} className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600">{column}</span>)}</div><p className="mt-4 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">**Rating**, **Total Reviews**, and **FAQs** are never turned into customer reviews. Ratings and totals stay only in the private import audit; FAQs are held for administrator review.</p></div>
+    </div>
+    <div className="space-y-5">
+      <div className="rounded-[24px] border border-slate-200 bg-white p-6">
+        <h2 className="font-semibold text-slate-900">Validation preview</h2>
+        {!staged ? <p className="mt-3 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-500">Upload a spreadsheet to see row-level category, city, location, duplicate, and field validation here.</p> : <><p className="mt-2 text-xs leading-5 text-slate-500">{staged.message}</p><div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4"><Summary label="Rows" value={staged.summary.totalRows} /><Summary label="Ready" value={staged.summary.validRows} tone="green" /><Summary label="Corrections" value={staged.summary.invalidRows} tone="red" /><Summary label="Warnings" value={staged.summary.warningRows} tone="amber" /></div><div className="mt-5 max-h-[420px] space-y-2 overflow-auto pr-1">{staged.rows.map(row => <div key={row.rowNumber} className="rounded-xl border border-slate-100 p-3"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-slate-800">#{row.rowNumber} · {row.businessName}</p><p className="mt-1 text-xs text-slate-500">{row.category}{row.subcategory ? ` · ${row.subcategory}` : ""} · {row.city}{row.locality ? ` · ${row.locality}` : ""}</p></div><StatusPill valid={row.valid} /></div>{row.errors.map(error => <p className="mt-2 text-xs leading-5 text-rose-700" key={error}>• {error}</p>)}{row.warnings.map(warning => <p className="mt-2 text-xs leading-5 text-amber-700" key={warning}>• {warning}</p>)}</div>)}</div><Button disabled={!staged.summary.validRows || commit.isPending || Boolean(commit.data?.alreadyCompleted)} onClick={() => commit.mutate({ importId: staged.importId })} className="mt-5 w-full rounded-xl">{commit.isPending ? <><LoaderCircle className="mr-2 size-4 animate-spin" />Creating submitted listings…</> : commit.data?.alreadyCompleted ? "Import already completed" : <>Create {staged.summary.validRows} submitted listing{staged.summary.validRows === 1 ? "" : "s"}</>}</Button>{commit.data && <p className="mt-3 rounded-xl bg-emerald-50 p-3 text-xs leading-5 text-emerald-800">Created {commit.data.createdRows} submitted listing{commit.data.createdRows === 1 ? "" : "s"}; {commit.data.skippedRows} row{commit.data.skippedRows === 1 ? "" : "s"} skipped. Review them in Approvals before publishing.</p>}{commit.error && <p className="mt-3 rounded-xl bg-rose-50 p-3 text-xs leading-5 text-rose-700">{commit.error.message}</p>}</>}
+      </div>
+      <div className="rounded-[24px] border border-slate-200 bg-white p-6"><h2 className="font-semibold text-slate-900">Recent imports</h2><div className="mt-4 space-y-2">{history.length ? history.map(item => <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-3"><div><p className="text-sm font-semibold text-slate-800">{item.filename}</p><p className="mt-1 text-xs text-slate-500">{item.validRows} ready/imported · {item.failedRows} invalid/skipped · {item.totalRows} total</p></div><span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold capitalize text-slate-600">{item.status}</span></div>) : <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No imports have been created yet.</p>}</div></div>
+    </div>
+  </section>;
+}
+
+function Summary({ label, value, tone = "slate" }: { label: string; value: number; tone?: "slate" | "green" | "red" | "amber" }) { const toneClass = tone === "green" ? "bg-emerald-50 text-emerald-800" : tone === "red" ? "bg-rose-50 text-rose-800" : tone === "amber" ? "bg-amber-50 text-amber-800" : "bg-slate-50 text-slate-800"; return <div className={`rounded-xl p-3 ${toneClass}`}><p className="text-lg font-semibold">{value}</p><p className="mt-0.5 text-[11px] font-medium uppercase tracking-[.1em] opacity-75">{label}</p></div>; }

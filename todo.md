@@ -197,3 +197,8 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 ## Category Result Isolation Fix
 - [x] Ensure category, subcategory, and business-type browse pages pass taxonomy filters correctly and return only businesses assigned to the selected taxonomy level.
 - [x] Add regression coverage for category, subcategory, and business-type result isolation; validate TypeScript and the full test suite before publishing.
+
+## Administrator Excel Bulk Upload
+- [x] Support the supplied Excel columns: Business Name, Main Category, Subcategory, Description (About), Address, City, Locality, State, Country, Latitude, Longitude, Phone, Email, Website, Hours, Rating, Total Reviews, and FAQs.
+- [x] Add taxonomy-aware matching, row-level validation, duplicate safeguards, import preview, and truthful handling for unsupported ratings, reviews, and FAQs fields.
+- [x] Add automated coverage for the new Excel mapping and administrator import flow; validate TypeScript and the full test suite before publishing.

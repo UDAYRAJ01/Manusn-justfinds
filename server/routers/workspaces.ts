@@ -1,7 +1,7 @@
-import { and, eq, or } from "drizzle-orm";
+import { and, desc, eq, inArray, or } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { approvalQueue, businesses, businessFieldValues, businessNotifications, categories, categoryFields, cities, users } from "../../drizzle/schema";
+import { approvalQueue, businesses, businessAiContent, businessFieldValues, businessHours, businessNotifications, businessTypes, bulkImportRows, bulkImports, categories, categoryFields, cities, localities, subcategories, users } from "../../drizzle/schema";
 import { deleteInternalValidationBusiness, getAdminCounts, getCategorySchemas, getDb, getInternalValidationBusinesses, getOwnerBusinesses, getPendingBusinesses } from "../db";
 import { canManageAdmins, canManageBusiness, canModerate } from "../domain/permissions";
 import { buildVoiceIntroductionScript } from "../domain/voiceScript";
@@ -9,6 +9,9 @@ import { storagePut } from "../storage";
 import { numberedSlug, preferredBusinessSlug } from "../domain/slug";
 import { normalizeCategorySlug } from "../domain/categorySlug";
 import { findApprovedIndiaCity } from "../domain/approvedIndiaCities";
+import { normalizeBulkListingRow, parseImportedFaqs, parseImportedHours, type NormalizedBulkListing } from "../domain/bulkListingImport";
+import { validateBulkListingRow, type ImportRow } from "../domain/importValidation";
+import { normalizeDuplicateText, scoreDuplicateCandidate } from "../domain/duplicateCheck";
 import { protectedProcedure, router } from "../_core/trpc";
 
 type JustFindsRole = "user" | "business_owner" | "admin" | "super_admin";
@@ -52,6 +55,98 @@ async function ownedBusinessOrThrow(businessId: number, userId: number, role: Ju
   if (!business) throw new TRPCError({ code: "NOT_FOUND", message: "Business not found." });
   if (!canManageBusiness(role, userId, business.ownerId)) throw new TRPCError({ code: "FORBIDDEN", message: "You cannot manage this business." });
   return { db, business };
+}
+
+const spreadsheetCell = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+const spreadsheetRowsInput = z.array(z.record(z.string(), spreadsheetCell)).min(1).max(500);
+
+type TaxonomyLookup = {
+  categoriesByName: Map<string, { id: number; name: string }>;
+  subcategoriesByCategoryAndName: Map<string, { id: number; name: string }>;
+  businessTypesBySubcategoryAndName: Map<string, { id: number; name: string }>;
+  citiesByName: Map<string, { id: number; name: string; state: string | null }>;
+  localitiesByCityAndName: Map<string, { id: number; name: string }>;
+  candidatesByCity: Map<number, Array<{ id: number; name: string; phone: string | null; email: string | null; address: string; cityId: number; latitude: string | null; longitude: string | null }>>;
+};
+
+function lookupName(value: string) { return normalizeDuplicateText(value); }
+function subcategoryKey(categoryId: number, name: string) { return `${categoryId}:${lookupName(name)}`; }
+function businessTypeKey(subcategoryId: number, name: string) { return `${subcategoryId}:${lookupName(name)}`; }
+function localityKey(cityId: number, name: string) { return `${cityId}:${lookupName(name)}`; }
+
+async function importTaxonomyLookup(db: Awaited<ReturnType<typeof getDb>> & {}, rows: ImportRow[]): Promise<TaxonomyLookup> {
+  const normalized = rows.map(normalizeBulkListingRow);
+  const cityNames = Array.from(new Set(normalized.flatMap(row => {
+    const approved = findApprovedIndiaCity(row.city);
+    return [row.city, approved?.name].filter((value): value is string => Boolean(value));
+  })));
+  const [activeCategories, activeSubcategories, activeBusinessTypes, supportedCities] = await Promise.all([
+    db.select({ id: categories.id, name: categories.name }).from(categories).where(and(eq(categories.isActive, true), eq(categories.status, "active"))),
+    db.select({ id: subcategories.id, categoryId: subcategories.categoryId, name: subcategories.name }).from(subcategories).where(and(eq(subcategories.isActive, true), eq(subcategories.status, "active"))),
+    db.select({ id: businessTypes.id, subcategoryId: businessTypes.subcategoryId, name: businessTypes.name }).from(businessTypes).where(and(eq(businessTypes.isActive, true), eq(businessTypes.status, "active"))),
+    cityNames.length ? db.select({ id: cities.id, name: cities.name, state: cities.state }).from(cities).where(and(inArray(cities.name, cityNames), eq(cities.isActive, true), eq(cities.country, "IN"))) : Promise.resolve([]),
+  ]);
+  const cityIds = supportedCities.map(city => city.id);
+  const [supportedLocalities, candidates] = await Promise.all([
+    cityIds.length ? db.select({ id: localities.id, cityId: localities.cityId, name: localities.name }).from(localities).where(inArray(localities.cityId, cityIds)) : Promise.resolve([]),
+    cityIds.length ? db.select({ id: businesses.id, name: businesses.name, phone: businesses.phone, email: businesses.email, address: businesses.address, cityId: businesses.cityId, latitude: businesses.latitude, longitude: businesses.longitude }).from(businesses).where(inArray(businesses.cityId, cityIds)) : Promise.resolve([]),
+  ]);
+  return {
+    categoriesByName: new Map(activeCategories.map(category => [lookupName(category.name), category])),
+    subcategoriesByCategoryAndName: new Map(activeSubcategories.map(subcategory => [subcategoryKey(subcategory.categoryId, subcategory.name), subcategory])),
+    businessTypesBySubcategoryAndName: new Map(activeBusinessTypes.map(type => [businessTypeKey(type.subcategoryId, type.name), type])),
+    citiesByName: new Map(supportedCities.flatMap(city => {
+      const approved = findApprovedIndiaCity(city.name);
+      return [[lookupName(city.name), city], ...(approved?.aliases ?? []).map(alias => [lookupName(alias), city] as [string, typeof city])];
+    })),
+    localitiesByCityAndName: new Map(supportedLocalities.map(locality => [localityKey(locality.cityId, locality.name), locality])),
+    candidatesByCity: new Map(cityIds.map(cityId => [cityId, candidates.filter(candidate => candidate.cityId === cityId)])),
+  };
+}
+
+function validateImportListing(raw: ImportRow, rowNumber: number, lookup: TaxonomyLookup, seenRows: Map<string, number>) {
+  const listing = normalizeBulkListingRow(raw);
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const category = lookup.categoriesByName.get(lookupName(listing.mainCategory));
+  const knownCity = findApprovedIndiaCity(listing.city);
+  const city = lookup.citiesByName.get(lookupName(knownCity?.name ?? listing.city));
+  const basic = validateBulkListingRow({ businessName: listing.businessName, category: category?.name ?? listing.mainCategory, city: city?.name ?? listing.city, address: listing.address, phone: listing.phone, email: listing.email, website: listing.website, latitude: listing.latitude || undefined, longitude: listing.longitude || undefined }, Array.from(lookup.categoriesByName.values()).map(value => value.name), Array.from(lookup.citiesByName.values()).map(value => value.name));
+  errors.push(...basic.errors);
+  if (listing.country && !/^(india|in)$/i.test(listing.country)) errors.push("Only India listings can be imported.");
+  if (city && listing.state && lookupName(listing.state) !== lookupName(city.state ?? "")) errors.push(`State does not match the supported city (${city.state ?? city.name}).`);
+  const subcategory = category && listing.subcategory ? lookup.subcategoriesByCategoryAndName.get(subcategoryKey(category.id, listing.subcategory)) : undefined;
+  if (listing.subcategory && !subcategory) errors.push("Subcategory is invalid for the selected main category.");
+  const businessType = subcategory && listing.businessType ? lookup.businessTypesBySubcategoryAndName.get(businessTypeKey(subcategory.id, listing.businessType)) : undefined;
+  if (listing.businessType && !businessType) errors.push("Business Type is invalid for the selected subcategory.");
+  const locality = city && listing.locality ? lookup.localitiesByCityAndName.get(localityKey(city.id, listing.locality)) : undefined;
+  if (listing.locality && !locality) warnings.push("Locality was not matched in the supported city and will remain unset until an administrator selects it.");
+  if (!listing.latitude && !listing.longitude) warnings.push("No coordinates supplied. The listing can be reviewed, but nearby-distance matching will remain unavailable until coordinates are verified.");
+  const hours = parseImportedHours(listing.hours);
+  if (hours.warning) warnings.push(hours.warning);
+  const faq = parseImportedFaqs(listing.faqs);
+  if (faq.warning) warnings.push(faq.warning);
+  if (listing.rating || listing.totalReviews) warnings.push("Rating and Total Reviews are retained only in the private import audit; they are not published or converted into customer reviews.");
+  const fileDuplicateKey = `${lookupName(listing.businessName)}:${city?.id ?? "unknown"}:${lookupName(listing.phone || listing.email || listing.address)}`;
+  const earlierRow = seenRows.get(fileDuplicateKey);
+  if (earlierRow) errors.push(`Duplicate of spreadsheet row ${earlierRow}.`); else seenRows.set(fileDuplicateKey, rowNumber);
+  const candidates = city ? lookup.candidatesByCity.get(city.id) ?? [] : [];
+  const duplicate = city ? candidates
+    .map(candidate => ({ candidate, match: scoreDuplicateCandidate({ name: listing.businessName, phone: listing.phone || null, email: listing.email || null, address: listing.address, cityId: city.id, latitude: listing.latitude || null, longitude: listing.longitude || null }, candidate) }))
+    .filter((entry): entry is { candidate: typeof candidates[number]; match: NonNullable<ReturnType<typeof scoreDuplicateCandidate>> } => Boolean(entry.match))
+    .sort((left, right) => right.match.score - left.match.score)[0] : undefined;
+  if (duplicate?.match.classification === "likely") errors.push(`Likely duplicate of existing listing “${duplicate.candidate.name}” (${duplicate.match.reasons.join(", ")}).`);
+  else if (duplicate) warnings.push(`Possible duplicate of existing listing “${duplicate.candidate.name}”; it will require administrator review.`);
+  return { rowNumber, raw, listing, category, subcategory: subcategory ?? null, businessType: businessType ?? null, city: city ?? null, locality: locality ?? null, hours: hours.days, faqs: faq.faqs, errors, warnings, duplicateCandidateId: duplicate?.candidate.id ?? null, valid: errors.length === 0 };
+}
+
+function nextImportSlug(name: string, usedSlugs: Set<string>) {
+  const base = preferredBusinessSlug(name);
+  for (let suffix = 1; suffix <= 500; suffix += 1) {
+    const candidate = suffix === 1 ? base : numberedSlug(base, suffix);
+    if (!usedSlugs.has(candidate)) { usedSlugs.add(candidate); return candidate; }
+  }
+  throw new TRPCError({ code: "CONFLICT", message: `Could not create a unique listing URL for ${name}.` });
 }
 
 export const workspaceRouter = router({
@@ -192,8 +287,74 @@ export const workspaceRouter = router({
     }
     return { status: input.decision };
   }),
-  bulkImportPreview: protectedProcedure.input(z.object({ filename: z.string().min(1).max(255) })).mutation(async ({ ctx, input }) => {
+  bulkImportPreview: protectedProcedure.input(z.object({ filename: z.string().min(1).max(255), rows: spreadsheetRowsInput })).mutation(async ({ ctx, input }) => {
     requireModerator(ctx.user.role);
-    return { filename: input.filename, status: "Pending" as const, message: "The upload interface is ready. A storage-backed parser and queue worker should be connected before processing source files." };
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The import service is temporarily unavailable." });
+    const lookup = await importTaxonomyLookup(db, input.rows);
+    const seenRows = new Map<string, number>();
+    const previewRows = input.rows.map((raw, index) => validateImportListing(raw, index + 2, lookup, seenRows));
+    const validRows = previewRows.filter(row => row.valid);
+    const invalidRows = previewRows.filter(row => !row.valid);
+    const created = await db.insert(bulkImports).values({ initiatedById: ctx.user.id, filename: input.filename, status: "pending", totalRows: previewRows.length, validRows: validRows.length, failedRows: invalidRows.length });
+    const importId = Number(created[0].insertId);
+    await db.insert(bulkImportRows).values(previewRows.map(row => {
+      const status: "valid" | "invalid" | "duplicate" = row.valid ? "valid" : row.duplicateCandidateId && row.errors.some(error => error.startsWith("Likely duplicate")) ? "duplicate" : "invalid";
+      return { importId, rowNumber: row.rowNumber, data: { raw: row.raw, normalized: row.listing, warnings: row.warnings, hours: row.hours, faqs: row.faqs, categoryId: row.category?.id ?? null, subcategoryId: row.subcategory?.id ?? null, businessTypeId: row.businessType?.id ?? null, cityId: row.city?.id ?? null, localityId: row.locality?.id ?? null }, validationErrors: row.errors.length ? row.errors : null, duplicateCandidateId: row.duplicateCandidateId, status };
+    }));
+    return {
+      importId,
+      filename: input.filename,
+      status: "Pending" as const,
+      message: `${validRows.length} of ${previewRows.length} rows are ready to create as submitted listings for administrator review. Nothing is public yet.`,
+      summary: { totalRows: previewRows.length, validRows: validRows.length, invalidRows: invalidRows.length, warningRows: previewRows.filter(row => row.warnings.length).length, duplicateRows: previewRows.filter(row => Boolean(row.duplicateCandidateId)).length },
+      rows: previewRows.slice(0, 100).map(row => ({ rowNumber: row.rowNumber, businessName: row.listing.businessName || "Unnamed row", category: row.category?.name ?? row.listing.mainCategory, subcategory: (row.subcategory?.name ?? row.listing.subcategory) || null, city: row.city?.name ?? row.listing.city, locality: (row.locality?.name ?? row.listing.locality) || null, valid: row.valid, errors: row.errors, warnings: row.warnings })),
+    };
+  }),
+  commitBulkImport: protectedProcedure.input(z.object({ importId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    requireModerator(ctx.user.role);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The import service is temporarily unavailable." });
+    const [importJob] = await db.select().from(bulkImports).where(eq(bulkImports.id, input.importId)).limit(1);
+    if (!importJob) throw new TRPCError({ code: "NOT_FOUND", message: "Import preview not found." });
+    if (importJob.initiatedById !== ctx.user.id && ctx.user.role !== "super_admin") throw new TRPCError({ code: "FORBIDDEN", message: "Only the initiating administrator may commit this import." });
+    if (importJob.status === "completed") return { importId: input.importId, createdRows: 0, skippedRows: 0, alreadyCompleted: true };
+    const pendingRows = await db.select().from(bulkImportRows).where(and(eq(bulkImportRows.importId, input.importId), eq(bulkImportRows.status, "valid")));
+    if (!pendingRows.length) throw new TRPCError({ code: "BAD_REQUEST", message: "This preview has no valid rows to import." });
+    await db.update(bulkImports).set({ status: "processing" }).where(eq(bulkImports.id, input.importId));
+    const existingSlugs = new Set((await db.select({ slug: businesses.slug }).from(businesses)).map(row => row.slug));
+    let createdRows = 0;
+    let skippedRows = 0;
+    for (const row of pendingRows) {
+      const payload = row.data as { normalized?: NormalizedBulkListing; categoryId?: number | null; subcategoryId?: number | null; businessTypeId?: number | null; cityId?: number | null; localityId?: number | null; hours?: ReturnType<typeof parseImportedHours>["days"]; faqs?: ReturnType<typeof parseImportedFaqs>["faqs"] } | null;
+      const listing = payload?.normalized;
+      if (!listing || !payload?.categoryId || !payload.cityId) {
+        skippedRows += 1;
+        await db.update(bulkImportRows).set({ status: "invalid", validationErrors: ["Import audit data is incomplete. Re-upload this row."] }).where(eq(bulkImportRows.id, row.id));
+        continue;
+      }
+      try {
+        const slug = nextImportSlug(listing.businessName, existingSlugs);
+        const created = await db.insert(businesses).values({ ownerId: ctx.user.id, categoryId: payload.categoryId, subcategoryId: payload.subcategoryId ?? null, businessTypeId: payload.businessTypeId ?? null, cityId: payload.cityId, localityId: payload.localityId ?? null, name: listing.businessName, slug, address: listing.address, shortDescription: listing.description || null, aboutDescription: listing.description || null, phone: listing.phone || null, email: listing.email || null, website: listing.website || null, latitude: listing.latitude || null, longitude: listing.longitude || null, status: "submitted", onboardingStep: 1 });
+        const businessId = Number(created[0].insertId);
+        if (payload.hours?.length === 7) await db.insert(businessHours).values(payload.hours.map(day => ({ ...day, businessId })));
+        if (payload.faqs?.length) await db.insert(businessAiContent).values({ businessId, about: listing.description || null, faqs: payload.faqs, status: "pending" });
+        await db.insert(approvalQueue).values({ entityType: "business", businessId, submittedById: ctx.user.id, status: "pending" });
+        await db.update(bulkImportRows).set({ status: "imported" }).where(eq(bulkImportRows.id, row.id));
+        createdRows += 1;
+      } catch (error) {
+        skippedRows += 1;
+        const message = error instanceof Error ? error.message.slice(0, 500) : "The row could not be imported.";
+        await db.update(bulkImportRows).set({ status: "invalid", validationErrors: [message] }).where(eq(bulkImportRows.id, row.id));
+      }
+    }
+    await db.update(bulkImports).set({ status: createdRows ? "completed" : "failed", validRows: createdRows, failedRows: importJob.failedRows + skippedRows }).where(eq(bulkImports.id, input.importId));
+    return { importId: input.importId, createdRows, skippedRows, alreadyCompleted: false };
+  }),
+  bulkImportHistory: protectedProcedure.query(async ({ ctx }) => {
+    requireModerator(ctx.user.role);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The import service is temporarily unavailable." });
+    return db.select({ id: bulkImports.id, filename: bulkImports.filename, status: bulkImports.status, totalRows: bulkImports.totalRows, validRows: bulkImports.validRows, failedRows: bulkImports.failedRows, createdAt: bulkImports.createdAt, updatedAt: bulkImports.updatedAt }).from(bulkImports).where(eq(bulkImports.initiatedById, ctx.user.id)).orderBy(desc(bulkImports.createdAt)).limit(20);
   }),
 });
