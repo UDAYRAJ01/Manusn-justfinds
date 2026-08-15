@@ -9,7 +9,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import AdminWorkspace from "./pages/AdminWorkspace";
 import AuthEntry from "./pages/AuthEntry";
 import BusinessDetail from "./pages/BusinessDetail";
-import BusinessPlatform from "./pages/BusinessPlatform";
+import BusinessPlatform, { MANUAL_BUSINESS_CREATION_PATH } from "./pages/BusinessPlatform";
 import BusinessTools from "./pages/BusinessTools";
 import PublicWebsite from "./pages/PublicWebsite";
 import Categories from "./pages/Categories";
@@ -44,6 +44,7 @@ function Router() {
     <Route path="/business" component={BusinessPlatform} />
     <Route path="/business/onboarding" component={BusinessPlatform} />
     <Route path="/business/add/import" component={GoogleImportSettings} />
+    <Route path={MANUAL_BUSINESS_CREATION_PATH} component={BusinessPlatform} />
     <Route path="/business/:identifier/website" component={BusinessWebsiteRoute} />
     <Route path="/business/:businessId/:tool" component={BusinessToolRoute} />
     <Route path="/business/:rest*" component={BusinessPlatform} />

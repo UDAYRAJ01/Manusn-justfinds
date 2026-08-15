@@ -288,3 +288,8 @@
 - [x] Apply the shared design system to public header, search experience, homepage, category/subcategory, results, listing cards, business detail, and footer patterns
 - [x] Apply the shared design system to authenticated user, owner, and administrator workspaces while retaining all current role gates and operational workflows
 - [x] Validate key desktop/mobile paths, keyboard/focus states, loading/empty/error states, TypeScript, and full regressions before publishing the presentation-only update; 180 tests across 62 files pass
+
+## Manual business creation repair
+- [x] Trace the Create manually action from the Add Business choice into the manual onboarding route
+- [x] Repair the manual-listing navigation without changing the existing Google import or ownership workflows
+- [x] Add focused regression coverage and validate the repaired manual entry path on desktop/mobile before publishing

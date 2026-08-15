@@ -9,6 +9,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 
 const DAY_INDEX: Record<string, number> = { sun: 0, sunday: 0, mon: 1, monday: 1, tue: 2, tues: 2, tuesday: 2, wed: 3, wednesday: 3, thu: 4, thurs: 4, thursday: 4, fri: 5, friday: 5, sat: 6, saturday: 6 };
+export const MANUAL_BUSINESS_CREATION_PATH = "/business/add/manual";
+export function getBusinessPlatformRouteMode(location: string) {
+  if (location.startsWith("/business/add/import")) return "google_import" as const;
+  if (location.startsWith(MANUAL_BUSINESS_CREATION_PATH) || location.includes("/onboarding")) return "manual_onboarding" as const;
+  if (location.startsWith("/business/add")) return "add_choice" as const;
+  return "workspace" as const;
+}
 function slugifyBusinessName(value: string) { return value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 240).replace(/-+$/g, ""); }
 type BusinessRow = { business: { id: number; name: string; status: string; profileCompleteness: number; slug: string; shortDescription: string | null }; category: string | null; city: string | null };
 
@@ -18,6 +25,7 @@ export default function BusinessPlatform() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [onboarding, setOnboarding] = useState(false);
   const businesses = trpc.business.myBusinesses.useQuery(undefined, { enabled: Boolean(user) });
+  const routeMode = getBusinessPlatformRouteMode(location);
   const selectedFromUrl = useMemo(() => getSelectedBusinessId(location), [location]);
   const selected = selectedFromUrl && businesses.data?.some(row => row.business.id === selectedFromUrl)
     ? selectedFromUrl
@@ -34,10 +42,9 @@ export default function BusinessPlatform() {
 
   if (loading) return <Loading />;
   if (!isAuthenticated) return <SignIn onLogin={startLogin} />;
-  if (location.startsWith("/business/add/import")) return <GoogleImportSettings />;
-  if (location.startsWith("/business/add")) return <AddBusinessChoice onManual={() => setOnboarding(true)} onGoogle={() => navigate("/business/add/import")} onBack={() => navigate("/business")} />;
-  if (onboarding) return <Onboarding onDone={(businessId) => { setOnboarding(false); void businesses.refetch(); navigate(getOwnerListingPath(businessId)); }} />;
-  if (location.includes("/onboarding")) return <Onboarding onDone={(businessId) => navigate(getOwnerListingPath(businessId))} />;
+  if (routeMode === "google_import") return <GoogleImportSettings />;
+  if (routeMode === "manual_onboarding" || onboarding) return <Onboarding onDone={(businessId) => { setOnboarding(false); void businesses.refetch(); navigate(getOwnerListingPath(businessId)); }} />;
+  if (routeMode === "add_choice") return <AddBusinessChoice onManual={() => navigate(MANUAL_BUSINESS_CREATION_PATH)} onGoogle={() => navigate("/business/add/import")} onBack={() => navigate("/business")} />;
 
   return (
     <div className="min-h-screen bg-[var(--jf-surface)] text-[var(--jf-text)]">
