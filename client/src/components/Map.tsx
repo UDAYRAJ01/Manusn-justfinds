@@ -76,7 +76,9 @@
 
 /// <reference types="@types/google.maps" />
 
-import { useEffect, useRef } from "react";
+import React from "react";
+import { MapPin } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { usePersistFn } from "@/hooks/usePersistFn";
 import { cn } from "@/lib/utils";
 
@@ -137,6 +139,7 @@ export function MapView({
 }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const init = usePersistFn(async () => {
     try {
@@ -163,6 +166,7 @@ export function MapView({
       }
     } catch (error) {
       console.error("Failed to initialize Google Maps", error);
+      setLoadFailed(true);
       onLoadError?.();
     }
   });
@@ -171,7 +175,17 @@ export function MapView({
     init();
   }, [init]);
 
-  return (
-    <div ref={mapContainer} className={cn("w-full h-[500px]", className)} />
-  );
+  if (loadFailed) {
+    return (
+      <div className={cn("grid h-[500px] place-items-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center", className)} role="status">
+        <div>
+          <span className="mx-auto grid size-11 place-items-center rounded-xl bg-blue-50 text-[#2456c8]"><MapPin className="size-5" /></span>
+          <p className="mt-3 text-sm font-semibold text-slate-800">Map is temporarily unavailable</p>
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500">You can still use the available address, location, and directions details on this page.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <div ref={mapContainer} className={cn("h-[500px] w-full", className)} />;
 }

@@ -281,3 +281,10 @@
 - [x] Identify missing, partial, deprecated, and high-risk capabilities without changing existing product behavior
 - [x] Prepare a priority-ordered implementation walkthrough with dependencies, scope boundaries, and acceptance criteria
 - [x] Deliver a concise audit report and recommend Milestone A: discovery reliability, open-now truthfulness, and transparent ranking v1 as the next safe implementation milestone
+
+## Supplied full UI/UX design-system specification
+- [x] Map the supplied design-system specification to current shared components and existing page families without changing product logic
+- [ ] Establish reusable tokens for color, typography, 8px spacing, restrained radius/shadows, form controls, badges, tabs, tables, feedback states, and desktop/mobile navigation
+- [ ] Apply the shared design system to public header, search experience, homepage, category/subcategory, results, listing cards, business detail, and footer patterns
+- [ ] Apply the shared design system to authenticated user, owner, and administrator workspaces while retaining all current role gates and operational workflows
+- [ ] Validate key desktop/mobile paths, keyboard/focus states, loading/empty/error states, TypeScript, and full regressions before publishing the presentation-only update
