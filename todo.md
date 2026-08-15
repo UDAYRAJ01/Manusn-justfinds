@@ -213,3 +213,6 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 
 ## Large-File Staging Reliability Repair
 - [x] Diagnose and correct the failed network request when the administrator stages a large import file in secure storage.
+
+## Stalled High-Volume Import Repair
+- [x] Diagnose and correct the staged import lifecycle so uploaded files can transition into queued validation and completed processing.

@@ -14,10 +14,10 @@ import { validateBulkListingRow, type ImportRow } from "../domain/importValidati
 import { normalizeDuplicateText, scoreDuplicateCandidate } from "../domain/duplicateCheck";
 import { HIGH_VOLUME_FILE_LIMIT, HIGH_VOLUME_IMPORT_CHUNK, HIGH_VOLUME_ROW_LIMIT, HIGH_VOLUME_VALIDATION_CHUNK, highVolumeProgress, isSupportedImportFilename } from "../domain/highVolumeImportPolicy";
 import { HIGH_VOLUME_IMPORT_CALLBACK_PATH, HIGH_VOLUME_IMPORT_CRON } from "../domain/highVolumeImportSchedule";
+import { heartbeatSessionFromHeaders } from "../domain/heartbeatSession";
 import { protectedProcedure, router } from "../_core/trpc";
 import { createHeartbeatJob, updateHeartbeatJob } from "../_core/heartbeat";
 import { COOKIE_NAME } from "@shared/const";
-import { parse as parseCookieHeader } from "cookie";
 import * as XLSX from "xlsx";
 
 type JustFindsRole = "user" | "business_owner" | "admin" | "super_admin";
@@ -28,10 +28,6 @@ function requireModerator(role: JustFindsRole) {
 
 function requireSuperAdmin(role: JustFindsRole) {
   if (!canManageAdmins(role)) throw new TRPCError({ code: "FORBIDDEN", message: "Super-administrator access is required." });
-}
-
-function heartbeatSessionFromRequest(cookieHeader: string | undefined) {
-  return parseCookieHeader(cookieHeader ?? "")[COOKIE_NAME] ?? "";
 }
 
 async function enableHighVolumeImportSchedule(importId: number, taskUid: string | null, userSession: string) {
@@ -450,7 +446,7 @@ export const workspaceRouter = router({
     if (!job) throw new TRPCError({ code: "NOT_FOUND", message: "Staged import not found." });
     if (job.initiatedById !== ctx.user.id && ctx.user.role !== "super_admin") throw new TRPCError({ code: "FORBIDDEN", message: "Only the initiating administrator may queue this import." });
     if (job.phase !== "staged") return { importId: job.id, status: job.status, phase: job.phase, alreadyQueued: true };
-    const scheduleCronTaskUid = await enableHighVolumeImportSchedule(input.importId, job.scheduleCronTaskUid, heartbeatSessionFromRequest(ctx.req.headers.cookie));
+    const scheduleCronTaskUid = await enableHighVolumeImportSchedule(input.importId, job.scheduleCronTaskUid, heartbeatSessionFromHeaders(ctx.req.headers.cookie, ctx.req.headers.authorization, COOKIE_NAME));
     await db.update(bulkImports).set({ scheduleCronTaskUid, status: "queued", phase: "validating", validationCursor: 0, progressPercent: 0, attempts: 0, errorMessage: null, errorCategory: null, finishedAt: null }).where(eq(bulkImports.id, input.importId));
     return { importId: input.importId, status: "queued" as const, phase: "validating" as const, alreadyQueued: false };
   }),
@@ -463,7 +459,7 @@ export const workspaceRouter = router({
     if (job.initiatedById !== ctx.user.id && ctx.user.role !== "super_admin") throw new TRPCError({ code: "FORBIDDEN", message: "Only the initiating administrator may start this import." });
     if (job.phase !== "ready") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Wait for validation to finish before creating submitted listings." });
     if (!job.validRows) throw new TRPCError({ code: "BAD_REQUEST", message: "This import has no valid rows to create." });
-    const scheduleCronTaskUid = await enableHighVolumeImportSchedule(input.importId, job.scheduleCronTaskUid, heartbeatSessionFromRequest(ctx.req.headers.cookie));
+    const scheduleCronTaskUid = await enableHighVolumeImportSchedule(input.importId, job.scheduleCronTaskUid, heartbeatSessionFromHeaders(ctx.req.headers.cookie, ctx.req.headers.authorization, COOKIE_NAME));
     await db.update(bulkImports).set({ scheduleCronTaskUid, status: "queued", phase: "importing", processedRows: 0, progressPercent: 45, attempts: 0, errorMessage: null, errorCategory: null, finishedAt: null }).where(eq(bulkImports.id, input.importId));
     return { importId: input.importId, status: "queued" as const, phase: "importing" as const };
   }),
@@ -475,7 +471,7 @@ export const workspaceRouter = router({
     if (!job) throw new TRPCError({ code: "NOT_FOUND", message: "Import not found." });
     if (job.initiatedById !== ctx.user.id && ctx.user.role !== "super_admin") throw new TRPCError({ code: "FORBIDDEN", message: "Only the initiating administrator may retry this import." });
     if (!["failed", "retrying"].includes(job.status) || !["validating", "importing"].includes(job.phase)) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Only a failed background import can be retried." });
-    const scheduleCronTaskUid = await enableHighVolumeImportSchedule(input.importId, job.scheduleCronTaskUid, heartbeatSessionFromRequest(ctx.req.headers.cookie));
+    const scheduleCronTaskUid = await enableHighVolumeImportSchedule(input.importId, job.scheduleCronTaskUid, heartbeatSessionFromHeaders(ctx.req.headers.cookie, ctx.req.headers.authorization, COOKIE_NAME));
     await db.update(bulkImports).set({ scheduleCronTaskUid, status: "queued", attempts: 0, errorMessage: null, errorCategory: null, finishedAt: null }).where(eq(bulkImports.id, input.importId));
     return { importId: input.importId, status: "queued" as const, phase: job.phase };
   }),
@@ -487,7 +483,7 @@ export const workspaceRouter = router({
     if (!job) throw new TRPCError({ code: "NOT_FOUND", message: "Import not found." });
     if (job.initiatedById !== ctx.user.id && ctx.user.role !== "super_admin") throw new TRPCError({ code: "FORBIDDEN", message: "Only the initiating administrator may cancel this import." });
     if (["completed", "cancelled"].includes(job.status)) return { importId: input.importId, status: job.status, alreadyFinal: true };
-    if (job.scheduleCronTaskUid) await updateHeartbeatJob(job.scheduleCronTaskUid, { enable: false }, heartbeatSessionFromRequest(ctx.req.headers.cookie));
+    if (job.scheduleCronTaskUid) await updateHeartbeatJob(job.scheduleCronTaskUid, { enable: false }, heartbeatSessionFromHeaders(ctx.req.headers.cookie, ctx.req.headers.authorization, COOKIE_NAME));
     await db.update(bulkImports).set({ status: "cancelled", phase: "cancelled", cancelledAt: new Date(), finishedAt: new Date() }).where(eq(bulkImports.id, input.importId));
     return { importId: input.importId, status: "cancelled" as const, alreadyFinal: false };
   }),
