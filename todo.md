@@ -333,3 +333,9 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Identify the reported Lovable-branded screen as a separate Lovable preview/editor rather than the live Just Finds deployment.
 - [x] Compare the reported preview indicators against the current live Just Finds homepage without modifying either environment.
 - [x] Explain the correct URL and recommended action for the reported screen.
+
+## Lovable Preview URL Review
+
+- [x] Inspect `preview--quick-stuff-locator.lovable.app`: it redirects to the distinct Lovable project `lovp_0qdkdghskb9dyv94ke6q8w5sfz` and denies access to `justfindsall@gmail.com`.
+- [x] Compare that URL with the live Just Finds deployment and confirm the two are separate environments with different domains, hosting, and access control.
+- [x] Provide the exact recommended action: do not share or rely on the separate Lovable preview; ask its owner to delete it or grant access only if the user intentionally needs that distinct project.
