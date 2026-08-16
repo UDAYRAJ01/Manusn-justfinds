@@ -218,6 +218,13 @@
       "when": 1786875244665,
       "tag": "0030_glossy_pestilence",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "5",
+      "when": 1786878054831,
+      "tag": "0031_smart_king_bedlam",
+      "breakpoints": true
     }
   ]
 }

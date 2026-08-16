@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { and, desc, eq, inArray, max } from "drizzle-orm";
-import { aiContentVersions, aiGenerationJobs, aiUsageEvents, businessAiContent, businesses } from "../../../drizzle/schema";
+import { and, asc, desc, eq, inArray, max, or, sql } from "drizzle-orm";
+import { aiContentVersions, aiGenerationBatches, aiGenerationJobs, aiUsageEvents, businessAiContent, businessRevisions, businesses } from "../../../drizzle/schema";
 import { getBusinessAiFacts, getDb } from "../../db";
 import { buildContentPrompt, PROMPT_VERSION, type PromptContentType } from "./prompts";
 import { generateStructured, classifyAiError } from "./provider";
@@ -13,7 +13,7 @@ const outputSchemaFor = (type: AiContentType) => ({
   name: `just_finds_${type}`,
   strict: true,
   schema: type === "business_seo_profile"
-    ? { type: "object", properties: { text: { type: "string" }, title: { type: "string" }, description: { type: "string" }, faqs: { type: "array", items: { type: "object", properties: { question: { type: "string" }, answer: { type: "string" } }, required: ["question", "answer"], additionalProperties: false } } }, required: ["text", "title", "description", "faqs"], additionalProperties: false }
+    ? { type: "object", properties: { text: { type: "string" }, title: { type: "string" }, description: { type: "string" }, faqs: { type: "array", items: { type: "object", properties: { question: { type: "string" }, answer: { type: "string" } }, required: ["question", "answer"], additionalProperties: false } }, serviceVerificationQuestions: { type: "array", items: { type: "string" }, maxItems: 5 }, facilityVerificationQuestions: { type: "array", items: { type: "string" }, maxItems: 5 } }, required: ["text", "title", "description", "faqs", "serviceVerificationQuestions", "facilityVerificationQuestions"], additionalProperties: false }
     : type === "faq"
     ? { type: "object", properties: { faqs: { type: "array", items: { type: "object", properties: { question: { type: "string" }, answer: { type: "string" } }, required: ["question", "answer"], additionalProperties: false } } }, required: ["faqs"], additionalProperties: false }
     : type === "seo_title"
@@ -69,7 +69,13 @@ function normalizeGeneratedContent(type: AiContentType, data: GeneratedContent, 
       status: "grounded" as const,
     }))
     .filter(item => item.question.trim().length > 0 && item.answer.trim().length > 0 && item.sourceFields.length > 0);
-  return { ...data, faqs: grounded.slice(0, 10) };
+  const profileSuggestions = type === "business_seo_profile"
+    ? {
+        serviceVerificationQuestions: Array.from(new Set((data.serviceVerificationQuestions ?? []).map(item => item.trim()).filter(item => /^verify whether\b/i.test(item)))).slice(0, 5),
+        facilityVerificationQuestions: Array.from(new Set((data.facilityVerificationQuestions ?? []).map(item => item.trim()).filter(item => /^verify whether\b/i.test(item)))).slice(0, 5),
+      }
+    : {};
+  return { ...data, ...profileSuggestions, faqs: grounded.slice(0, 10) };
 }
 
 function similarity(left: string, right: string) {
@@ -98,6 +104,7 @@ export function validateGeneratedContent(type: AiContentType, data: GeneratedCon
     if (faqCount < 5 || faqCount > 10) flags.push("profile_faq_count_invalid");
     if (!(normalized.title ?? "").trim() || (normalized.title ?? "").length > 60) flags.push("profile_title_invalid");
     if (!(normalized.description ?? "").trim() || (normalized.description ?? "").length > 160) flags.push("profile_meta_description_invalid");
+    if ([...(data.serviceVerificationQuestions ?? []), ...(data.facilityVerificationQuestions ?? [])].some(item => !/^verify whether\b/i.test(item.trim()))) flags.push("profile_verification_question_invalid");
   }
   if (type === "business_highlights" && ((normalized.highlights ?? []).length < 3 || (normalized.highlights ?? []).length > 6)) flags.push("highlight_count_invalid");
   if (["faq", "business_seo_profile"].includes(type) && (normalized.faqs ?? []).some(item => !item.question.trim() || !item.answer.trim() || !item.sourceFields?.length)) flags.push("faq_source_fields_missing");
@@ -186,12 +193,58 @@ export async function processAiGenerationJob(jobId: number) {
 export async function enqueueAiGenerationBatch(input: { businessIds: number[]; contentTypes: AiContentType[]; requestedById: number; batchId: string }) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
-  const businessIds = Array.from(new Set(input.businessIds)).slice(0, 250);
+  const businessIds = Array.from(new Set(input.businessIds)).slice(0, 1000);
   const contentTypes = Array.from(new Set(input.contentTypes));
   const values = businessIds.flatMap(businessId => contentTypes.map(contentType => ({ businessId, contentType, requestedById: input.requestedById, batchId: input.batchId, status: "queued" as const, attempts: 0, progressPercent: 0 })));
   if (!values.length) return { batchId: input.batchId, jobIds: [], queued: 0 };
+  await db.insert(aiGenerationBatches).values({ id: input.batchId, requestedById: input.requestedById, status: "queued", totalJobs: values.length, completedJobs: 0, failedJobs: 0 });
   const inserted = await db.insert(aiGenerationJobs).values(values).$returningId();
   return { batchId: input.batchId, jobIds: inserted.map(item => Number(item.id)), queued: values.length };
+}
+
+export async function attachAiGenerationBatchSchedule(batchId: string, taskUid: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+  await db.update(aiGenerationBatches).set({ scheduleCronTaskUid: taskUid, status: "queued", lastError: null, finishedAt: null }).where(eq(aiGenerationBatches.id, batchId));
+}
+
+export async function getAiGenerationBatch(batchId: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [batch] = await db.select().from(aiGenerationBatches).where(eq(aiGenerationBatches.id, batchId)).limit(1);
+  if (!batch) return undefined;
+  const progress = await getAiGenerationProgress({ batchId });
+  return { ...batch, ...progress };
+}
+
+export async function processAiGenerationBatchChunk(input: { taskUid: string; batchId: string; maxJobs?: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+  const [batch] = await db.select().from(aiGenerationBatches).where(and(eq(aiGenerationBatches.id, input.batchId), eq(aiGenerationBatches.scheduleCronTaskUid, input.taskUid))).limit(1);
+  if (!batch || ["completed", "cancelled"].includes(batch.status)) return { processed: false, reason: "no_owned_queued_batch" as const };
+  const staleBefore = new Date(Date.now() - 3 * 60_000);
+  const jobs = await db.select({ id: aiGenerationJobs.id }).from(aiGenerationJobs)
+    .where(and(eq(aiGenerationJobs.batchId, input.batchId), or(inArray(aiGenerationJobs.status, ["queued", "retrying"]), and(eq(aiGenerationJobs.status, "processing"), sql`${aiGenerationJobs.startedAt} < ${staleBefore}`))))
+    .orderBy(asc(aiGenerationJobs.createdAt)).limit(Math.min(Math.max(input.maxJobs ?? 3, 1), 5));
+  if (!jobs.length) {
+    const progress = await getAiGenerationProgress({ batchId: input.batchId });
+    const final = progress.pending === 0;
+    await db.update(aiGenerationBatches).set({ status: final ? "completed" : "processing", completedJobs: progress.completed, failedJobs: progress.failed, finishedAt: final ? new Date() : null }).where(eq(aiGenerationBatches.id, input.batchId));
+    return { processed: false, completed: progress.completed, failed: progress.failed, pending: progress.pending, done: final };
+  }
+  await db.update(aiGenerationBatches).set({ status: "processing" }).where(eq(aiGenerationBatches.id, input.batchId));
+  let lastError: string | null = null;
+  for (const job of jobs) {
+    try {
+      await processAiGenerationJob(job.id);
+    } catch (error) {
+      lastError = error instanceof Error ? error.message.slice(0, 1000) : "The AI rewrite worker failed.";
+    }
+  }
+  const progress = await getAiGenerationProgress({ batchId: input.batchId });
+  const done = progress.pending === 0;
+  await db.update(aiGenerationBatches).set({ status: done ? "completed" : "processing", completedJobs: progress.completed, failedJobs: progress.failed, lastError, finishedAt: done ? new Date() : null }).where(eq(aiGenerationBatches.id, input.batchId));
+  return { processed: true, completed: progress.completed, failed: progress.failed, pending: progress.pending, done };
 }
 
 export async function getAiGenerationProgress(input: { batchId?: string; jobId?: number }) {
@@ -321,6 +374,49 @@ export async function publishApprovedAboutToListing(input: { versionId: number; 
   return publishApprovedContentToListing(input, true);
 }
 
+async function captureOriginalAiContentSnapshot(businessId: number, actorId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+  const [business] = await db.select({ aboutDescription: businesses.aboutDescription, seoTitle: businesses.seoTitle, metaDescription: businesses.metaDescription }).from(businesses).where(eq(businesses.id, businessId)).limit(1);
+  if (!business) throw new Error("Business not found");
+  const [existingAi] = await db.select({ faqs: businessAiContent.faqs, status: businessAiContent.status, sourceHash: businessAiContent.sourceHash }).from(businessAiContent).where(eq(businessAiContent.businessId, businessId)).limit(1);
+  const existingSnapshot = await db.select({ id: businessRevisions.id }).from(businessRevisions).where(and(eq(businessRevisions.businessId, businessId), eq(businessRevisions.changeType, "ai_content_original_snapshot"))).limit(1);
+  if (existingSnapshot[0]) return;
+  await db.insert(businessRevisions).values({
+    businessId,
+    createdBy: actorId,
+    changeType: "ai_content_original_snapshot",
+    payload: { business, aiContent: existingAi ?? null },
+    status: "approved",
+  });
+}
+
+export async function revertBusinessAiContentToOriginal(input: { businessId: number; actorId: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+  const [snapshot] = await db.select({ payload: businessRevisions.payload }).from(businessRevisions)
+    .where(and(eq(businessRevisions.businessId, input.businessId), eq(businessRevisions.changeType, "ai_content_original_snapshot")))
+    .orderBy(asc(businessRevisions.createdAt), asc(businessRevisions.id)).limit(1);
+  const payload = snapshot?.payload as { business?: { aboutDescription?: string | null; seoTitle?: string | null; metaDescription?: string | null }; aiContent?: { faqs?: unknown; status?: "pending" | "processing" | "completed" | "failed"; sourceHash?: string | null } | null } | undefined;
+  if (!payload?.business) throw new Error("No original AI-content snapshot is available for this listing.");
+  await db.transaction(async tx => {
+    await tx.update(businesses).set({
+      aboutDescription: payload.business?.aboutDescription ?? null,
+      seoTitle: payload.business?.seoTitle ?? null,
+      metaDescription: payload.business?.metaDescription ?? null,
+    }).where(eq(businesses.id, input.businessId));
+    const [currentAi] = await tx.select({ id: businessAiContent.id }).from(businessAiContent).where(eq(businessAiContent.businessId, input.businessId)).limit(1);
+    if (!payload.aiContent) {
+      if (currentAi) await tx.delete(businessAiContent).where(eq(businessAiContent.id, currentAi.id));
+      return;
+    }
+    const values = { faqs: payload.aiContent.faqs ?? null, status: payload.aiContent.status ?? "completed", sourceHash: payload.aiContent.sourceHash ?? null };
+    if (currentAi) await tx.update(businessAiContent).set(values).where(eq(businessAiContent.id, currentAi.id));
+    else await tx.insert(businessAiContent).values({ businessId: input.businessId, ...values });
+  });
+  return { businessId: input.businessId, reverted: true };
+}
+
 export async function publishApprovedContentToListing(input: { versionId: number; reviewerId: number; note?: string }, aboutOnly = false) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
@@ -330,6 +426,7 @@ export async function publishApprovedContentToListing(input: { versionId: number
   const contentType = version.contentType as AiContentType;
   const permitted = aboutOnly ? canApplyApprovedAboutToListing(contentType, version.status as AiContentStatus) : canApplyApprovedContentToListing(contentType, version.status as AiContentStatus);
   if (!permitted) throw new Error(aboutOnly ? "Only an approved About Business draft can update the listing." : "Only an approved business profile, About, SEO title, meta description, or FAQ draft can update the listing.");
+  await captureOriginalAiContentSnapshot(version.businessId, input.reviewerId);
   if (contentType === "business_seo_profile") {
     const profile = version.structured && typeof version.structured === "object" ? version.structured as GeneratedContent : {};
     const faqs = Array.isArray(profile.faqs) ? profile.faqs : [];

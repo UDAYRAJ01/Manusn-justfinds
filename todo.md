@@ -290,3 +290,13 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Generate between five and ten source-grounded FAQs in the same combined review profile.
 - [x] Provide one clear comparison, approval, and publication action that applies the approved combined profile to the private listing.
 - [x] Add regression coverage and validate TypeScript, complete automated tests, and the revised administrator interface before release.
+
+## Reliable High-Volume AI Rewrite Workflow
+- [x] Diagnose and repair inconsistent administrator AI rewrite button execution and clear completion/error feedback.
+- [x] Show all submitted/imported businesses as a searchable list with a click-to-open factual detail panel.
+- [x] Display generated AI content in the listing detail panel without requiring original-versus-draft comparison; retain original values privately for controlled reversal.
+- [x] Add a permission-checked Revert to original action that restores the immediately previous factual listing content without changing customer feedback data.
+- [x] Add factual 5–10 FAQ generation and private, explicitly unverified service/facility suggestions; publish only administrator-approved facts.
+- [x] Implement bounded, resumable background batch processing for large selections with per-listing queued, processing, AI done, failed, and retry states.
+- [x] Preserve real ratings and reviews exactly as supplied/audited; do not fabricate, vary, or publish synthetic customer reviews or ratings.
+- [x] Add regression coverage and validate type safety, the full automated suite, and the administrator UI before release.

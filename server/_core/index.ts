@@ -10,6 +10,7 @@ import { generateRobotsTxt, generateSitemapXml } from "../domain/seo/sitemap";
 import { shouldPauseHighVolumeImportSchedule } from "../domain/highVolumeImportSchedule";
 import { appRouter } from "../routers";
 import { processNextHighVolumeImportChunk } from "../routers/workspaces";
+import { processAiGenerationBatchChunk } from "../domain/ai/content";
 import { updateHeartbeatJob } from "./heartbeat";
 import { createContext } from "./context";
 import { sdk } from "./sdk";
@@ -60,6 +61,28 @@ async function startServer() {
     } catch (error) {
       const detail = error instanceof Error ? error.message : "The import processor failed.";
       console.error("[HighVolumeImport] scheduled processor failed", error);
+      return res.status(500).json({ error: detail, timestamp: new Date().toISOString(), context: { url: req.originalUrl } });
+    }
+  });
+
+  app.post("/api/scheduled/process-ai-rewrites", async (req, res) => {
+    try {
+      const user = await sdk.authenticateRequest(req);
+      if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only" });
+      const batchId = typeof req.query.batchId === "string" ? req.query.batchId : "";
+      if (!batchId || batchId.length > 64) return res.status(400).json({ error: "missing-or-invalid-batch-id" });
+      const result = await processAiGenerationBatchChunk({ taskUid: user.taskUid, batchId, maxJobs: 3 });
+      if ("done" in result && result.done) {
+        try {
+          await updateHeartbeatJob(user.taskUid, { enable: false }, "");
+        } catch (pauseError) {
+          console.warn("[AiRewrite] could not pause completed task", pauseError);
+        }
+      }
+      return res.json({ ok: true, result, timestamp: new Date().toISOString() });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "The AI rewrite processor failed.";
+      console.error("[AiRewrite] scheduled processor failed", error);
       return res.status(500).json({ error: detail, timestamp: new Date().toISOString(), context: { url: req.originalUrl } });
     }
   });

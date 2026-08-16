@@ -34,6 +34,7 @@ export const pageStatusValues = ["draft", "pending_review", "published", "unpubl
 export const pageVersionStatusValues = ["draft", "published", "archived"] as const;
 export const pageAnalyticsEventValues = ["page_view", "cta_click", "lead_start", "lead_submit", "call_click", "whatsapp_click", "website_click", "directions", "scroll_depth", "section_interaction"] as const;
 export const aiJobStatusValues = ["queued", "processing", "completed", "failed", "retrying", "cancelled"] as const;
+export const aiGenerationBatchStatusValues = ["queued", "processing", "completed", "cancelled"] as const;
 export const aiAuthorshipValues = ["ai_generated", "owner_edited", "admin_edited"] as const;
 export const knowledgeSourceValues = [
   "profile",
@@ -711,6 +712,24 @@ export const aiGenerationJobs = mysqlTable("ai_generation_jobs", {
   index("ai_job_status_created_idx").on(table.status, table.createdAt),
   index("ai_job_business_idx").on(table.businessId, table.status),
   index("ai_job_batch_idx").on(table.batchId, table.status),
+]);
+
+export const aiGenerationBatches = mysqlTable("ai_generation_batches", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  requestedById: int("requestedById").notNull().references(() => users.id),
+  scheduleCronTaskUid: varchar("scheduleCronTaskUid", { length: 96 }),
+  status: mysqlEnum("status", aiGenerationBatchStatusValues).default("queued").notNull(),
+  totalJobs: int("totalJobs").default(0).notNull(),
+  completedJobs: int("completedJobs").default(0).notNull(),
+  failedJobs: int("failedJobs").default(0).notNull(),
+  lastError: text("lastError"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  finishedAt: timestamp("finishedAt"),
+}, table => [
+  index("ai_batch_status_created_idx").on(table.status, table.createdAt),
+  index("ai_batch_task_idx").on(table.scheduleCronTaskUid, table.status),
+  index("ai_batch_requester_idx").on(table.requestedById, table.createdAt),
 ]);
 
 export const aiUsageEvents = mysqlTable("ai_usage_events", {

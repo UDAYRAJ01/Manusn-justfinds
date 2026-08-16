@@ -2,6 +2,7 @@ import { and, asc, count, desc, eq, inArray, isNotNull, like, ne, or, sql } from
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   aiContentVersions,
+  aiGenerationJobs,
   businessAiContent,
   businessCertificates,
   businessDomains,
@@ -620,10 +621,12 @@ export async function getPendingBusinesses() {
     .limit(100);
   const businessIds = rows.map(row => row.business.id);
   if (!businessIds.length) return [];
-  const [services, hours, importedContent] = await Promise.all([
+  const [services, hours, importedContent, profiles, rewriteJobs] = await Promise.all([
     db.select({ businessId: businessServices.businessId, name: businessServices.name, description: businessServices.description, sortOrder: businessServices.sortOrder }).from(businessServices).where(inArray(businessServices.businessId, businessIds)).orderBy(asc(businessServices.sortOrder)),
     db.select({ businessId: businessHours.businessId, dayOfWeek: businessHours.dayOfWeek, opensAt: businessHours.opensAt, closesAt: businessHours.closesAt, isClosed: businessHours.isClosed, isTwentyFourHours: businessHours.isTwentyFourHours }).from(businessHours).where(inArray(businessHours.businessId, businessIds)).orderBy(asc(businessHours.dayOfWeek)),
     db.select({ businessId: businessAiContent.businessId, faqs: businessAiContent.faqs }).from(businessAiContent).where(inArray(businessAiContent.businessId, businessIds)),
+    db.select({ id: aiContentVersions.id, businessId: aiContentVersions.businessId, status: aiContentVersions.status, content: aiContentVersions.content, structured: aiContentVersions.structured, generatedAt: aiContentVersions.generatedAt }).from(aiContentVersions).where(and(inArray(aiContentVersions.businessId, businessIds), eq(aiContentVersions.contentType, "business_seo_profile"))).orderBy(desc(aiContentVersions.generatedAt), desc(aiContentVersions.id)),
+    db.select({ id: aiGenerationJobs.id, businessId: aiGenerationJobs.businessId, status: aiGenerationJobs.status, errorCategory: aiGenerationJobs.errorCategory, createdAt: aiGenerationJobs.createdAt }).from(aiGenerationJobs).where(and(inArray(aiGenerationJobs.businessId, businessIds), eq(aiGenerationJobs.contentType, "business_seo_profile"))).orderBy(desc(aiGenerationJobs.createdAt), desc(aiGenerationJobs.id)),
   ]);
   const byBusiness = <T extends { businessId: number }>(items: T[]) => items.reduce((map, item) => {
     const group = map.get(item.businessId) ?? [];
@@ -634,6 +637,9 @@ export async function getPendingBusinesses() {
   const servicesByBusiness = byBusiness(services);
   const hoursByBusiness = byBusiness(hours);
   const faqsByBusiness = new Map(importedContent.map(item => [item.businessId, Array.isArray(item.faqs) ? item.faqs : []]));
+  const newestByBusiness = <T extends { businessId: number }>(items: T[]) => items.reduce((map, item) => map.has(item.businessId) ? map : map.set(item.businessId, item), new Map<number, T>());
+  const profileByBusiness = newestByBusiness(profiles);
+  const rewriteJobByBusiness = newestByBusiness(rewriteJobs);
   return rows.map(row => {
     const imported = row.importRow?.data as { normalized?: { rating?: string; totalReviews?: string } } | null;
     return {
@@ -661,6 +667,8 @@ export async function getPendingBusinesses() {
     totalReviewsAudit: imported?.normalized?.totalReviews || null,
     ratingAuditNote: "Rating and Total Reviews are retained only as private import audit data and are never shown as customer reviews.",
     faqs: faqsByBusiness.get(row.business.id) ?? [],
+    aiProfile: profileByBusiness.get(row.business.id) ?? null,
+    aiRewriteJob: rewriteJobByBusiness.get(row.business.id) ?? null,
   };
   });
 }

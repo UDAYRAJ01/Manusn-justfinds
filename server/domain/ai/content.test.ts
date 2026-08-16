@@ -62,10 +62,17 @@ describe("Phase 5 factual content guardrails", () => {
         { question: "When is the clinic listed as open?", answer: "Its supplied hours show Monday from 09:00 to 17:00." },
         { question: "Is a phone number available?", answer: "The source facts contain an available phone number." },
       ],
+      serviceVerificationQuestions: ["Verify whether additional dental services are offered."],
+      facilityVerificationQuestions: ["Verify whether a waiting area is available."],
     };
     const accepted = validateGeneratedContent("business_seo_profile", profile, facts);
     expect(accepted.accepted).toBe(true);
     expect(accepted.normalized.faqs).toHaveLength(5);
+    expect(accepted.normalized.serviceVerificationQuestions).toEqual(["Verify whether additional dental services are offered."]);
+    expect(accepted.normalized.facilityVerificationQuestions).toEqual(["Verify whether a waiting area is available."]);
+    const unsafeSuggestion = validateGeneratedContent("business_seo_profile", { ...profile, serviceVerificationQuestions: ["Additional dental services are available."] }, facts);
+    expect(unsafeSuggestion.accepted).toBe(false);
+    expect(unsafeSuggestion.flags).toContain("profile_verification_question_invalid");
     const unsupported = validateGeneratedContent("business_seo_profile", { ...profile, text: "North Star Dental is the best clinic with guaranteed results." }, facts);
     expect(unsupported.accepted).toBe(false);
     expect(unsupported.flags).toContain("unsupported_claim_language");

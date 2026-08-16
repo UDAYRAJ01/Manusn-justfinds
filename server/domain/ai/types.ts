@@ -22,6 +22,8 @@ export type GeneratedContent = {
   description?: string;
   highlights?: string[];
   faqs?: FaqItem[];
+  serviceVerificationQuestions?: string[];
+  facilityVerificationQuestions?: string[];
 };
 
 export type ValidationResult = {
