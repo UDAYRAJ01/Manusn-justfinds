@@ -374,4 +374,4 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 
 - [x] Compare the latest checkpointed project tree against GitHub main: source-tree file counts match at 383, while GitHub main is behind the current checkpoint and the URL directory awaits inclusion.
 - [x] Add the complete URL directory to the tracked project tree and create one complete current-source snapshot commit.
-- [ ] Push the complete latest snapshot to GitHub main and verify remote file coverage and commit identity.
+- [x] Push the complete latest snapshot to GitHub main and verify remote file coverage and commit identity (384 tracked files; `docs/URL_DIRECTORY.md` confirmed remotely).
