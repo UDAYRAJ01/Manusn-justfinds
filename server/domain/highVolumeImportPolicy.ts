@@ -1,7 +1,8 @@
 export const HIGH_VOLUME_ROW_LIMIT = 100_000;
 export const HIGH_VOLUME_FILE_LIMIT = 500 * 1024 * 1024;
 export const HIGH_VOLUME_VALIDATION_CHUNK = 500;
-export const HIGH_VOLUME_IMPORT_CHUNK = 200;
+// Creation includes several durable writes per business; keep each scheduled run short and recoverable.
+export const HIGH_VOLUME_IMPORT_CHUNK = 25;
 
 export function isSupportedImportFilename(filename: string) {
   return /\.(csv|xls|xlsx)$/i.test(filename.trim());

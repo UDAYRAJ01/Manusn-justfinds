@@ -384,10 +384,12 @@ async function importHighVolumeChunk(db: NonNullable<Awaited<ReturnType<typeof g
     try {
       const createdBusiness = await db.insert(businesses).values({ ownerId: job.initiatedById, categoryId: payload.categoryId, subcategoryId: payload.subcategoryId ?? null, businessTypeId: payload.businessTypeId ?? null, cityId: payload.cityId, localityId: payload.localityId ?? null, name: listing.businessName, slug: nextImportSlug(listing.businessName, existingSlugs), address: listing.address, shortDescription: listing.description || null, aboutDescription: listing.description || null, phone: listing.phone || null, email: listing.email || null, website: listing.website || null, latitude: listing.latitude || null, longitude: listing.longitude || null, status: "submitted", onboardingStep: 1 });
       const businessId = Number(createdBusiness[0].insertId);
-      if (payload.hours?.length === 7) await db.insert(businessHours).values(payload.hours.map(day => ({ ...day, businessId })));
-      if (payload.faqs?.length) await db.insert(businessAiContent).values({ businessId, about: listing.description || null, faqs: payload.faqs, status: "pending" });
-      await db.insert(approvalQueue).values({ entityType: "business", businessId, submittedById: job.initiatedById, status: "pending" });
-      await db.update(bulkImportRows).set({ status: "imported" }).where(eq(bulkImportRows.id, row.id));
+      await Promise.all([
+        payload.hours?.length === 7 ? db.insert(businessHours).values(payload.hours.map(day => ({ ...day, businessId }))) : Promise.resolve(),
+        payload.faqs?.length ? db.insert(businessAiContent).values({ businessId, about: listing.description || null, faqs: payload.faqs, status: "pending" }) : Promise.resolve(),
+        db.insert(approvalQueue).values({ entityType: "business", businessId, submittedById: job.initiatedById, status: "pending" }),
+        db.update(bulkImportRows).set({ status: "imported" }).where(eq(bulkImportRows.id, row.id)),
+      ]);
       created += 1;
     } catch (error) {
       failed += 1;

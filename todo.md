@@ -246,6 +246,10 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [ ] Validate a large CSV through staging, streamed validation, and background listing creation.
 - [x] Suppress retry controls for workbook jobs that are terminal due to the managed format-size limit.
 
+## Private Listing Creation Recovery
+- [x] Diagnose the stalled private-listing creation claim and bound each worker run to 25 businesses with parallel independent audit writes.
+- [ ] Release the bounded creator and verify that the validated CSV import advances past its first private-listing chunk.
+
 ## Background-Resumable CSV Validation
 - [x] Move confirmed large-CSV validation into the scheduled processor with bounded streaming reads so progress survives browser closure.
 - [x] Apply the additive parser checkpoint migration for resumable CSV validation.
