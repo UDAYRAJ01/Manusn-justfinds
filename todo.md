@@ -327,3 +327,9 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Compare the currently deployed Just Finds source, local working tree, and GitHub `main` branch to identify any current files or commits that are not present in GitHub.
 - [x] Commit and upload every intended missing latest tracked source file to the authorized GitHub repository without including secrets, dependencies, or build artifacts.
 - [x] Verify the remote GitHub commit and full tree after synchronization, then report the final source-export status.
+
+## Preview Environment Identification
+
+- [x] Identify the reported Lovable-branded screen as a separate Lovable preview/editor rather than the live Just Finds deployment.
+- [x] Compare the reported preview indicators against the current live Just Finds homepage without modifying either environment.
+- [x] Explain the correct URL and recommended action for the reported screen.
