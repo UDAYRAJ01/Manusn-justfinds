@@ -228,3 +228,7 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Diagnose and repair the production large-file secure-staging endpoint failure with authenticated, exact-size 5 MB storage chunks that avoid the gateway request-size limit.
 - [x] Apply the additive chunk-metadata migration required by the repaired staging protocol.
 - [ ] Validate the repaired production upload with the user's spreadsheet through automatic background validation.
+
+## Confirmed-Chunk Background Read Repair
+- [x] Diagnose and repair the `fetch failed` error while the confirmed multipart source is read by the scheduled validation processor, using a bounded three-worker storage-read pool with retry handling.
+- [ ] Retry the confirmed 250 MB import and verify background validation advances without storage-read failures.

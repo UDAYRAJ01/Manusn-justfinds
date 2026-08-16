@@ -16,12 +16,37 @@ import { HIGH_VOLUME_FILE_LIMIT, HIGH_VOLUME_IMPORT_CHUNK, HIGH_VOLUME_ROW_LIMIT
 import { highVolumeUploadPartBytes, highVolumeUploadPartCount } from "../domain/highVolumeUploadPolicy";
 import { HIGH_VOLUME_IMPORT_CALLBACK_PATH, HIGH_VOLUME_IMPORT_CRON } from "../domain/highVolumeImportSchedule";
 import { heartbeatSessionFromHeaders } from "../domain/heartbeatSession";
+import { mapWithConcurrency } from "../domain/asyncPool";
 import { protectedProcedure, router } from "../_core/trpc";
 import { createHeartbeatJob, updateHeartbeatJob } from "../_core/heartbeat";
 import { COOKIE_NAME } from "@shared/const";
 import * as XLSX from "xlsx";
 
 type JustFindsRole = "user" | "business_owner" | "admin" | "super_admin";
+const HIGH_VOLUME_STORAGE_READ_CONCURRENCY = 3;
+const HIGH_VOLUME_STORAGE_READ_ATTEMPTS = 3;
+
+function delay(milliseconds: number) {
+  return new Promise(resolve => setTimeout(resolve, milliseconds));
+}
+
+async function readConfirmedSourcePart(storageKey: string, expectedBytes: number) {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= HIGH_VOLUME_STORAGE_READ_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetch(await storageGetSignedUrl(storageKey));
+      if (!response.ok) throw new Error(`Secure storage returned ${response.status}.`);
+      const bytes = Buffer.from(await response.arrayBuffer());
+      if (bytes.length !== expectedBytes) throw new Error("The downloaded source chunk size does not match its verified upload.");
+      return bytes;
+    } catch (error) {
+      lastError = error;
+      if (attempt < HIGH_VOLUME_STORAGE_READ_ATTEMPTS) await delay(attempt * 500);
+    }
+  }
+  const reason = lastError instanceof Error ? lastError.message : "unknown network error";
+  throw new Error(`A verified spreadsheet chunk could not be read from secure storage after ${HIGH_VOLUME_STORAGE_READ_ATTEMPTS} attempts (${reason}).`);
+}
 
 function requireModerator(role: JustFindsRole) {
   if (!canModerate(role)) throw new TRPCError({ code: "FORBIDDEN", message: "Administrator access is required." });
@@ -197,13 +222,7 @@ async function validateHighVolumeChunk(db: NonNullable<Awaited<ReturnType<typeof
   if (parts.length) {
     const totalParts = highVolumeUploadPartCount(job.sourceFileSize);
     if (!totalParts || parts.length !== totalParts || parts.some(part => part.byteSize !== highVolumeUploadPartBytes(job.sourceFileSize, part.partNumber))) throw new Error("The staged spreadsheet is incomplete. Upload the file again to create a new import.");
-    const buffers = await Promise.all(parts.map(async part => {
-      const response = await fetch(await storageGetSignedUrl(part.storageKey));
-      if (!response.ok) throw new Error("A staged spreadsheet chunk could not be read from secure storage.");
-      const bytes = Buffer.from(await response.arrayBuffer());
-      if (bytes.length !== part.byteSize) throw new Error("A staged spreadsheet chunk is incomplete. Upload the file again to create a new import.");
-      return bytes;
-    }));
+    const buffers = await mapWithConcurrency(parts, HIGH_VOLUME_STORAGE_READ_CONCURRENCY, part => readConfirmedSourcePart(part.storageKey, part.byteSize));
     sourceBuffer = Buffer.concat(buffers);
     if (sourceBuffer.length !== job.sourceFileSize) throw new Error("The staged spreadsheet size could not be verified. Upload the file again to create a new import.");
   } else {
