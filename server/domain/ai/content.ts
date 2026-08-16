@@ -217,22 +217,23 @@ export async function getAiGenerationBatch(batchId: string) {
   return { ...batch, ...progress };
 }
 
-export async function processAiGenerationBatchChunk(input: { taskUid: string; batchId: string; maxJobs?: number }) {
+export async function processAiGenerationBatchChunk(input: { taskUid: string; maxJobs?: number }) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
-  const [batch] = await db.select().from(aiGenerationBatches).where(and(eq(aiGenerationBatches.id, input.batchId), eq(aiGenerationBatches.scheduleCronTaskUid, input.taskUid))).limit(1);
+  const [batch] = await db.select().from(aiGenerationBatches).where(eq(aiGenerationBatches.scheduleCronTaskUid, input.taskUid)).limit(1);
   if (!batch || ["completed", "cancelled"].includes(batch.status)) return { processed: false, reason: "no_owned_queued_batch" as const };
+  const batchId = batch.id;
   const staleBefore = new Date(Date.now() - 3 * 60_000);
   const jobs = await db.select({ id: aiGenerationJobs.id }).from(aiGenerationJobs)
-    .where(and(eq(aiGenerationJobs.batchId, input.batchId), or(inArray(aiGenerationJobs.status, ["queued", "retrying"]), and(eq(aiGenerationJobs.status, "processing"), sql`${aiGenerationJobs.startedAt} < ${staleBefore}`))))
+    .where(and(eq(aiGenerationJobs.batchId, batchId), or(inArray(aiGenerationJobs.status, ["queued", "retrying"]), and(eq(aiGenerationJobs.status, "processing"), sql`${aiGenerationJobs.startedAt} < ${staleBefore}`))))
     .orderBy(asc(aiGenerationJobs.createdAt)).limit(Math.min(Math.max(input.maxJobs ?? 3, 1), 5));
   if (!jobs.length) {
-    const progress = await getAiGenerationProgress({ batchId: input.batchId });
+    const progress = await getAiGenerationProgress({ batchId });
     const final = progress.pending === 0;
-    await db.update(aiGenerationBatches).set({ status: final ? "completed" : "processing", completedJobs: progress.completed, failedJobs: progress.failed, finishedAt: final ? new Date() : null }).where(eq(aiGenerationBatches.id, input.batchId));
+    await db.update(aiGenerationBatches).set({ status: final ? "completed" : "processing", completedJobs: progress.completed, failedJobs: progress.failed, finishedAt: final ? new Date() : null }).where(eq(aiGenerationBatches.id, batchId));
     return { processed: false, completed: progress.completed, failed: progress.failed, pending: progress.pending, done: final };
   }
-  await db.update(aiGenerationBatches).set({ status: "processing" }).where(eq(aiGenerationBatches.id, input.batchId));
+  await db.update(aiGenerationBatches).set({ status: "processing" }).where(eq(aiGenerationBatches.id, batchId));
   let lastError: string | null = null;
   for (const job of jobs) {
     try {
@@ -241,9 +242,9 @@ export async function processAiGenerationBatchChunk(input: { taskUid: string; ba
       lastError = error instanceof Error ? error.message.slice(0, 1000) : "The AI rewrite worker failed.";
     }
   }
-  const progress = await getAiGenerationProgress({ batchId: input.batchId });
+  const progress = await getAiGenerationProgress({ batchId });
   const done = progress.pending === 0;
-  await db.update(aiGenerationBatches).set({ status: done ? "completed" : "processing", completedJobs: progress.completed, failedJobs: progress.failed, lastError, finishedAt: done ? new Date() : null }).where(eq(aiGenerationBatches.id, input.batchId));
+  await db.update(aiGenerationBatches).set({ status: done ? "completed" : "processing", completedJobs: progress.completed, failedJobs: progress.failed, lastError, finishedAt: done ? new Date() : null }).where(eq(aiGenerationBatches.id, batchId));
   return { processed: true, completed: progress.completed, failed: progress.failed, pending: progress.pending, done };
 }
 

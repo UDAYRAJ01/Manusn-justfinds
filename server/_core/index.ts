@@ -69,9 +69,7 @@ async function startServer() {
     try {
       const user = await sdk.authenticateRequest(req);
       if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only" });
-      const batchId = typeof req.query.batchId === "string" ? req.query.batchId : "";
-      if (!batchId || batchId.length > 64) return res.status(400).json({ error: "missing-or-invalid-batch-id" });
-      const result = await processAiGenerationBatchChunk({ taskUid: user.taskUid, batchId, maxJobs: 3 });
+      const result = await processAiGenerationBatchChunk({ taskUid: user.taskUid, maxJobs: 3 });
       if ("done" in result && result.done) {
         try {
           await updateHeartbeatJob(user.taskUid, { enable: false }, "");

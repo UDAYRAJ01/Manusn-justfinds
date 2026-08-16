@@ -18,7 +18,7 @@ async function enableAiRewriteBatchSchedule(batchId: string, userSession: string
   const created = await createHeartbeatJob({
     name: `just-finds-ai-rewrite-${batchId}`,
     cron: AI_REWRITE_CRON,
-    path: `${AI_REWRITE_CALLBACK_PATH}?batchId=${encodeURIComponent(batchId)}`,
+    path: AI_REWRITE_CALLBACK_PATH,
     method: "POST",
     description: `Process durable, bounded AI business-profile batch ${batchId}.`,
   }, userSession);

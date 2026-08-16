@@ -300,3 +300,8 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Implement bounded, resumable background batch processing for large selections with per-listing queued, processing, AI done, failed, and retry states.
 - [x] Preserve real ratings and reviews exactly as supplied/audited; do not fabricate, vary, or publish synthetic customer reviews or ratings.
 - [x] Add regression coverage and validate type safety, the full automated suite, and the administrator UI before release.
+
+## Production AI Generation Repair
+- [x] Diagnose why requested administrator AI rewrites remain unwritten or undisplayed in production.
+- [x] Repair the queue, scheduled worker, provider, or UI result path and give administrators actionable per-listing recovery feedback.
+- [x] Validate end-to-end generation for a factual listing without creating fabricated customer data, then run regression coverage and publish the repair.
