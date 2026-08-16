@@ -363,3 +363,9 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Compare the current local homepage source, live homepage rendering, and GitHub main `Home.tsx`: all are byte-identical and render the current “Find what you need, near you.” homepage.
 - [x] Confirm that no homepage source or deployment divergence exists; the earlier “Find the best services in your city” screen belongs to the unrelated Lovable preview rather than Just Finds.
 - [x] Visually verify the homepage and confirm the local and GitHub `Home.tsx` Git blob IDs match exactly (`f2bfce3a6f8196efada0bc028ccebfce6ebf98cc`).
+
+## Complete URL Directory
+
+- [x] Extract every registered Just Finds URL pattern, including static pages, dynamic templates, workspace paths, business tools, appointment, verification, and fallback routes.
+- [x] Cross-check nested owner and administrator workspace navigation paths against route handlers so no reachable page URL is omitted.
+- [x] Prepare the complete numbered URL directory with base domain, access requirements, search parameters, and dynamic placeholder instructions.
