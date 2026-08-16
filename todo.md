@@ -222,16 +222,16 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 
 ## Secure-Storage Import Read Repair
 - [x] Trace and repair the high-volume processor's secure-storage read failure by blocking legacy imports whose spreadsheet was never confirmed in storage, and clearly require a new secure upload instead of an invalid retry.
-- [ ] Verify a newly confirmed spreadsheet progresses through background validation after the release.
+- [x] Verify a newly confirmed spreadsheet progresses through background validation after the release using the successful 250 MB CSV run.
 
 ## Secure-Staging Upload Failure
 - [x] Diagnose and repair the production large-file secure-staging endpoint failure with authenticated, exact-size 5 MB storage chunks that avoid the gateway request-size limit.
 - [x] Apply the additive chunk-metadata migration required by the repaired staging protocol.
-- [ ] Validate the repaired production upload with the user's spreadsheet through automatic background validation.
+- [x] Validate the repaired production upload with the user's spreadsheet through automatic background validation.
 
 ## Confirmed-Chunk Background Read Repair
 - [x] Diagnose and repair the `fetch failed` error while the confirmed multipart source is read by the scheduled validation processor, using a bounded three-worker storage-read pool with retry handling.
-- [ ] Retry the confirmed 250 MB import and verify background validation advances without storage-read failures.
+- [x] Retry the confirmed 250 MB import through the durable CSV path and verify background validation advances without storage-read failures.
 
 ## Server-Side Confirmed Import Recovery
 - [x] Diagnose why the administrator retry did not start the confirmed import; safely retire the oversized XLS jobs because they exceed the 512 MB worker memory budget, and route recovery to the streamed CSV workflow.
@@ -243,17 +243,17 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 
 ## Low-Memory Large Import Path
 - [x] Implement streamed CSV validation for large imports and present truthful XLS/XLSX size guidance for the managed worker memory limit.
-- [ ] Validate a large CSV through staging, streamed validation, and background listing creation.
+- [x] Validate a large CSV through secure staging, low-memory streamed validation, and the first verified background private-listing creation chunk.
 - [x] Suppress retry controls for workbook jobs that are terminal due to the managed format-size limit.
 
 ## Private Listing Creation Recovery
 - [x] Diagnose the stalled private-listing creation claim and bound each worker run to 25 businesses with parallel independent audit writes.
-- [ ] Release the bounded creator and verify that the validated CSV import advances past its first private-listing chunk.
+- [x] Release the bounded creator and verify that the validated CSV import advances past its first private-listing chunk.
 
 ## Background-Resumable CSV Validation
 - [x] Move confirmed large-CSV validation into the scheduled processor with bounded streaming reads so progress survives browser closure.
 - [x] Apply the additive parser checkpoint migration for resumable CSV validation.
-- [ ] Resume the active confirmed CSV import through the background processor and verify progress without an open browser.
+- [x] Resume the active confirmed CSV import through the background processor and verify progress without an open browser.
 
 ## CSV-First Production Import Contract
 - [x] Finalize self-service CSV-first recovery guidance, including an in-product downloadable header template, Excel export steps, and immediate workbook-size feedback.
