@@ -34,7 +34,9 @@ export class AiProviderResponseError extends Error {
   }
 }
 
-const DEFAULT_MODEL = process.env.AI_DEFAULT_MODEL?.trim() || undefined;
+// `gpt-5-mini` is the verified live structured-output fallback for high-volume factual rewrites.
+// Deployments may still select another available model through AI_DEFAULT_MODEL.
+const DEFAULT_MODEL = process.env.AI_DEFAULT_MODEL?.trim() || "gpt-5-mini";
 
 function getTextContent(content: Message["content"]): string {
   if (typeof content === "string") return content;

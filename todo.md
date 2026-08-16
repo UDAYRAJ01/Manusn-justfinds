@@ -305,3 +305,8 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Diagnose why requested administrator AI rewrites remain unwritten or undisplayed in production.
 - [x] Repair the queue, scheduled worker, provider, or UI result path and give administrators actionable per-listing recovery feedback.
 - [x] Validate end-to-end generation for a factual listing without creating fabricated customer data, then run regression coverage and publish the repair.
+
+## Server-Side AI Provider Verification
+- [x] Inspect the configured server-side AI provider and confirm that rewrite jobs use a real API without exposing a key in the browser.
+- [x] Validate a factual, structured business-profile generation request through the live provider path.
+- [x] Repair the provider integration or configure a required secure credential, then run regression tests and publish the verified connection.
