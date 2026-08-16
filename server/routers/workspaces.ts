@@ -17,6 +17,7 @@ import { highVolumeUploadPartBytes, highVolumeUploadPartCount } from "../domain/
 import { HIGH_VOLUME_IMPORT_CALLBACK_PATH, HIGH_VOLUME_IMPORT_CRON } from "../domain/highVolumeImportSchedule";
 import { heartbeatSessionFromHeaders } from "../domain/heartbeatSession";
 import { mapWithConcurrency } from "../domain/asyncPool";
+import { withRequestDeadline } from "../domain/requestDeadline";
 import { protectedProcedure, router } from "../_core/trpc";
 import { createHeartbeatJob, updateHeartbeatJob } from "../_core/heartbeat";
 import { COOKIE_NAME } from "@shared/const";
@@ -25,6 +26,7 @@ import * as XLSX from "xlsx";
 type JustFindsRole = "user" | "business_owner" | "admin" | "super_admin";
 const HIGH_VOLUME_STORAGE_READ_CONCURRENCY = 3;
 const HIGH_VOLUME_STORAGE_READ_ATTEMPTS = 3;
+const HIGH_VOLUME_STORAGE_READ_TIMEOUT_MS = 15_000;
 
 function delay(milliseconds: number) {
   return new Promise(resolve => setTimeout(resolve, milliseconds));
@@ -34,11 +36,13 @@ async function readConfirmedSourcePart(storageKey: string, expectedBytes: number
   let lastError: unknown;
   for (let attempt = 1; attempt <= HIGH_VOLUME_STORAGE_READ_ATTEMPTS; attempt += 1) {
     try {
-      const response = await fetch(await storageGetSignedUrl(storageKey));
-      if (!response.ok) throw new Error(`Secure storage returned ${response.status}.`);
-      const bytes = Buffer.from(await response.arrayBuffer());
-      if (bytes.length !== expectedBytes) throw new Error("The downloaded source chunk size does not match its verified upload.");
-      return bytes;
+      return await withRequestDeadline(HIGH_VOLUME_STORAGE_READ_TIMEOUT_MS, async signal => {
+        const response = await fetch(await storageGetSignedUrl(storageKey, signal), { signal });
+        if (!response.ok) throw new Error(`Secure storage returned ${response.status}.`);
+        const bytes = Buffer.from(await response.arrayBuffer());
+        if (bytes.length !== expectedBytes) throw new Error("The downloaded source chunk size does not match its verified upload.");
+        return bytes;
+      }, "Secure storage did not respond within 15 seconds.");
     } catch (error) {
       lastError = error;
       if (attempt < HIGH_VOLUME_STORAGE_READ_ATTEMPTS) await delay(attempt * 500);

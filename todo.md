@@ -232,3 +232,10 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 ## Confirmed-Chunk Background Read Repair
 - [x] Diagnose and repair the `fetch failed` error while the confirmed multipart source is read by the scheduled validation processor, using a bounded three-worker storage-read pool with retry handling.
 - [ ] Retry the confirmed 250 MB import and verify background validation advances without storage-read failures.
+
+## Server-Side Confirmed Import Recovery
+- [ ] Diagnose why the administrator retry did not start the confirmed import and recover it without requiring further user actions.
+- [x] Add bounded per-chunk storage-read timeouts so a stalled signed download cannot keep the import in processing indefinitely.
+
+## Spreadsheet Value Normalization
+- [ ] Diagnose the confirmed import’s category, subcategory, city, hours, and FAQ validation failures and safely accept unambiguous source formats.
