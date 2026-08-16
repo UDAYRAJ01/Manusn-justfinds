@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { importCityCandidates, importLookupKeys, missingRequiredBulkHeaders, normalizeBulkListingRow, parseImportedFaqs, parseImportedHours } from "./bulkListingImport";
+import { importCityCandidates, importLookupKeys, missingRequiredBulkHeaders, normalizeBulkListingRow, parseImportedFaqs, parseImportedHours, parseImportedServices } from "./bulkListingImport";
 
 describe("Excel bulk listing normalization", () => {
   it("maps the supplied spreadsheet headers into a taxonomy-aware listing", () => {
@@ -8,6 +8,7 @@ describe("Excel bulk listing normalization", () => {
       "Main Category": "Healthcare",
       Subcategory: "Clinics",
       "Description (About)": "Primary care clinic.",
+      Services: "Consultation; Vaccination",
       Address: "Civil Lines, Kanpur",
       City: "Kanpur",
       Locality: "Civil Lines",
@@ -23,7 +24,7 @@ describe("Excel bulk listing normalization", () => {
       "Total Reviews": 120,
       FAQs: "[]",
     });
-    expect(row).toMatchObject({ businessName: "North Star Clinic", mainCategory: "Healthcare", subcategory: "Clinics", city: "Kanpur", latitude: "26.48", longitude: "80.3", totalReviews: "120" });
+    expect(row).toMatchObject({ businessName: "North Star Clinic", mainCategory: "Healthcare", subcategory: "Clinics", city: "Kanpur", services: "Consultation; Vaccination", latitude: "26.48", longitude: "80.3", totalReviews: "120" });
   });
 
   it("reports only missing required user-supplied headers and treats Business Type as optional", () => {
@@ -51,5 +52,9 @@ describe("safe imported hours and FAQs", () => {
     expect(parseImportedFaqs('[{"question":"Do you take appointments?","answer":"Yes."}]')).toEqual({ faqs: [{ question: "Do you take appointments?", answer: "Yes." }], warning: null });
     expect(parseImportedFaqs("Call us for details").faqs).toEqual([]);
     expect(parseImportedFaqs("Call us for details").warning).toContain("FAQs were not imported");
+  });
+
+  it("normalizes a semicolon-separated services list without duplicating supplied services", () => {
+    expect(parseImportedServices("Haircut; Beard trim; Haircut").services).toEqual([{ name: "Haircut" }, { name: "Beard trim" }]);
   });
 });

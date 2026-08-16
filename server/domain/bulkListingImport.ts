@@ -27,6 +27,7 @@ export type NormalizedBulkListing = {
   subcategory: string;
   businessType: string;
   description: string;
+  services: string;
   address: string;
   city: string;
   locality: string;
@@ -53,6 +54,7 @@ export type ImportedHours = Array<{
 }>;
 
 export type ImportedFaq = { question: string; answer: string };
+export type ImportedService = { name: string };
 
 const DAY_INDEX: Record<string, number> = {
   sun: 0, sunday: 0,
@@ -70,6 +72,7 @@ const HEADER_ALIASES: Record<keyof NormalizedBulkListing, string[]> = {
   subcategory: ["subcategory", "sub category"],
   businessType: ["business type", "type"],
   description: ["description about", "description", "about", "about business"],
+  services: ["services", "service list", "business services"],
   address: ["address", "business address"],
   city: ["city"],
   locality: ["locality", "area", "neighbourhood", "neighborhood"],
@@ -205,4 +208,16 @@ export function parseImportedFaqs(raw: string): { faqs: ImportedFaq[]; warning: 
   } catch {
     return { faqs: [], warning: "FAQs were not imported. Use a JSON array such as [{\"question\":\"Do you take appointments?\",\"answer\":\"Yes.\"}]." };
   }
+}
+
+export function parseImportedServices(raw: string): { services: ImportedService[]; warning: string | null } {
+  const values = raw.split(/[;\n|]+/).map(value => stringValue(value)).filter(Boolean);
+  const seen = new Set<string>();
+  const services = values.filter(value => {
+    const key = value.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 50).map(name => ({ name: name.slice(0, 160) }));
+  return { services, warning: values.length > 50 ? "Only the first 50 services were retained for review." : null };
 }

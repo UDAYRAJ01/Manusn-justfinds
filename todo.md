@@ -257,3 +257,7 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 
 ## CSV-First Production Import Contract
 - [x] Finalize self-service CSV-first recovery guidance, including an in-product downloadable header template, Excel export steps, and immediate workbook-size feedback.
+
+## Import Template Deliverable
+- [x] Create a CSV-first bulk-import template with all supported fields, formatting guidance, services support, ratings/review audit fields, business hours, FAQs, and one example row.
+- [x] Import a semicolon-separated Services column into private business services, without converting supplied ratings or review totals into public customer reviews.

@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray, lt, or } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { approvalQueue, businesses, businessAiContent, businessFieldValues, businessHours, businessNotifications, businessTypes, bulkImportRows, bulkImports, bulkImportSourceChunks, categories, categoryFields, cities, localities, subcategories, users } from "../../drizzle/schema";
+import { approvalQueue, businesses, businessAiContent, businessFieldValues, businessHours, businessNotifications, businessServices, businessTypes, bulkImportRows, bulkImports, bulkImportSourceChunks, categories, categoryFields, cities, localities, subcategories, users } from "../../drizzle/schema";
 import { deleteInternalValidationBusiness, getAdminCounts, getCategorySchemas, getDb, getInternalValidationBusinesses, getOwnerBusinesses, getPendingBusinesses } from "../db";
 import { canManageAdmins, canManageBusiness, canModerate } from "../domain/permissions";
 import { buildVoiceIntroductionScript } from "../domain/voiceScript";
@@ -9,7 +9,7 @@ import { storageGetSignedUrl, storagePut } from "../storage";
 import { numberedSlug, preferredBusinessSlug } from "../domain/slug";
 import { normalizeCategorySlug } from "../domain/categorySlug";
 import { findApprovedIndiaCity } from "../domain/approvedIndiaCities";
-import { importCityCandidates, importLookupKeys, normalizeBulkListingRow, parseImportedFaqs, parseImportedHours, type NormalizedBulkListing } from "../domain/bulkListingImport";
+import { importCityCandidates, importLookupKeys, normalizeBulkListingRow, parseImportedFaqs, parseImportedHours, parseImportedServices, type NormalizedBulkListing } from "../domain/bulkListingImport";
 import { validateBulkListingRow, type ImportRow } from "../domain/importValidation";
 import { normalizeDuplicateText, scoreDuplicateCandidate } from "../domain/duplicateCheck";
 import { HIGH_VOLUME_FILE_LIMIT, HIGH_VOLUME_IMPORT_CHUNK, HIGH_VOLUME_ROW_LIMIT, HIGH_VOLUME_VALIDATION_CHUNK, highVolumeProgress, isSupportedImportFilename, sourceQueueIssue } from "../domain/highVolumeImportPolicy";
@@ -210,6 +210,8 @@ function validateImportListing(raw: ImportRow, rowNumber: number, lookup: Taxono
   if (hours.warning) warnings.push(hours.warning);
   const faq = parseImportedFaqs(listing.faqs);
   if (faq.warning) warnings.push(faq.warning);
+  const services = parseImportedServices(listing.services);
+  if (services.warning) warnings.push(services.warning);
   if (listing.rating || listing.totalReviews) warnings.push("Rating and Total Reviews are retained only in the private import audit; they are not published or converted into customer reviews.");
   const fileDuplicateKey = importRowFingerprint(listing, city?.id);
   const earlierRow = seenRows.get(fileDuplicateKey);
@@ -221,7 +223,7 @@ function validateImportListing(raw: ImportRow, rowNumber: number, lookup: Taxono
     .sort((left, right) => right.match.score - left.match.score)[0] : undefined;
   if (duplicate?.match.classification === "likely") errors.push(`Likely duplicate of existing listing “${duplicate.candidate.name}” (${duplicate.match.reasons.join(", ")}).`);
   else if (duplicate) warnings.push(`Possible duplicate of existing listing “${duplicate.candidate.name}”; it will require administrator review.`);
-  return { rowNumber, raw, listing, category, subcategory: subcategory ?? null, businessType: businessType ?? null, city: city ?? null, locality: locality ?? null, hours: hours.days, faqs: faq.faqs, errors, warnings, duplicateCandidateId: duplicate?.candidate.id ?? null, valid: errors.length === 0 };
+  return { rowNumber, raw, listing, category, subcategory: subcategory ?? null, businessType: businessType ?? null, city: city ?? null, locality: locality ?? null, hours: hours.days, faqs: faq.faqs, services: services.services, errors, warnings, duplicateCandidateId: duplicate?.candidate.id ?? null, valid: errors.length === 0 };
 }
 
 function importRowFingerprint(listing: NormalizedBulkListing, cityId: number | null | undefined) {
@@ -248,7 +250,7 @@ function spreadsheetRowsFromBuffer(buffer: Buffer): ImportRow[] {
 }
 
 function importPayload(row: ReturnType<typeof validateImportListing>) {
-  return { raw: row.raw, normalized: row.listing, warnings: row.warnings, hours: row.hours, faqs: row.faqs, categoryId: row.category?.id ?? null, subcategoryId: row.subcategory?.id ?? null, businessTypeId: row.businessType?.id ?? null, cityId: row.city?.id ?? null, localityId: row.locality?.id ?? null };
+  return { raw: row.raw, normalized: row.listing, warnings: row.warnings, hours: row.hours, faqs: row.faqs, services: row.services, categoryId: row.category?.id ?? null, subcategoryId: row.subcategory?.id ?? null, businessTypeId: row.businessType?.id ?? null, cityId: row.city?.id ?? null, localityId: row.locality?.id ?? null };
 }
 
 async function validateHighVolumeChunk(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, job: typeof bulkImports.$inferSelect) {
@@ -374,7 +376,7 @@ async function importHighVolumeChunk(db: NonNullable<Awaited<ReturnType<typeof g
   let created = 0;
   let failed = 0;
   for (const row of readyRows) {
-    const payload = row.data as { normalized?: NormalizedBulkListing; categoryId?: number | null; subcategoryId?: number | null; businessTypeId?: number | null; cityId?: number | null; localityId?: number | null; hours?: ReturnType<typeof parseImportedHours>["days"]; faqs?: ReturnType<typeof parseImportedFaqs>["faqs"] } | null;
+    const payload = row.data as { normalized?: NormalizedBulkListing; categoryId?: number | null; subcategoryId?: number | null; businessTypeId?: number | null; cityId?: number | null; localityId?: number | null; hours?: ReturnType<typeof parseImportedHours>["days"]; faqs?: ReturnType<typeof parseImportedFaqs>["faqs"]; services?: ReturnType<typeof parseImportedServices>["services"] } | null;
     const listing = payload?.normalized;
     if (!listing || !payload?.categoryId || !payload.cityId) {
       failed += 1;
@@ -387,6 +389,7 @@ async function importHighVolumeChunk(db: NonNullable<Awaited<ReturnType<typeof g
       await Promise.all([
         payload.hours?.length === 7 ? db.insert(businessHours).values(payload.hours.map(day => ({ ...day, businessId }))) : Promise.resolve(),
         payload.faqs?.length ? db.insert(businessAiContent).values({ businessId, about: listing.description || null, faqs: payload.faqs, status: "pending" }) : Promise.resolve(),
+        payload.services?.length ? db.insert(businessServices).values(payload.services.map((service, sortOrder) => ({ businessId, name: service.name, sortOrder }))) : Promise.resolve(),
         db.insert(approvalQueue).values({ entityType: "business", businessId, submittedById: job.initiatedById, status: "pending" }),
         db.update(bulkImportRows).set({ status: "imported" }).where(eq(bulkImportRows.id, row.id)),
       ]);
@@ -693,7 +696,7 @@ export const workspaceRouter = router({
     let createdRows = 0;
     let skippedRows = 0;
     for (const row of pendingRows) {
-      const payload = row.data as { normalized?: NormalizedBulkListing; categoryId?: number | null; subcategoryId?: number | null; businessTypeId?: number | null; cityId?: number | null; localityId?: number | null; hours?: ReturnType<typeof parseImportedHours>["days"]; faqs?: ReturnType<typeof parseImportedFaqs>["faqs"] } | null;
+      const payload = row.data as { normalized?: NormalizedBulkListing; categoryId?: number | null; subcategoryId?: number | null; businessTypeId?: number | null; cityId?: number | null; localityId?: number | null; hours?: ReturnType<typeof parseImportedHours>["days"]; faqs?: ReturnType<typeof parseImportedFaqs>["faqs"]; services?: ReturnType<typeof parseImportedServices>["services"] } | null;
       const listing = payload?.normalized;
       if (!listing || !payload?.categoryId || !payload.cityId) {
         skippedRows += 1;
@@ -704,10 +707,13 @@ export const workspaceRouter = router({
         const slug = nextImportSlug(listing.businessName, existingSlugs);
         const created = await db.insert(businesses).values({ ownerId: ctx.user.id, categoryId: payload.categoryId, subcategoryId: payload.subcategoryId ?? null, businessTypeId: payload.businessTypeId ?? null, cityId: payload.cityId, localityId: payload.localityId ?? null, name: listing.businessName, slug, address: listing.address, shortDescription: listing.description || null, aboutDescription: listing.description || null, phone: listing.phone || null, email: listing.email || null, website: listing.website || null, latitude: listing.latitude || null, longitude: listing.longitude || null, status: "submitted", onboardingStep: 1 });
         const businessId = Number(created[0].insertId);
-        if (payload.hours?.length === 7) await db.insert(businessHours).values(payload.hours.map(day => ({ ...day, businessId })));
-        if (payload.faqs?.length) await db.insert(businessAiContent).values({ businessId, about: listing.description || null, faqs: payload.faqs, status: "pending" });
-        await db.insert(approvalQueue).values({ entityType: "business", businessId, submittedById: ctx.user.id, status: "pending" });
-        await db.update(bulkImportRows).set({ status: "imported" }).where(eq(bulkImportRows.id, row.id));
+        await Promise.all([
+          payload.hours?.length === 7 ? db.insert(businessHours).values(payload.hours.map(day => ({ ...day, businessId }))) : Promise.resolve(),
+          payload.faqs?.length ? db.insert(businessAiContent).values({ businessId, about: listing.description || null, faqs: payload.faqs, status: "pending" }) : Promise.resolve(),
+          payload.services?.length ? db.insert(businessServices).values(payload.services.map((service, sortOrder) => ({ businessId, name: service.name, sortOrder }))) : Promise.resolve(),
+          db.insert(approvalQueue).values({ entityType: "business", businessId, submittedById: ctx.user.id, status: "pending" }),
+          db.update(bulkImportRows).set({ status: "imported" }).where(eq(bulkImportRows.id, row.id)),
+        ]);
         createdRows += 1;
       } catch (error) {
         skippedRows += 1;

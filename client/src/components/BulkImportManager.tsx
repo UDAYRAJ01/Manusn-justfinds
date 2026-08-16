@@ -9,19 +9,43 @@ type SpreadsheetCell = string | number | boolean | null;
 type SpreadsheetRow = Record<string, SpreadsheetCell>;
 
 const expectedColumns = [
-  "Business Name", "Main Category", "Subcategory", "Business Type", "Description (About)", "Address", "City", "Locality", "State", "Country", "Latitude", "Longitude", "Phone", "Email", "Website", "Hours", "Rating", "Total Reviews", "FAQs",
+  "Business Name", "Main Category", "Subcategory", "Business Type", "Description (About)", "Services", "Address", "City", "Locality", "State", "Country", "Latitude", "Longitude", "Phone", "Email", "Website", "Hours", "Rating", "Total Reviews", "FAQs",
 ];
+const templateExample: Record<string, string> = {
+  "Business Name": "Example Hospital — Replace Before Import",
+  "Main Category": "Healthcare",
+  Subcategory: "Hospitals",
+  "Business Type": "General Hospital",
+  "Description (About)": "Template example only. Replace all details with factual business information before importing.",
+  Services: "Outpatient consultation; Emergency care; Diagnostic services",
+  Address: "123 Example Road, Civil Lines",
+  City: "Jaipur",
+  Locality: "Civil Lines",
+  State: "Rajasthan",
+  Country: "India",
+  Latitude: "26.9124",
+  Longitude: "75.7873",
+  Phone: "+91 141 555 0100",
+  Email: "hello@examplewellness.in",
+  Website: "https://examplewellness.in",
+  Hours: "Mon-Fri 09:00-18:00; Sat 10:00-14:00; Sun Closed",
+  Rating: "",
+  "Total Reviews": "",
+  FAQs: '[{"question":"Do you take appointments?","answer":"Yes, appointments are available."}]',
+};
 const HIGH_VOLUME_FILE_LIMIT = 500 * 1024 * 1024;
 const HIGH_VOLUME_FILE_LIMIT_LABEL = "500 MB";
 const HIGH_VOLUME_UPLOAD_CHUNK_BYTES = 5 * 1024 * 1024;
 const HIGH_VOLUME_WORKBOOK_FILE_LIMIT = 25 * 1024 * 1024;
 
 function downloadLargeCsvTemplate() {
-  const blob = new Blob([`\uFEFF${expectedColumns.join(",")}\n`], { type: "text/csv;charset=utf-8" });
+  const escapeCsv = (value: string) => `"${value.replaceAll('"', '""')}"`;
+  const example = expectedColumns.map(column => escapeCsv(templateExample[column] ?? "")).join(",");
+  const blob = new Blob([`\uFEFF${expectedColumns.map(escapeCsv).join(",")}\n${example}\n`], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = "just-finds-large-import-template.csv";
+  anchor.download = "just-finds-import-template-with-example.csv";
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
