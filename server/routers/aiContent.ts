@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { and, eq } from "drizzle-orm";
 import { aiContentVersions, aiGenerationJobs, businesses } from "../../drizzle/schema";
 import { getBusinessAiFacts, getDb } from "../db";
-import { approveAiContentVersion, cancelAiGenerationJob, createAiDraftFromVersion, enqueueAiGenerationBatch, enqueueAiGenerationJob, getAiGenerationAnalytics, getAiGenerationProgress, getAiReviewQueue, getLatestAiContent, processAiGenerationJob, publishAiContentVersion, transitionAiContentVersion } from "../domain/ai/content";
+import { approveAiContentVersion, cancelAiGenerationJob, createAiDraftFromVersion, enqueueAiGenerationBatch, enqueueAiGenerationJob, getAiGenerationAnalytics, getAiGenerationProgress, getAiReviewQueue, getLatestAiContent, processAiGenerationJob, publishAiContentVersion, publishApprovedAboutToListing, transitionAiContentVersion } from "../domain/ai/content";
 import { canManageBusiness, canModerate } from "../domain/permissions";
 import { protectedProcedure, router } from "../_core/trpc";
 import { z } from "zod";
@@ -30,7 +30,7 @@ export const aiContentRouter = router({
     await getManagedBusiness(input.businessId, ctx.user.id, ctx.user.role);
     return getLatestAiContent(input.businessId, input.contentType);
   }),
-  bulkGenerate: protectedProcedure.input(z.object({ businessIds: z.array(z.number().int().positive()).min(1).max(250), contentTypes: z.array(contentType).min(1).max(10) })).mutation(async ({ ctx, input }) => {
+  bulkGenerate: protectedProcedure.input(z.object({ businessIds: z.array(z.number().int().positive()).min(1).max(25), contentTypes: z.array(contentType).min(1).max(10) })).mutation(async ({ ctx, input }) => {
     if (!canModerate(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "Administrator access is required for bulk AI generation." });
     for (const businessId of input.businessIds) await getManagedBusiness(businessId, ctx.user.id, ctx.user.role);
     const batchId = `bulk-${ctx.user.id}-${Date.now()}`;
@@ -116,11 +116,17 @@ export const aiContentRouter = router({
   publish: protectedProcedure.input(z.object({ versionId: z.number().int().positive(), note: z.string().max(2000).optional() })).mutation(async ({ ctx, input }) => {
     if (!canModerate(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "Administrator access is required to publish AI content." });
     try {
-      await publishAiContentVersion({ versionId: input.versionId, reviewerId: ctx.user.id, note: input.note });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The AI workspace is temporarily unavailable." });
+      const versions = await db.select({ contentType: aiContentVersions.contentType }).from(aiContentVersions).where(eq(aiContentVersions.id, input.versionId)).limit(1);
+      if (!versions[0]) throw new TRPCError({ code: "NOT_FOUND", message: "AI content version not found." });
+      const applied = versions[0].contentType === "about_business";
+      if (applied) await publishApprovedAboutToListing({ versionId: input.versionId, reviewerId: ctx.user.id, note: input.note });
+      else await publishAiContentVersion({ versionId: input.versionId, reviewerId: ctx.user.id, note: input.note });
+      return { published: true, appliedToListing: applied, status: "published" as const };
     } catch (error) {
       throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "This AI content cannot be published." });
     }
-    return { published: true, status: "published" as const };
   }),
   getBusinessFactsPreview: protectedProcedure.input(z.object({ businessId: z.number().int().positive() })).query(async ({ ctx, input }) => {
     await getManagedBusiness(input.businessId, ctx.user.id, ctx.user.role);

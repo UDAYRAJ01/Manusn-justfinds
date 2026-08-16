@@ -265,3 +265,9 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 ## Grounded AI About Business Rewrites
 - [x] Add an administrator-authorized AI action for every submitted/imported listing that creates an About Business draft from factual fields only.
 - [x] Keep generated descriptions as private reviewable drafts, with transparent errors and no automatic public publication.
+
+## Reusable AI Rewrite Skill and Bulk Review
+- [x] Create and validate a reusable grounded-AI business-content rewrite skill.
+- [x] Add bulk selection and bounded batch About draft generation for submitted listings.
+- [x] Add original-versus-AI-draft comparison before approval.
+- [x] Add a one-click publish action for approved AI About drafts.

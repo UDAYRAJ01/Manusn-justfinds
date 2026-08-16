@@ -233,6 +233,8 @@ export async function getAiReviewQueue() {
     id: aiContentVersions.id,
     businessId: aiContentVersions.businessId,
     businessName: businesses.name,
+    originalAbout: businesses.aboutDescription,
+    originalShortDescription: businesses.shortDescription,
     contentType: aiContentVersions.contentType,
     version: aiContentVersions.version,
     content: aiContentVersions.content,
@@ -256,6 +258,10 @@ const allowedTransitions: Record<AiContentStatus, AiContentStatus[]> = {
 
 export function canTransitionAiContent(from: AiContentStatus, to: AiContentStatus) {
   return allowedTransitions[from].includes(to);
+}
+
+export function canApplyApprovedAboutToListing(contentType: AiContentType, status: AiContentStatus) {
+  return contentType === "about_business" && status === "approved";
 }
 
 export async function transitionAiContentVersion(input: { versionId: number; to: AiContentStatus; actorId: number; note?: string }) {
@@ -286,4 +292,16 @@ export async function approveAiContentVersion(input: { versionId: number; review
 
 export async function publishAiContentVersion(input: { versionId: number; reviewerId: number; note?: string }) {
   return transitionAiContentVersion({ versionId: input.versionId, to: "published", actorId: input.reviewerId, note: input.note });
+}
+
+export async function publishApprovedAboutToListing(input: { versionId: number; reviewerId: number; note?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+  const rows = await db.select({ businessId: aiContentVersions.businessId, contentType: aiContentVersions.contentType, status: aiContentVersions.status, content: aiContentVersions.content }).from(aiContentVersions).where(eq(aiContentVersions.id, input.versionId)).limit(1);
+  const version = rows[0];
+  if (!version) throw new Error("AI content version not found");
+  if (!canApplyApprovedAboutToListing(version.contentType as AiContentType, version.status as AiContentStatus)) throw new Error("Only an approved About Business draft can update the listing.");
+  await db.update(businesses).set({ aboutDescription: version.content }).where(eq(businesses.id, version.businessId));
+  await transitionAiContentVersion({ versionId: input.versionId, to: "published", actorId: input.reviewerId, note: input.note });
+  return { businessId: version.businessId, applied: true };
 }

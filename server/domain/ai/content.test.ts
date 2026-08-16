@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateGeneratedContent } from "./content";
+import { canApplyApprovedAboutToListing, validateGeneratedContent } from "./content";
 import { buildChatPrompt, buildContentPrompt } from "./prompts";
 import type { BusinessAiFacts } from "./types";
 
@@ -54,5 +54,11 @@ describe("Phase 5 factual content guardrails", () => {
     const prompt = buildChatPrompt({ name: "North Star Dental" }, "What is your price?");
     expect(prompt.system).toContain("I don't have that information for this business.");
     expect(prompt.user).toBe("What is your price?");
+  });
+
+  it("allows only an approved About draft to update the business listing", () => {
+    expect(canApplyApprovedAboutToListing("about_business", "approved")).toBe(true);
+    expect(canApplyApprovedAboutToListing("about_business", "pending_review")).toBe(false);
+    expect(canApplyApprovedAboutToListing("seo_title", "approved")).toBe(false);
   });
 });
