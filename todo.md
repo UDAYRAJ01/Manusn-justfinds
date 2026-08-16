@@ -375,3 +375,9 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Compare the latest checkpointed project tree against GitHub main: source-tree file counts match at 383, while GitHub main is behind the current checkpoint and the URL directory awaits inclusion.
 - [x] Add the complete URL directory to the tracked project tree and create one complete current-source snapshot commit.
 - [x] Push the complete latest snapshot to GitHub main and verify remote file coverage and commit identity (384 tracked files; `docs/URL_DIRECTORY.md` confirmed remotely).
+
+## GitHub-Linked Page URL Directory
+
+- [x] Map every registered Just Finds page URL pattern to its corresponding source component and GitHub main URL.
+- [x] Create a tracked directory document containing live URLs, GitHub source links, access notes, and dynamic placeholder examples.
+- [ ] Verify the generated GitHub links resolve against the current `main` commit, then push the document and report it.
