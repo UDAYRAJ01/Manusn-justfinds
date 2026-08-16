@@ -234,8 +234,13 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [ ] Retry the confirmed 250 MB import and verify background validation advances without storage-read failures.
 
 ## Server-Side Confirmed Import Recovery
-- [ ] Diagnose why the administrator retry did not start the confirmed import and recover it without requiring further user actions.
+- [x] Diagnose why the administrator retry did not start the confirmed import; safely retire the oversized XLS jobs because they exceed the 512 MB worker memory budget, and route recovery to the streamed CSV workflow.
 - [x] Add bounded per-chunk storage-read timeouts so a stalled signed download cannot keep the import in processing indefinitely.
 
 ## Spreadsheet Value Normalization
 - [ ] Diagnose the confirmed import’s category, subcategory, city, hours, and FAQ validation failures and safely accept unambiguous source formats.
+
+## Low-Memory Large Import Path
+- [x] Implement streamed CSV validation for large imports and present truthful XLS/XLSX size guidance for the managed worker memory limit.
+- [ ] Validate a large CSV through staging, streamed validation, and background listing creation.
+- [x] Suppress retry controls for workbook jobs that are terminal due to the managed format-size limit.

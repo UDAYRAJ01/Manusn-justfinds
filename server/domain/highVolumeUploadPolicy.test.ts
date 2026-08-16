@@ -1,5 +1,6 @@
 import { HIGH_VOLUME_FILE_LIMIT } from "./highVolumeImportPolicy";
-import { HIGH_VOLUME_UPLOAD_CHUNK_BYTES, highVolumeUploadIssue, highVolumeUploadPartBytes, highVolumeUploadPartCount, highVolumeUploadPartIssue } from "./highVolumeUploadPolicy";
+import { HIGH_VOLUME_FILE_LIMIT } from "./highVolumeImportPolicy";
+import { HIGH_VOLUME_UPLOAD_CHUNK_BYTES, HIGH_VOLUME_WORKBOOK_FILE_LIMIT, highVolumeFormatIssue, highVolumeUploadIssue, highVolumeUploadPartBytes, highVolumeUploadPartCount, highVolumeUploadPartIssue } from "./highVolumeUploadPolicy";
 import { sourceQueueIssue } from "./highVolumeImportPolicy";
 import { describe, expect, it } from "vitest";
 
@@ -28,5 +29,10 @@ describe("high-volume upload policy", () => {
     expect(highVolumeUploadPartIssue(fileSize, 2, 17)).toBeNull();
     expect(highVolumeUploadPartIssue(fileSize, 2, 16)).toContain("does not match");
     expect(highVolumeUploadPartBytes(fileSize, 3)).toBeNull();
+  });
+
+  it("requires CSV for workbooks exceeding the managed decode limit", () => {
+    expect(highVolumeFormatIssue("listings.xls", HIGH_VOLUME_WORKBOOK_FILE_LIMIT + 1)).toContain("export this workbook as CSV");
+    expect(highVolumeFormatIssue("listings.csv", HIGH_VOLUME_FILE_LIMIT)).toBeNull();
   });
 });

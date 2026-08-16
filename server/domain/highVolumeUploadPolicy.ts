@@ -1,6 +1,15 @@
 import { HIGH_VOLUME_FILE_LIMIT } from "./highVolumeImportPolicy";
 
 export const HIGH_VOLUME_UPLOAD_CHUNK_BYTES = 5 * 1024 * 1024;
+export const HIGH_VOLUME_WORKBOOK_FILE_LIMIT = 25 * 1024 * 1024;
+
+export function highVolumeFormatIssue(filename: string, fileSize: number): string | null {
+  const normalized = filename.trim().toLowerCase();
+  if (/\.(xls|xlsx)$/.test(normalized) && fileSize > HIGH_VOLUME_WORKBOOK_FILE_LIMIT) {
+    return `For reliable large imports, export this workbook as CSV. XLS/XLSX files are limited to ${Math.floor(HIGH_VOLUME_WORKBOOK_FILE_LIMIT / (1024 * 1024))} MB because they must be fully decoded before validation.`;
+  }
+  return null;
+}
 
 export function highVolumeUploadIssue(expectedBytes: number | null, receivedBytes: number | null): string | null {
   if (!expectedBytes || expectedBytes < 1 || expectedBytes > HIGH_VOLUME_FILE_LIMIT) {

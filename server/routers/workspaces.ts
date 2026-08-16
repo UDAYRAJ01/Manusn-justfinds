@@ -13,7 +13,7 @@ import { normalizeBulkListingRow, parseImportedFaqs, parseImportedHours, type No
 import { validateBulkListingRow, type ImportRow } from "../domain/importValidation";
 import { normalizeDuplicateText, scoreDuplicateCandidate } from "../domain/duplicateCheck";
 import { HIGH_VOLUME_FILE_LIMIT, HIGH_VOLUME_IMPORT_CHUNK, HIGH_VOLUME_ROW_LIMIT, HIGH_VOLUME_VALIDATION_CHUNK, highVolumeProgress, isSupportedImportFilename, sourceQueueIssue } from "../domain/highVolumeImportPolicy";
-import { highVolumeUploadPartBytes, highVolumeUploadPartCount } from "../domain/highVolumeUploadPolicy";
+import { highVolumeFormatIssue, highVolumeUploadPartBytes, highVolumeUploadPartCount } from "../domain/highVolumeUploadPolicy";
 import { HIGH_VOLUME_IMPORT_CALLBACK_PATH, HIGH_VOLUME_IMPORT_CRON } from "../domain/highVolumeImportSchedule";
 import { heartbeatSessionFromHeaders } from "../domain/heartbeatSession";
 import { mapWithConcurrency } from "../domain/asyncPool";
@@ -472,13 +472,45 @@ export const workspaceRouter = router({
   beginHighVolumeImport: protectedProcedure.input(z.object({ filename: z.string().min(1).max(255), contentType: z.string().max(120).optional(), fileSize: z.number().int().positive().max(HIGH_VOLUME_FILE_LIMIT) })).mutation(async ({ ctx, input }) => {
     requireModerator(ctx.user.role);
     if (!isSupportedImportFilename(input.filename)) throw new TRPCError({ code: "BAD_REQUEST", message: "Choose a CSV, XLS, or XLSX file." });
+    const formatIssue = highVolumeFormatIssue(input.filename, input.fileSize);
+    if (formatIssue) throw new TRPCError({ code: "BAD_REQUEST", message: formatIssue });
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The import service is temporarily unavailable." });
     const safeFilename = input.filename.replace(/[^a-zA-Z0-9._-]/g, "_");
     const key = `bulk-imports/${ctx.user.id}/${Date.now()}-${crypto.randomUUID()}-${safeFilename}`;
     const created = await db.insert(bulkImports).values({ initiatedById: ctx.user.id, filename: input.filename, status: "pending", phase: "staged", sourceFileKey: key, sourceFileContentType: input.contentType || null, sourceFileSize: input.fileSize, maxAttempts: 3 });
     const importId = Number(created[0].insertId);
-    return { importId, uploadPath: `/api/admin/bulk-imports/${importId}/upload`, fileKey: key, maxRows: HIGH_VOLUME_ROW_LIMIT, maxBytes: HIGH_VOLUME_FILE_LIMIT };
+    return { importId, uploadPath: `/api/admin/bulk-imports/${importId}/upload`, fileKey: key, maxRows: HIGH_VOLUME_ROW_LIMIT, maxBytes: HIGH_VOLUME_FILE_LIMIT, validatesCsvInBrowser: input.filename.toLowerCase().endsWith(".csv") };
+  }),
+  validateHighVolumeCsvBatch: protectedProcedure.input(z.object({ importId: z.number().int().positive(), rowOffset: z.number().int().min(0).max(HIGH_VOLUME_ROW_LIMIT), sourceBytesRead: z.number().int().min(0).max(HIGH_VOLUME_FILE_LIMIT), rows: spreadsheetRowsInput.optional().default([]), final: z.boolean().default(false) })).mutation(async ({ ctx, input }) => {
+    requireModerator(ctx.user.role);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The import service is temporarily unavailable." });
+    const [job] = await db.select().from(bulkImports).where(eq(bulkImports.id, input.importId)).limit(1);
+    if (!job) throw new TRPCError({ code: "NOT_FOUND", message: "Staged import not found." });
+    if (job.initiatedById !== ctx.user.id && ctx.user.role !== "super_admin") throw new TRPCError({ code: "FORBIDDEN", message: "Only the initiating administrator may validate this import." });
+    if (!job.filename.toLowerCase().endsWith(".csv")) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Only CSV files use streamed browser validation." });
+    const stagingIssue = sourceQueueIssue(job.sourceUploadedAt);
+    if (stagingIssue) throw new TRPCError({ code: "PRECONDITION_FAILED", message: stagingIssue });
+    if (job.phase !== "staged" && job.phase !== "validating") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "This import is no longer awaiting CSV validation." });
+    if (job.validationCursor !== input.rowOffset) throw new TRPCError({ code: "CONFLICT", message: "CSV validation is out of sequence. Refresh import history before continuing." });
+    if (!input.final && !input.rows.length) throw new TRPCError({ code: "BAD_REQUEST", message: "A CSV validation batch must include at least one business row." });
+    if (input.rowOffset + input.rows.length > HIGH_VOLUME_ROW_LIMIT) throw new TRPCError({ code: "BAD_REQUEST", message: `This import exceeds the ${HIGH_VOLUME_ROW_LIMIT.toLocaleString()} row limit.` });
+    const lookup = input.rows.length ? await importTaxonomyLookup(db, input.rows) : null;
+    const priorRows = input.rowOffset ? await db.select({ rowNumber: bulkImportRows.rowNumber, fingerprint: bulkImportRows.fingerprint }).from(bulkImportRows).where(and(eq(bulkImportRows.importId, job.id), lt(bulkImportRows.rowNumber, input.rowOffset + 2))) : [];
+    const seenRows = new Map(priorRows.flatMap(row => row.fingerprint ? [[row.fingerprint, row.rowNumber] as [string, number]] : []));
+    const prepared = lookup ? input.rows.map((raw, index) => validateImportListing(raw as ImportRow, input.rowOffset + index + 2, lookup, seenRows)) : [];
+    const rowsToInsert = prepared.map(row => ({ importId: job.id, rowNumber: row.rowNumber, fingerprint: row.errors.some(error => error.startsWith("Duplicate of spreadsheet row")) ? null : importRowFingerprint(row.listing, row.city?.id), data: importPayload(row), validationErrors: row.errors.length ? row.errors : null, duplicateCandidateId: row.duplicateCandidateId, status: row.valid ? "valid" as const : row.duplicateCandidateId && row.errors.some(error => error.startsWith("Likely duplicate")) ? "duplicate" as const : "invalid" as const }));
+    if (rowsToInsert.length) await db.insert(bulkImportRows).values(rowsToInsert);
+    const validAdded = prepared.filter(row => row.valid).length;
+    const nextCursor = input.rowOffset + prepared.length;
+    if (input.final) {
+      await db.update(bulkImports).set({ status: "pending", phase: "ready", totalRows: nextCursor, validationCursor: nextCursor, validRows: job.validRows + validAdded, failedRows: job.failedRows + prepared.length - validAdded, progressPercent: 100, finishedAt: new Date(), errorMessage: null, errorCategory: null }).where(eq(bulkImports.id, job.id));
+      return { importId: job.id, phase: "ready" as const, processed: prepared.length, totalRows: nextCursor };
+    }
+    const progressPercent = job.sourceFileSize ? Math.min(44, Math.max(1, Math.floor((input.sourceBytesRead / job.sourceFileSize) * 45))) : 1;
+    await db.update(bulkImports).set({ status: "processing", phase: "validating", validationCursor: nextCursor, validRows: job.validRows + validAdded, failedRows: job.failedRows + prepared.length - validAdded, progressPercent, errorMessage: null, errorCategory: null }).where(eq(bulkImports.id, job.id));
+    return { importId: job.id, phase: "validating" as const, processed: prepared.length, totalRows: null };
   }),
   queueHighVolumeValidation: protectedProcedure.input(z.object({ importId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     requireModerator(ctx.user.role);
@@ -515,6 +547,7 @@ export const workspaceRouter = router({
     if (!job) throw new TRPCError({ code: "NOT_FOUND", message: "Import not found." });
     if (job.initiatedById !== ctx.user.id && ctx.user.role !== "super_admin") throw new TRPCError({ code: "FORBIDDEN", message: "Only the initiating administrator may retry this import." });
     if (!["failed", "retrying"].includes(job.status) || !["validating", "importing"].includes(job.phase)) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Only a failed background import can be retried." });
+    if (job.errorCategory === "format_limit") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "This oversized XLS/XLSX import cannot run in the managed worker. Export it as CSV UTF-8 and create a new large import." });
     const stagingIssue = sourceQueueIssue(job.sourceUploadedAt);
     if (stagingIssue) throw new TRPCError({ code: "PRECONDITION_FAILED", message: stagingIssue });
     const scheduleCronTaskUid = await enableHighVolumeImportSchedule(input.importId, job.scheduleCronTaskUid, heartbeatSessionFromHeaders(ctx.req.headers.cookie, ctx.req.headers.authorization, COOKIE_NAME));
