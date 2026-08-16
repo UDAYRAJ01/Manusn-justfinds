@@ -283,3 +283,10 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Preserve unverified service ideas as private suggestions only; do not add or publish invented services or claims.
 - [x] Add comparison, approval, and publication controls for each generated content type.
 - [x] Add regression coverage and complete TypeScript, full-test, and visual validation before release.
+
+## Single Human-First AI SEO Profile
+- [x] Replace the four separate AI SEO review drafts with one combined, administrator-reviewable best-profile draft.
+- [x] Generate a factual, human-first About section with search-intent-aware headings, SEO title, and meta description without keyword stuffing or unsupported claims.
+- [x] Generate between five and ten source-grounded FAQs in the same combined review profile.
+- [x] Provide one clear comparison, approval, and publication action that applies the approved combined profile to the private listing.
+- [x] Add regression coverage and validate TypeScript, complete automated tests, and the revised administrator interface before release.

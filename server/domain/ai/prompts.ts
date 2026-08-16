@@ -5,6 +5,7 @@ export const PROMPT_VERSION = 1;
 export const AI_CONTENT_TYPES = [
   "short_description",
   "about_business",
+  "business_seo_profile",
   "seo_title",
   "meta_description",
   "faq",
@@ -20,6 +21,7 @@ export type PromptContentType = (typeof AI_CONTENT_TYPES)[number];
 const instructions: Record<PromptContentType, string> = {
   short_description: "Write one factual, welcoming business description in 120 characters or fewer.",
   about_business: "Write a concise factual About section in 2 to 4 short paragraphs. Do not add claims absent from the facts.",
+  business_seo_profile: "Create one complete human-first local business profile. Return a natural, directly useful About section in `text`, a clear factual page title in `title` (60 characters or fewer), a direct factual search snippet in `description` (160 characters or fewer), and 5 to 10 FAQ pairs in `faqs`. Write for people trying to find this business; answer their likely practical questions plainly. Use descriptive, intent-aligned wording and natural headings only when useful. Never keyword-stuff, use robotic phrasing, impersonate an author, claim personal experience, add credentials, or invent services, policies, prices, hours, reviews, ratings, outcomes, or other facts. Each FAQ must be answerable solely from source facts.",
   seo_title: "Write one search-friendly page title in 55 characters or fewer.",
   meta_description: "Write one search snippet in 155 characters or fewer.",
   faq: "Create exactly 10 question-and-answer pairs. Use only facts present in the source facts; omit any item that cannot be answered from the facts.",

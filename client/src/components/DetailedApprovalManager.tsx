@@ -39,13 +39,13 @@ export function DetailedApprovalManager() {
     setError(null); setNotice(null);
     try {
       const result = await generateSeoPack.mutateAsync({ businessId });
-      setNotice(`${result.completed} private AI drafts were created (About, SEO title, meta description, and FAQs). Review them in AI governance before publishing.`);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "The AI SEO drafts could not be created."); }
+      setNotice(result.completed ? "One private Best AI SEO Profile was created. Review, approve, and publish the complete profile in AI governance." : "The Best AI SEO Profile could not be created. Check the actionable error below.");
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "The Best AI SEO Profile could not be created."); }
   };
   const runSelected = async () => {
     const ids = selectedIds.slice(0, 5); if (!ids.length) return;
     setError(null); setNotice(null); setProgress({ completed: 0, total: ids.length });
-    let completed = 0;
+      let completed = 0;
     try {
       for (let index = 0; index < ids.length; index += 1) {
         const result = await generateSeoPack.mutateAsync({ businessId: ids[index]! });
@@ -53,12 +53,12 @@ export function DetailedApprovalManager() {
         setProgress({ completed: index + 1, total: ids.length });
       }
       setSelectedIds([]);
-      setNotice(`${completed} private AI SEO drafts were created. Open AI governance to compare, approve, and publish each draft.`);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "The selected AI SEO drafts could not be created."); }
+      setNotice(`${completed} private Best AI SEO profiles were created. Open AI governance to compare, approve, and publish each complete profile.`);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "The selected Best AI SEO profiles could not be created."); }
     finally { setProgress(null); void utils.aiContent.reviewQueue.invalidate(); }
   };
   return <section className="mt-8 space-y-5">
-    <div className="rounded-[24px] border border-slate-200 bg-white p-5 sm:p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="eyebrow">Listing approval</p><h2 className="mt-1 text-xl font-semibold tracking-[-.035em] text-slate-900">Full business details before approval</h2><p className="mt-2 max-w-3xl text-xs leading-5 text-slate-500">Every source field is shown separately. AI SEO uses only the factual fields below, keeps all drafts private, and never turns import ratings or review totals into public customer reviews.</p></div><div className="flex items-center gap-2"><span className="text-xs font-medium text-slate-500">{selectedIds.length}/5 selected</span><Button disabled={!selectedIds.length || busy} onClick={() => void runSelected()} className="h-9 rounded-lg text-xs"><Sparkles className="mr-1.5 size-3.5" />{progress ? `Creating ${progress.completed}/${progress.total}` : "Create AI SEO packs"}</Button><ClipboardCheck className="size-5 text-[#1f51c8]" /></div></div>
+    <div className="rounded-[24px] border border-slate-200 bg-white p-5 sm:p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="eyebrow">Listing approval</p><h2 className="mt-1 text-xl font-semibold tracking-[-.035em] text-slate-900">Full business details before approval</h2><p className="mt-2 max-w-3xl text-xs leading-5 text-slate-500">Every source field is shown separately. One Best AI SEO Profile uses only the factual fields below, stays private until approved, and never turns import ratings or review totals into public customer reviews.</p></div><div className="flex items-center gap-2"><span className="text-xs font-medium text-slate-500">{selectedIds.length}/5 selected</span><Button disabled={!selectedIds.length || busy} onClick={() => void runSelected()} className="h-9 rounded-lg text-xs"><Sparkles className="mr-1.5 size-3.5" />{progress ? `Creating ${progress.completed}/${progress.total}` : "Create best AI profiles"}</Button><ClipboardCheck className="size-5 text-[#1f51c8]" /></div></div>
       {notice && <div role="status" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-900"><span>{notice}</span><a href="/admin/ai" className="font-semibold underline underline-offset-2">Open AI governance</a></div>}
       {error && <p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800">{error}</p>}
     </div>

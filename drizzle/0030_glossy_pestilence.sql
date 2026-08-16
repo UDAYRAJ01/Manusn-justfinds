@@ -1,0 +1,2 @@
+ALTER TABLE `ai_content_versions` MODIFY COLUMN `contentType` enum('short_description','about_business','business_seo_profile','seo_title','meta_description','faq','service_description','category_description','local_landing','business_highlights','cta_copy') NOT NULL;--> statement-breakpoint
+ALTER TABLE `ai_generation_jobs` MODIFY COLUMN `contentType` enum('short_description','about_business','business_seo_profile','seo_title','meta_description','faq','service_description','category_description','local_landing','business_highlights','cta_copy') NOT NULL;

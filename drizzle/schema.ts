@@ -19,6 +19,7 @@ export const businessAiContentStatusValues = ["pending", "processing", "complete
 export const aiContentTypeValues = [
   "short_description",
   "about_business",
+  "business_seo_profile",
   "seo_title",
   "meta_description",
   "faq",

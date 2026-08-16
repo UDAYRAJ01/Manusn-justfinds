@@ -50,6 +50,27 @@ describe("Phase 5 factual content guardrails", () => {
     expect(prompt.user).toContain("North Star Dental");
   });
 
+  it("accepts one grounded human-first SEO profile with five FAQs and blocks unsupported profile claims", () => {
+    const profile = {
+      text: "North Star Dental is a dental clinic in Mumbai. Its listed consultation service is available at the supplied address.",
+      title: "North Star Dental in Mumbai",
+      description: "Find North Star Dental, a dental clinic in Mumbai, with listed consultation details and contact information.",
+      faqs: [
+        { question: "Where is North Star Dental?", answer: "North Star Dental is at 12 Market Road in Mumbai." },
+        { question: "What type of business is North Star Dental?", answer: "It is listed as a Dental Clinic." },
+        { question: "Which service is listed?", answer: "Dental consultation is listed as a service." },
+        { question: "When is the clinic listed as open?", answer: "Its supplied hours show Monday from 09:00 to 17:00." },
+        { question: "Is a phone number available?", answer: "The source facts contain an available phone number." },
+      ],
+    };
+    const accepted = validateGeneratedContent("business_seo_profile", profile, facts);
+    expect(accepted.accepted).toBe(true);
+    expect(accepted.normalized.faqs).toHaveLength(5);
+    const unsupported = validateGeneratedContent("business_seo_profile", { ...profile, text: "North Star Dental is the best clinic with guaranteed results." }, facts);
+    expect(unsupported.accepted).toBe(false);
+    expect(unsupported.flags).toContain("unsupported_claim_language");
+  });
+
   it("uses an exact fallback instruction for isolated business chat", () => {
     const prompt = buildChatPrompt({ name: "North Star Dental" }, "What is your price?");
     expect(prompt.system).toContain("I don't have that information for this business.");
@@ -64,6 +85,7 @@ describe("Phase 5 factual content guardrails", () => {
 
   it("allows approved SEO and FAQ drafts, but never pending or unsupported content, to update a private listing", () => {
     expect(canApplyApprovedContentToListing("about_business", "approved")).toBe(true);
+    expect(canApplyApprovedContentToListing("business_seo_profile", "approved")).toBe(true);
     expect(canApplyApprovedContentToListing("seo_title", "approved")).toBe(true);
     expect(canApplyApprovedContentToListing("meta_description", "approved")).toBe(true);
     expect(canApplyApprovedContentToListing("faq", "approved")).toBe(true);

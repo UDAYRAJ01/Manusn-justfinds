@@ -23,7 +23,7 @@ export function AiAdminWorkspace() {
     </div>
     {analytics.data?.costMessage && <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900">{analytics.data.costMessage} Provider cost data is intentionally not estimated.</p>}
     <section className="rounded-[24px] border border-slate-200 bg-white p-5 sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="eyebrow">AI governance</p><h2 className="mt-1 text-xl font-semibold tracking-[-.035em] text-slate-900">Content review queue</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">Only fact-grounded versions that entered the moderation workflow appear here. Publishing an approved About, SEO title, meta description, or FAQ draft updates the private listing and preserves the version record.</p></div><CheckCircle2 className="size-6 text-emerald-600" /></div>
+      <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="eyebrow">AI governance</p><h2 className="mt-1 text-xl font-semibold tracking-[-.035em] text-slate-900">Content review queue</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">Only fact-grounded versions that entered the moderation workflow appear here. Publishing an approved Best AI SEO Profile updates its private listing’s About, SEO title, meta description, and grounded FAQs together while preserving the version record.</p></div><CheckCircle2 className="size-6 text-emerald-600" /></div>
       {queue.error && <p className="mt-4 text-xs text-rose-600">{queue.error.message}</p>}
       <div className="mt-5 grid gap-3">
         {queue.isLoading ? <div className="h-24 animate-pulse rounded-2xl bg-slate-100" /> : queue.data?.length ? queue.data.map(item => <article className="rounded-2xl border border-slate-200 p-4" key={item.id}>
@@ -48,6 +48,7 @@ function formatValidationFlags(value: unknown) {
 }
 
 function originalLabel(contentType: string) {
+  if (contentType === "business_seo_profile") return "Current business profile";
   if (contentType === "seo_title") return "Current SEO title";
   if (contentType === "meta_description") return "Current meta description";
   if (contentType === "faq") return "Current FAQs";
@@ -55,6 +56,7 @@ function originalLabel(contentType: string) {
 }
 
 function draftLabel(contentType: string) {
+  if (contentType === "business_seo_profile") return "Best AI SEO Profile";
   if (contentType === "seo_title") return "SEO title";
   if (contentType === "meta_description") return "meta description";
   if (contentType === "faq") return "10 FAQs";
@@ -62,6 +64,7 @@ function draftLabel(contentType: string) {
 }
 
 function originalContent(item: { contentType: string; originalAbout?: string | null; originalShortDescription?: string | null; originalSeoTitle?: string | null; originalMetaDescription?: string | null; originalFaqs?: unknown }) {
+  if (item.contentType === "business_seo_profile") return [item.originalAbout || item.originalShortDescription || "No prior About text was saved.", `SEO title: ${item.originalSeoTitle || "Not saved"}`, `Meta description: ${item.originalMetaDescription || "Not saved"}`, formatFaqs(item.originalFaqs) ? `FAQs:\n${formatFaqs(item.originalFaqs)}` : "FAQs: Not saved"].join("\n\n");
   if (item.contentType === "seo_title") return item.originalSeoTitle || "No SEO title has been saved.";
   if (item.contentType === "meta_description") return item.originalMetaDescription || "No meta description has been saved.";
   if (item.contentType === "faq") return formatFaqs(item.originalFaqs) || "No prior FAQs were saved.";
@@ -69,6 +72,10 @@ function originalContent(item: { contentType: string; originalAbout?: string | n
 }
 
 function draftContent(item: { contentType: string; content: string; structured?: unknown }) {
+  if (item.contentType === "business_seo_profile") {
+    const profile = item.structured && typeof item.structured === "object" ? item.structured as { title?: unknown; description?: unknown; faqs?: unknown } : {};
+    return [item.content, `SEO title: ${typeof profile.title === "string" ? profile.title : "Not generated"}`, `Meta description: ${typeof profile.description === "string" ? profile.description : "Not generated"}`, formatFaqs(profile.faqs) ? `FAQs:\n${formatFaqs(profile.faqs)}` : "FAQs: Not generated"].join("\n\n");
+  }
   return item.contentType === "faq" ? formatFaqs(item.structured) || item.content : item.content;
 }
 

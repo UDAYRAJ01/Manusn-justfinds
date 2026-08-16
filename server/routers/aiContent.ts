@@ -7,7 +7,7 @@ import { canManageBusiness, canModerate } from "../domain/permissions";
 import { protectedProcedure, router } from "../_core/trpc";
 import { z } from "zod";
 
-const contentType = z.enum(["short_description", "about_business", "seo_title", "meta_description", "faq", "service_description", "category_description", "local_landing", "business_highlights", "cta_copy"]);
+const contentType = z.enum(["short_description", "about_business", "business_seo_profile", "seo_title", "meta_description", "faq", "service_description", "category_description", "local_landing", "business_highlights", "cta_copy"]);
 
 async function getManagedBusiness(businessId: number, userId: number, role: string) {
   const db = await getDb();
@@ -29,20 +29,12 @@ export const aiContentRouter = router({
   generateSeoPack: protectedProcedure.input(z.object({ businessId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     if (!canModerate(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "Administrator access is required to create AI SEO drafts." });
     await getManagedBusiness(input.businessId, ctx.user.id, ctx.user.role);
-    const batchId = `seo-pack-${ctx.user.id}-${Date.now()}`;
-    const results: Array<{ contentType: "about_business" | "seo_title" | "meta_description" | "faq"; status: "completed" | "failed"; versionId?: number }> = [];
-    for (const draftType of ["about_business", "seo_title", "meta_description", "faq"] as const) {
-      const queued = await enqueueAiGenerationJob({ businessId: input.businessId, contentType: draftType, requestedById: ctx.user.id, batchId });
-      const result = await processAiGenerationJob(queued.jobId);
-      const versionId = "versionId" in result ? result.versionId : undefined;
-      if (result.status === "completed" && versionId) {
-        await transitionAiContentVersion({ versionId, to: "pending_review", actorId: ctx.user.id });
-        results.push({ contentType: draftType, status: "completed", versionId });
-      } else {
-        results.push({ contentType: draftType, status: "failed", ...(versionId ? { versionId } : {}) });
-      }
-    }
-    return { batchId, results, completed: results.filter(result => result.status === "completed").length, failed: results.filter(result => result.status === "failed").length };
+    const batchId = `best-profile-${ctx.user.id}-${Date.now()}`;
+    const queued = await enqueueAiGenerationJob({ businessId: input.businessId, contentType: "business_seo_profile", requestedById: ctx.user.id, batchId });
+    const result = await processAiGenerationJob(queued.jobId);
+    const versionId = "versionId" in result ? result.versionId : undefined;
+    if (result.status === "completed" && versionId) await transitionAiContentVersion({ versionId, to: "pending_review", actorId: ctx.user.id });
+    return { batchId, profile: { contentType: "business_seo_profile" as const, status: result.status === "completed" && versionId ? "completed" as const : "failed" as const, ...(versionId ? { versionId } : {}) }, completed: result.status === "completed" && versionId ? 1 : 0, failed: result.status === "completed" && versionId ? 0 : 1 };
   }),
   preview: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), contentType: contentType.optional() })).query(async ({ ctx, input }) => {
     await getManagedBusiness(input.businessId, ctx.user.id, ctx.user.role);
@@ -138,7 +130,7 @@ export const aiContentRouter = router({
       if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The AI workspace is temporarily unavailable." });
       const versions = await db.select({ contentType: aiContentVersions.contentType }).from(aiContentVersions).where(eq(aiContentVersions.id, input.versionId)).limit(1);
       if (!versions[0]) throw new TRPCError({ code: "NOT_FOUND", message: "AI content version not found." });
-      const applied = ["about_business", "seo_title", "meta_description", "faq"].includes(versions[0].contentType);
+      const applied = ["about_business", "business_seo_profile", "seo_title", "meta_description", "faq"].includes(versions[0].contentType);
       if (applied) await publishApprovedContentToListing({ versionId: input.versionId, reviewerId: ctx.user.id, note: input.note });
       else await publishAiContentVersion({ versionId: input.versionId, reviewerId: ctx.user.id, note: input.note });
       return { published: true, appliedToListing: applied, status: "published" as const };

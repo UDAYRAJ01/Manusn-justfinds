@@ -12,7 +12,9 @@ const numberPattern = /\b\d+(?:[.,]\d+)?\b/g;
 const outputSchemaFor = (type: AiContentType) => ({
   name: `just_finds_${type}`,
   strict: true,
-  schema: type === "faq"
+  schema: type === "business_seo_profile"
+    ? { type: "object", properties: { text: { type: "string" }, title: { type: "string" }, description: { type: "string" }, faqs: { type: "array", items: { type: "object", properties: { question: { type: "string" }, answer: { type: "string" } }, required: ["question", "answer"], additionalProperties: false } } }, required: ["text", "title", "description", "faqs"], additionalProperties: false }
+    : type === "faq"
     ? { type: "object", properties: { faqs: { type: "array", items: { type: "object", properties: { question: { type: "string" }, answer: { type: "string" } }, required: ["question", "answer"], additionalProperties: false } } }, required: ["faqs"], additionalProperties: false }
     : type === "seo_title"
       ? { type: "object", properties: { title: { type: "string" } }, required: ["title"], additionalProperties: false }
@@ -35,6 +37,11 @@ function contentText(type: AiContentType, data: GeneratedContent): string {
   return data.text ?? "";
 }
 
+function validationText(type: AiContentType, data: GeneratedContent) {
+  if (type !== "business_seo_profile") return contentText(type, data);
+  return [data.text, data.title, data.description, ...(data.faqs ?? []).flatMap(item => [item.question, item.answer])].filter(Boolean).join("\n");
+}
+
 function faqSourceFields(item: { question: string; answer: string }, facts: BusinessAiFacts): string[] {
   const text = `${item.question} ${item.answer}`.toLowerCase();
   const sources: string[] = [];
@@ -43,15 +50,18 @@ function faqSourceFields(item: { question: string; answer: string }, facts: Busi
     ...facts.services.map(item => [`service:${item.name}`, item.name] as [string, unknown]),
     ...facts.facilities.map(item => [`facility:${item.name}`, item.name] as [string, unknown]),
     ...facts.fields.map(item => [`field:${item.label}`, item.label] as [string, unknown]),
+    ...facts.hours.flatMap((item, index) => [[`hours:${index}:opens`, item.opensAt], [`hours:${index}:closes`, item.closesAt]] as Array<[string, unknown]>),
   ];
   for (const [key, value] of candidates) {
     if (typeof value === "string" && value.trim().length >= 3 && text.includes(value.toLowerCase())) sources.push(key);
   }
+  if (facts.business.phone && /\b(phone|telephone|call|contact number)\b/.test(text)) sources.push("business.phone");
+  if (facts.business.email && /\b(email|e-mail)\b/.test(text)) sources.push("business.email");
   return sources;
 }
 
 function normalizeGeneratedContent(type: AiContentType, data: GeneratedContent, facts: BusinessAiFacts): GeneratedContent {
-  if (type !== "faq" || !data.faqs) return data;
+  if (!(["faq", "business_seo_profile"] as AiContentType[]).includes(type) || !data.faqs) return data;
   const grounded = data.faqs
     .map(item => ({
       ...item,
@@ -73,7 +83,7 @@ function similarity(left: string, right: string) {
 export function validateGeneratedContent(type: AiContentType, data: GeneratedContent, facts: BusinessAiFacts, existingContents: string[] = []): ValidationResult {
   const flags: string[] = [];
   const normalized = normalizeGeneratedContent(type, data, facts);
-  const text = contentText(type, normalized).trim();
+  const text = validationText(type, normalized).trim();
   const source = serializedFacts(facts);
   if (!text) flags.push("empty_content");
   if (forbiddenClaims.test(text)) flags.push("unsupported_claim_language");
@@ -83,8 +93,14 @@ export function validateGeneratedContent(type: AiContentType, data: GeneratedCon
   if (["short_description", "seo_title"].includes(type) && text.length > 180) flags.push("length_limit_exceeded");
   if (type === "meta_description" && text.length > 300) flags.push("length_limit_exceeded");
   if (type === "faq" && (normalized.faqs ?? []).length !== 10) flags.push("faq_count_invalid");
+  if (type === "business_seo_profile") {
+    const faqCount = normalized.faqs?.length ?? 0;
+    if (faqCount < 5 || faqCount > 10) flags.push("profile_faq_count_invalid");
+    if (!(normalized.title ?? "").trim() || (normalized.title ?? "").length > 60) flags.push("profile_title_invalid");
+    if (!(normalized.description ?? "").trim() || (normalized.description ?? "").length > 160) flags.push("profile_meta_description_invalid");
+  }
   if (type === "business_highlights" && ((normalized.highlights ?? []).length < 3 || (normalized.highlights ?? []).length > 6)) flags.push("highlight_count_invalid");
-  if (type === "faq" && (normalized.faqs ?? []).some(item => !item.question.trim() || !item.answer.trim() || !item.sourceFields?.length)) flags.push("faq_source_fields_missing");
+  if (["faq", "business_seo_profile"].includes(type) && (normalized.faqs ?? []).some(item => !item.question.trim() || !item.answer.trim() || !item.sourceFields?.length)) flags.push("faq_source_fields_missing");
   if (["doctor", "hospital", "clinic", "medical", "healthcare"].some(term => facts.business.category.toLowerCase().includes(term)) && /\b(diagnos|prescrib|success rate|guaranteed cure|guaranteed result|emergency instruction)\b/i.test(text)) flags.push("sensitive_claim_blocked");
   if (existingContents.some(existing => similarity(text, existing) >= 0.85)) flags.push("duplicate_content");
   return { accepted: flags.length === 0, flags: Array.from(new Set(flags)), normalized };
@@ -268,7 +284,7 @@ export function canApplyApprovedAboutToListing(contentType: AiContentType, statu
 }
 
 export function canApplyApprovedContentToListing(contentType: AiContentType, status: AiContentStatus) {
-  return ["about_business", "seo_title", "meta_description", "faq"].includes(contentType) && status === "approved";
+  return ["about_business", "business_seo_profile", "seo_title", "meta_description", "faq"].includes(contentType) && status === "approved";
 }
 
 export async function transitionAiContentVersion(input: { versionId: number; to: AiContentStatus; actorId: number; note?: string }) {
@@ -313,7 +329,16 @@ export async function publishApprovedContentToListing(input: { versionId: number
   if (!version) throw new Error("AI content version not found");
   const contentType = version.contentType as AiContentType;
   const permitted = aboutOnly ? canApplyApprovedAboutToListing(contentType, version.status as AiContentStatus) : canApplyApprovedContentToListing(contentType, version.status as AiContentStatus);
-  if (!permitted) throw new Error(aboutOnly ? "Only an approved About Business draft can update the listing." : "Only an approved About, SEO title, meta description, or FAQ draft can update the listing.");
+  if (!permitted) throw new Error(aboutOnly ? "Only an approved About Business draft can update the listing." : "Only an approved business profile, About, SEO title, meta description, or FAQ draft can update the listing.");
+  if (contentType === "business_seo_profile") {
+    const profile = version.structured && typeof version.structured === "object" ? version.structured as GeneratedContent : {};
+    const faqs = Array.isArray(profile.faqs) ? profile.faqs : [];
+    if (!profile.title || !profile.description || faqs.length < 5 || faqs.length > 10) throw new Error("The approved business SEO profile is incomplete and cannot be published.");
+    await db.update(businesses).set({ aboutDescription: version.content, seoTitle: profile.title, metaDescription: profile.description }).where(eq(businesses.id, version.businessId));
+    const existing = await db.select({ id: businessAiContent.id }).from(businessAiContent).where(eq(businessAiContent.businessId, version.businessId)).limit(1);
+    if (existing[0]) await db.update(businessAiContent).set({ faqs, status: "completed" }).where(eq(businessAiContent.id, existing[0].id));
+    else await db.insert(businessAiContent).values({ businessId: version.businessId, faqs, status: "completed" });
+  }
   if (contentType === "about_business") await db.update(businesses).set({ aboutDescription: version.content }).where(eq(businesses.id, version.businessId));
   if (contentType === "seo_title") await db.update(businesses).set({ seoTitle: version.content }).where(eq(businesses.id, version.businessId));
   if (contentType === "meta_description") await db.update(businesses).set({ metaDescription: version.content }).where(eq(businesses.id, version.businessId));

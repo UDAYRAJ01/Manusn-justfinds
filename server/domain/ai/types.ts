@@ -1,6 +1,7 @@
 export const aiContentTypes = [
   "short_description",
   "about_business",
+  "business_seo_profile",
   "seo_title",
   "meta_description",
   "faq",
@@ -13,7 +14,7 @@ export const aiContentTypes = [
 
 export type AiContentType = (typeof aiContentTypes)[number];
 
-export type FaqItem = { question: string; answer: string; sourceFields?: string[] };
+export type FaqItem = { question: string; answer: string; sourceFields?: string[]; status?: "grounded" };
 
 export type GeneratedContent = {
   text?: string;
