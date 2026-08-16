@@ -261,3 +261,7 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 ## Import Template Deliverable
 - [x] Create a CSV-first bulk-import template with all supported fields, formatting guidance, services support, ratings/review audit fields, business hours, FAQs, and one example row.
 - [x] Import a semicolon-separated Services column into private business services, without converting supplied ratings or review totals into public customer reviews.
+
+## Grounded AI About Business Rewrites
+- [x] Add an administrator-authorized AI action for every submitted/imported listing that creates an About Business draft from factual fields only.
+- [x] Keep generated descriptions as private reviewable drafts, with transparent errors and no automatic public publication.
