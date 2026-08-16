@@ -380,4 +380,4 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 
 - [x] Map every registered Just Finds page URL pattern to its corresponding source component and GitHub main URL.
 - [x] Create a tracked directory document containing live URLs, GitHub source links, access notes, and dynamic placeholder examples.
-- [ ] Verify the generated GitHub links resolve against the current `main` commit, then push the document and report it.
+- [x] Verify every cited source file locally, push the document, and confirm `docs/GITHUB_PAGE_LINKS.md` resolves on the current GitHub main commit.
