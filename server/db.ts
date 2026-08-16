@@ -611,7 +611,8 @@ export async function getPendingBusinesses() {
     .innerJoin(categories, eq(businesses.categoryId, categories.id))
     .innerJoin(cities, eq(businesses.cityId, cities.id))
     .where(eq(businesses.status, "submitted"))
-    .orderBy(desc(businesses.updatedAt));
+    .orderBy(desc(businesses.updatedAt))
+    .limit(100);
 }
 
 export async function getPublishedJobs(query?: string, citySlug?: string) {

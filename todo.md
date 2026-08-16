@@ -271,3 +271,7 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Add bulk selection and bounded batch About draft generation for submitted listings.
 - [x] Add original-versus-AI-draft comparison before approval.
 - [x] Add a one-click publish action for approved AI About drafts.
+
+## Bulk AI Review Button Repair
+- [x] Diagnose and repair the administrator bulk AI About action button reported as not executing.
+- [x] Add regression coverage for the repaired selection-to-batch-generation button flow.
