@@ -275,3 +275,11 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 ## Bulk AI Review Button Repair
 - [x] Diagnose and repair the administrator bulk AI About action button reported as not executing.
 - [x] Add regression coverage for the repaired selection-to-batch-generation button flow.
+
+## Detailed Approval Review and Grounded AI SEO
+- [x] Show each submitted/imported business in a clear field-by-field approval review, including all provided import fields and private audit-only ratings/review totals.
+- [x] Show supplied services and FAQs separately, with explicit missing-data states and no invented business facts.
+- [x] Add an administrator AI SEO draft action that generates grounded About, SEO metadata, and up to ten fact-supported FAQs for review.
+- [x] Preserve unverified service ideas as private suggestions only; do not add or publish invented services or claims.
+- [x] Add comparison, approval, and publication controls for each generated content type.
+- [x] Add regression coverage and complete TypeScript, full-test, and visual validation before release.

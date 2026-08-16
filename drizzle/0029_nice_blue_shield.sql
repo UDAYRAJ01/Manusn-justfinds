@@ -1,0 +1,3 @@
+ALTER TABLE `bulk_import_rows` ADD `createdBusinessId` int;--> statement-breakpoint
+ALTER TABLE `bulk_import_rows` ADD CONSTRAINT `bulk_import_rows_createdBusinessId_businesses_id_fk` FOREIGN KEY (`createdBusinessId`) REFERENCES `businesses`(`id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX `import_row_created_business_idx` ON `bulk_import_rows` (`createdBusinessId`);

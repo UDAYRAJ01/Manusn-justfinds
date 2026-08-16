@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canApplyApprovedAboutToListing, validateGeneratedContent } from "./content";
+import { canApplyApprovedAboutToListing, canApplyApprovedContentToListing, validateGeneratedContent } from "./content";
 import { buildChatPrompt, buildContentPrompt } from "./prompts";
 import type { BusinessAiFacts } from "./types";
 
@@ -60,5 +60,14 @@ describe("Phase 5 factual content guardrails", () => {
     expect(canApplyApprovedAboutToListing("about_business", "approved")).toBe(true);
     expect(canApplyApprovedAboutToListing("about_business", "pending_review")).toBe(false);
     expect(canApplyApprovedAboutToListing("seo_title", "approved")).toBe(false);
+  });
+
+  it("allows approved SEO and FAQ drafts, but never pending or unsupported content, to update a private listing", () => {
+    expect(canApplyApprovedContentToListing("about_business", "approved")).toBe(true);
+    expect(canApplyApprovedContentToListing("seo_title", "approved")).toBe(true);
+    expect(canApplyApprovedContentToListing("meta_description", "approved")).toBe(true);
+    expect(canApplyApprovedContentToListing("faq", "approved")).toBe(true);
+    expect(canApplyApprovedContentToListing("faq", "pending_review")).toBe(false);
+    expect(canApplyApprovedContentToListing("business_highlights", "approved")).toBe(false);
   });
 });

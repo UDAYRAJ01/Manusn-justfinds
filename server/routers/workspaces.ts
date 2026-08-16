@@ -391,7 +391,7 @@ async function importHighVolumeChunk(db: NonNullable<Awaited<ReturnType<typeof g
         payload.faqs?.length ? db.insert(businessAiContent).values({ businessId, about: listing.description || null, faqs: payload.faqs, status: "pending" }) : Promise.resolve(),
         payload.services?.length ? db.insert(businessServices).values(payload.services.map((service, sortOrder) => ({ businessId, name: service.name, sortOrder }))) : Promise.resolve(),
         db.insert(approvalQueue).values({ entityType: "business", businessId, submittedById: job.initiatedById, status: "pending" }),
-        db.update(bulkImportRows).set({ status: "imported" }).where(eq(bulkImportRows.id, row.id)),
+        db.update(bulkImportRows).set({ status: "imported", createdBusinessId: businessId }).where(eq(bulkImportRows.id, row.id)),
       ]);
       created += 1;
     } catch (error) {

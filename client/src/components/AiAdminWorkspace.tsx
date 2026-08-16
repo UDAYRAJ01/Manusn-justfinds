@@ -1,5 +1,5 @@
 import { AlertTriangle, BarChart3, CheckCircle2, FileCheck2, Sparkles, type LucideIcon } from "lucide-react";
-import { useState } from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 
@@ -23,15 +23,15 @@ export function AiAdminWorkspace() {
     </div>
     {analytics.data?.costMessage && <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900">{analytics.data.costMessage} Provider cost data is intentionally not estimated.</p>}
     <section className="rounded-[24px] border border-slate-200 bg-white p-5 sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="eyebrow">AI governance</p><h2 className="mt-1 text-xl font-semibold tracking-[-.035em] text-slate-900">Content review queue</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">Only fact-grounded versions that entered the moderation workflow appear here. For approved About drafts, publishing updates the private business listing and preserves the version record.</p></div><CheckCircle2 className="size-6 text-emerald-600" /></div>
+      <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="eyebrow">AI governance</p><h2 className="mt-1 text-xl font-semibold tracking-[-.035em] text-slate-900">Content review queue</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">Only fact-grounded versions that entered the moderation workflow appear here. Publishing an approved About, SEO title, meta description, or FAQ draft updates the private listing and preserves the version record.</p></div><CheckCircle2 className="size-6 text-emerald-600" /></div>
       {queue.error && <p className="mt-4 text-xs text-rose-600">{queue.error.message}</p>}
       <div className="mt-5 grid gap-3">
         {queue.isLoading ? <div className="h-24 animate-pulse rounded-2xl bg-slate-100" /> : queue.data?.length ? queue.data.map(item => <article className="rounded-2xl border border-slate-200 p-4" key={item.id}>
           <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="text-sm font-semibold text-slate-900">{item.businessName}</h3><span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-[.12em] text-blue-700">{item.contentType}</span><span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[.12em] text-slate-600">{item.status}</span></div><p className="mt-2 text-xs leading-5 text-slate-600">Version {item.version} · {formatValidationFlags(item.validationFlags)}</p></div></div>
-          <details className="mt-3 rounded-xl bg-slate-50 p-3"><summary className="cursor-pointer text-xs font-semibold text-slate-700">Compare original and AI draft</summary><div className="mt-3 grid gap-3 lg:grid-cols-2"><div className="rounded-lg border border-slate-200 bg-white p-3"><p className="text-[10px] font-semibold uppercase tracking-[.12em] text-slate-500">Original About</p><p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-slate-600">{item.originalAbout || item.originalShortDescription || "No prior About text was saved."}</p></div><div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-3"><p className="text-[10px] font-semibold uppercase tracking-[.12em] text-indigo-700">AI-generated draft</p><p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-slate-700">{item.content}</p></div></div></details>
+          <details className="mt-3 rounded-xl bg-slate-50 p-3"><summary className="cursor-pointer text-xs font-semibold text-slate-700">Compare original and AI draft</summary><div className="mt-3 grid gap-3 lg:grid-cols-2"><div className="rounded-lg border border-slate-200 bg-white p-3"><p className="text-[10px] font-semibold uppercase tracking-[.12em] text-slate-500">{originalLabel(item.contentType)}</p><p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-slate-600">{originalContent(item)}</p></div><div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-3"><p className="text-[10px] font-semibold uppercase tracking-[.12em] text-indigo-700">AI-generated {draftLabel(item.contentType)}</p><p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-slate-700">{draftContent(item)}</p></div></div></details>
           <div className="mt-3 flex flex-wrap gap-2">
             {item.status === "pending_review" && <><Button disabled={busy} onClick={() => approve.mutate({ versionId: item.id, note: noteFor === item.id ? note : undefined })} className="h-9 rounded-lg text-xs">Approve</Button><Button disabled={busy} onClick={() => setNoteFor(noteFor === item.id ? null : item.id)} variant="outline" className="h-9 rounded-lg bg-white text-xs">Return for changes</Button></>}
-            {item.status === "approved" && <Button disabled={busy} onClick={() => publish.mutate({ versionId: item.id, note: noteFor === item.id ? note : undefined })} className="h-9 rounded-lg text-xs">{item.contentType === "about_business" ? "Publish to business listing" : "Publish approved version"}</Button>}
+            {item.status === "approved" && <Button disabled={busy} onClick={() => publish.mutate({ versionId: item.id, note: noteFor === item.id ? note : undefined })} className="h-9 rounded-lg text-xs">Publish {draftLabel(item.contentType)} to listing</Button>}
           </div>
           {noteFor === item.id && <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]"><input value={note} onChange={event => setNote(event.target.value)} placeholder="Optional review note" className="h-9 rounded-lg border border-slate-200 px-3 text-xs" />{item.status === "pending_review" && <Button disabled={!note.trim() || busy} onClick={() => reject.mutate({ versionId: item.id, note })} variant="outline" className="h-9 rounded-lg border-rose-200 bg-white text-xs text-rose-700">Return with note</Button>}</div>}
           {(approve.error || reject.error || publish.error) && <p className="mt-2 text-xs text-rose-600">{approve.error?.message ?? reject.error?.message ?? publish.error?.message}</p>}
@@ -45,6 +45,37 @@ function formatValidationFlags(value: unknown) {
   if (Array.isArray(value) && value.length) return `Validation flags: ${value.map(String).join(", ")}`;
   if (value && typeof value === "object") return "Validation metadata is available for review";
   return "No validation flags";
+}
+
+function originalLabel(contentType: string) {
+  if (contentType === "seo_title") return "Current SEO title";
+  if (contentType === "meta_description") return "Current meta description";
+  if (contentType === "faq") return "Current FAQs";
+  return "Original About";
+}
+
+function draftLabel(contentType: string) {
+  if (contentType === "seo_title") return "SEO title";
+  if (contentType === "meta_description") return "meta description";
+  if (contentType === "faq") return "10 FAQs";
+  return "About";
+}
+
+function originalContent(item: { contentType: string; originalAbout?: string | null; originalShortDescription?: string | null; originalSeoTitle?: string | null; originalMetaDescription?: string | null; originalFaqs?: unknown }) {
+  if (item.contentType === "seo_title") return item.originalSeoTitle || "No SEO title has been saved.";
+  if (item.contentType === "meta_description") return item.originalMetaDescription || "No meta description has been saved.";
+  if (item.contentType === "faq") return formatFaqs(item.originalFaqs) || "No prior FAQs were saved.";
+  return item.originalAbout || item.originalShortDescription || "No prior About text was saved.";
+}
+
+function draftContent(item: { contentType: string; content: string; structured?: unknown }) {
+  return item.contentType === "faq" ? formatFaqs(item.structured) || item.content : item.content;
+}
+
+function formatFaqs(value: unknown) {
+  const entries = value && typeof value === "object" && "faqs" in value ? (value as { faqs?: unknown }).faqs : value;
+  if (!Array.isArray(entries)) return "";
+  return entries.map((entry, index) => entry && typeof entry === "object" && "question" in entry && "answer" in entry ? `${index + 1}. ${(entry as { question: string }).question}\n${(entry as { answer: string }).answer}` : "").filter(Boolean).join("\n\n");
 }
 
 function Metric({ label, value, icon: Icon }: { label: string; value: string; icon: LucideIcon }) {

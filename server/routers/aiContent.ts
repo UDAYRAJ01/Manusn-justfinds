@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { and, eq } from "drizzle-orm";
 import { aiContentVersions, aiGenerationJobs, businesses } from "../../drizzle/schema";
 import { getBusinessAiFacts, getDb } from "../db";
-import { approveAiContentVersion, cancelAiGenerationJob, createAiDraftFromVersion, enqueueAiGenerationBatch, enqueueAiGenerationJob, getAiGenerationAnalytics, getAiGenerationProgress, getAiReviewQueue, getLatestAiContent, processAiGenerationJob, publishAiContentVersion, publishApprovedAboutToListing, transitionAiContentVersion } from "../domain/ai/content";
+import { approveAiContentVersion, cancelAiGenerationJob, createAiDraftFromVersion, enqueueAiGenerationBatch, enqueueAiGenerationJob, getAiGenerationAnalytics, getAiGenerationProgress, getAiReviewQueue, getLatestAiContent, processAiGenerationJob, publishAiContentVersion, publishApprovedContentToListing, transitionAiContentVersion } from "../domain/ai/content";
 import { canManageBusiness, canModerate } from "../domain/permissions";
 import { protectedProcedure, router } from "../_core/trpc";
 import { z } from "zod";
@@ -25,6 +25,24 @@ export const aiContentRouter = router({
     await getManagedBusiness(input.businessId, ctx.user.id, ctx.user.role);
     const queued = await enqueueAiGenerationJob({ businessId: input.businessId, contentType: input.contentType, requestedById: ctx.user.id, batchId: `single-${Date.now()}` });
     return processAiGenerationJob(queued.jobId);
+  }),
+  generateSeoPack: protectedProcedure.input(z.object({ businessId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    if (!canModerate(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "Administrator access is required to create AI SEO drafts." });
+    await getManagedBusiness(input.businessId, ctx.user.id, ctx.user.role);
+    const batchId = `seo-pack-${ctx.user.id}-${Date.now()}`;
+    const results: Array<{ contentType: "about_business" | "seo_title" | "meta_description" | "faq"; status: "completed" | "failed"; versionId?: number }> = [];
+    for (const draftType of ["about_business", "seo_title", "meta_description", "faq"] as const) {
+      const queued = await enqueueAiGenerationJob({ businessId: input.businessId, contentType: draftType, requestedById: ctx.user.id, batchId });
+      const result = await processAiGenerationJob(queued.jobId);
+      const versionId = "versionId" in result ? result.versionId : undefined;
+      if (result.status === "completed" && versionId) {
+        await transitionAiContentVersion({ versionId, to: "pending_review", actorId: ctx.user.id });
+        results.push({ contentType: draftType, status: "completed", versionId });
+      } else {
+        results.push({ contentType: draftType, status: "failed", ...(versionId ? { versionId } : {}) });
+      }
+    }
+    return { batchId, results, completed: results.filter(result => result.status === "completed").length, failed: results.filter(result => result.status === "failed").length };
   }),
   preview: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), contentType: contentType.optional() })).query(async ({ ctx, input }) => {
     await getManagedBusiness(input.businessId, ctx.user.id, ctx.user.role);
@@ -120,8 +138,8 @@ export const aiContentRouter = router({
       if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The AI workspace is temporarily unavailable." });
       const versions = await db.select({ contentType: aiContentVersions.contentType }).from(aiContentVersions).where(eq(aiContentVersions.id, input.versionId)).limit(1);
       if (!versions[0]) throw new TRPCError({ code: "NOT_FOUND", message: "AI content version not found." });
-      const applied = versions[0].contentType === "about_business";
-      if (applied) await publishApprovedAboutToListing({ versionId: input.versionId, reviewerId: ctx.user.id, note: input.note });
+      const applied = ["about_business", "seo_title", "meta_description", "faq"].includes(versions[0].contentType);
+      if (applied) await publishApprovedContentToListing({ versionId: input.versionId, reviewerId: ctx.user.id, note: input.note });
       else await publishAiContentVersion({ versionId: input.versionId, reviewerId: ctx.user.id, note: input.note });
       return { published: true, appliedToListing: applied, status: "published" as const };
     } catch (error) {

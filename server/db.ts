@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, isNotNull, like, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull, like, ne, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   aiContentVersions,
@@ -22,6 +22,7 @@ import {
   businessOffers,
   businessVerifications,
   approvalQueue,
+  bulkImportRows,
   categories,
   categoryFields,
   cities,
@@ -606,13 +607,62 @@ export async function getAdminCounts() {
 export async function getPendingBusinesses() {
   const db = await getDb();
   if (!db) return [];
-  return db.select({ id: businesses.id, name: businesses.name, status: businesses.status, shortDescription: businesses.shortDescription, createdAt: businesses.createdAt, category: categories.name, city: cities.name })
+  const rows = await db.select({ business: businesses, category: categories.name, subcategory: subcategories.name, businessType: businessTypes.name, city: cities.name, state: cities.state, country: cities.country, locality: localities.name, importRow: { data: bulkImportRows.data } })
     .from(businesses)
     .innerJoin(categories, eq(businesses.categoryId, categories.id))
     .innerJoin(cities, eq(businesses.cityId, cities.id))
+    .leftJoin(subcategories, eq(businesses.subcategoryId, subcategories.id))
+    .leftJoin(businessTypes, eq(businesses.businessTypeId, businessTypes.id))
+    .leftJoin(localities, eq(businesses.localityId, localities.id))
+    .leftJoin(bulkImportRows, eq(bulkImportRows.createdBusinessId, businesses.id))
     .where(eq(businesses.status, "submitted"))
     .orderBy(desc(businesses.updatedAt))
     .limit(100);
+  const businessIds = rows.map(row => row.business.id);
+  if (!businessIds.length) return [];
+  const [services, hours, importedContent] = await Promise.all([
+    db.select({ businessId: businessServices.businessId, name: businessServices.name, description: businessServices.description, sortOrder: businessServices.sortOrder }).from(businessServices).where(inArray(businessServices.businessId, businessIds)).orderBy(asc(businessServices.sortOrder)),
+    db.select({ businessId: businessHours.businessId, dayOfWeek: businessHours.dayOfWeek, opensAt: businessHours.opensAt, closesAt: businessHours.closesAt, isClosed: businessHours.isClosed, isTwentyFourHours: businessHours.isTwentyFourHours }).from(businessHours).where(inArray(businessHours.businessId, businessIds)).orderBy(asc(businessHours.dayOfWeek)),
+    db.select({ businessId: businessAiContent.businessId, faqs: businessAiContent.faqs }).from(businessAiContent).where(inArray(businessAiContent.businessId, businessIds)),
+  ]);
+  const byBusiness = <T extends { businessId: number }>(items: T[]) => items.reduce((map, item) => {
+    const group = map.get(item.businessId) ?? [];
+    group.push(item);
+    map.set(item.businessId, group);
+    return map;
+  }, new Map<number, T[]>());
+  const servicesByBusiness = byBusiness(services);
+  const hoursByBusiness = byBusiness(hours);
+  const faqsByBusiness = new Map(importedContent.map(item => [item.businessId, Array.isArray(item.faqs) ? item.faqs : []]));
+  return rows.map(row => {
+    const imported = row.importRow?.data as { normalized?: { rating?: string; totalReviews?: string } } | null;
+    return {
+    id: row.business.id,
+    status: row.business.status,
+    createdAt: row.business.createdAt,
+    businessName: row.business.name,
+    mainCategory: row.category,
+    subcategory: row.subcategory ?? null,
+    businessType: row.businessType ?? null,
+    description: row.business.aboutDescription ?? row.business.shortDescription ?? null,
+    services: servicesByBusiness.get(row.business.id) ?? [],
+    address: row.business.address,
+    city: row.city,
+    locality: row.locality ?? null,
+    state: row.state ?? null,
+    country: row.country ?? "IN",
+    latitude: row.business.latitude ?? null,
+    longitude: row.business.longitude ?? null,
+    phone: row.business.phone ?? null,
+    email: row.business.email ?? null,
+    website: row.business.website ?? null,
+    hours: hoursByBusiness.get(row.business.id) ?? [],
+    ratingAudit: imported?.normalized?.rating || null,
+    totalReviewsAudit: imported?.normalized?.totalReviews || null,
+    ratingAuditNote: "Rating and Total Reviews are retained only as private import audit data and are never shown as customer reviews.",
+    faqs: faqsByBusiness.get(row.business.id) ?? [],
+  };
+  });
 }
 
 export async function getPublishedJobs(query?: string, citySlug?: string) {

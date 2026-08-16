@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { and, desc, eq, inArray, max } from "drizzle-orm";
-import { aiContentVersions, aiGenerationJobs, aiUsageEvents, businesses } from "../../../drizzle/schema";
+import { aiContentVersions, aiGenerationJobs, aiUsageEvents, businessAiContent, businesses } from "../../../drizzle/schema";
 import { getBusinessAiFacts, getDb } from "../../db";
 import { buildContentPrompt, PROMPT_VERSION, type PromptContentType } from "./prompts";
 import { generateStructured, classifyAiError } from "./provider";
@@ -235,6 +235,9 @@ export async function getAiReviewQueue() {
     businessName: businesses.name,
     originalAbout: businesses.aboutDescription,
     originalShortDescription: businesses.shortDescription,
+    originalSeoTitle: businesses.seoTitle,
+    originalMetaDescription: businesses.metaDescription,
+    originalFaqs: businessAiContent.faqs,
     contentType: aiContentVersions.contentType,
     version: aiContentVersions.version,
     content: aiContentVersions.content,
@@ -243,7 +246,7 @@ export async function getAiReviewQueue() {
     status: aiContentVersions.status,
     reviewRequired: aiContentVersions.reviewRequired,
     generatedAt: aiContentVersions.generatedAt,
-  }).from(aiContentVersions).innerJoin(businesses, eq(aiContentVersions.businessId, businesses.id)).where(inArray(aiContentVersions.status, ["pending_review", "approved"])).orderBy(desc(aiContentVersions.generatedAt));
+  }).from(aiContentVersions).innerJoin(businesses, eq(aiContentVersions.businessId, businesses.id)).leftJoin(businessAiContent, eq(aiContentVersions.businessId, businessAiContent.businessId)).where(inArray(aiContentVersions.status, ["pending_review", "approved"])).orderBy(desc(aiContentVersions.generatedAt));
 }
 
 export type AiContentStatus = "draft" | "pending_review" | "approved" | "published" | "rejected";
@@ -262,6 +265,10 @@ export function canTransitionAiContent(from: AiContentStatus, to: AiContentStatu
 
 export function canApplyApprovedAboutToListing(contentType: AiContentType, status: AiContentStatus) {
   return contentType === "about_business" && status === "approved";
+}
+
+export function canApplyApprovedContentToListing(contentType: AiContentType, status: AiContentStatus) {
+  return ["about_business", "seo_title", "meta_description", "faq"].includes(contentType) && status === "approved";
 }
 
 export async function transitionAiContentVersion(input: { versionId: number; to: AiContentStatus; actorId: number; note?: string }) {
@@ -295,13 +302,28 @@ export async function publishAiContentVersion(input: { versionId: number; review
 }
 
 export async function publishApprovedAboutToListing(input: { versionId: number; reviewerId: number; note?: string }) {
+  return publishApprovedContentToListing(input, true);
+}
+
+export async function publishApprovedContentToListing(input: { versionId: number; reviewerId: number; note?: string }, aboutOnly = false) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
-  const rows = await db.select({ businessId: aiContentVersions.businessId, contentType: aiContentVersions.contentType, status: aiContentVersions.status, content: aiContentVersions.content }).from(aiContentVersions).where(eq(aiContentVersions.id, input.versionId)).limit(1);
+  const rows = await db.select({ businessId: aiContentVersions.businessId, contentType: aiContentVersions.contentType, status: aiContentVersions.status, content: aiContentVersions.content, structured: aiContentVersions.structured }).from(aiContentVersions).where(eq(aiContentVersions.id, input.versionId)).limit(1);
   const version = rows[0];
   if (!version) throw new Error("AI content version not found");
-  if (!canApplyApprovedAboutToListing(version.contentType as AiContentType, version.status as AiContentStatus)) throw new Error("Only an approved About Business draft can update the listing.");
-  await db.update(businesses).set({ aboutDescription: version.content }).where(eq(businesses.id, version.businessId));
+  const contentType = version.contentType as AiContentType;
+  const permitted = aboutOnly ? canApplyApprovedAboutToListing(contentType, version.status as AiContentStatus) : canApplyApprovedContentToListing(contentType, version.status as AiContentStatus);
+  if (!permitted) throw new Error(aboutOnly ? "Only an approved About Business draft can update the listing." : "Only an approved About, SEO title, meta description, or FAQ draft can update the listing.");
+  if (contentType === "about_business") await db.update(businesses).set({ aboutDescription: version.content }).where(eq(businesses.id, version.businessId));
+  if (contentType === "seo_title") await db.update(businesses).set({ seoTitle: version.content }).where(eq(businesses.id, version.businessId));
+  if (contentType === "meta_description") await db.update(businesses).set({ metaDescription: version.content }).where(eq(businesses.id, version.businessId));
+  if (contentType === "faq") {
+    const faqs = version.structured && typeof version.structured === "object" && "faqs" in version.structured && Array.isArray((version.structured as { faqs?: unknown }).faqs) ? (version.structured as { faqs: unknown[] }).faqs : [];
+    if (!faqs.length) throw new Error("The approved FAQ draft has no structured FAQ entries to publish.");
+    const existing = await db.select({ id: businessAiContent.id }).from(businessAiContent).where(eq(businessAiContent.businessId, version.businessId)).limit(1);
+    if (existing[0]) await db.update(businessAiContent).set({ faqs, status: "completed" }).where(eq(businessAiContent.id, existing[0].id));
+    else await db.insert(businessAiContent).values({ businessId: version.businessId, faqs, status: "completed" });
+  }
   await transitionAiContentVersion({ versionId: input.versionId, to: "published", actorId: input.reviewerId, note: input.note });
   return { businessId: version.businessId, applied: true };
 }

@@ -456,9 +456,10 @@ export const bulkImportRows = mysqlTable("bulk_import_rows", {
   data: json("data").notNull(),
   validationErrors: json("validationErrors"),
   duplicateCandidateId: int("duplicateCandidateId").references(() => businesses.id),
+  createdBusinessId: int("createdBusinessId").references(() => businesses.id),
   fingerprint: varchar("fingerprint", { length: 260 }),
   status: mysqlEnum("status", ["pending", "valid", "invalid", "imported", "duplicate", "processing"]).default("pending").notNull(),
-}, table => [uniqueIndex("import_row_number_uidx").on(table.importId, table.rowNumber), uniqueIndex("import_row_fingerprint_uidx").on(table.importId, table.fingerprint), index("import_row_status_idx").on(table.importId, table.status)]);
+}, table => [uniqueIndex("import_row_number_uidx").on(table.importId, table.rowNumber), uniqueIndex("import_row_fingerprint_uidx").on(table.importId, table.fingerprint), index("import_row_status_idx").on(table.importId, table.status), index("import_row_created_business_idx").on(table.createdBusinessId)]);
 
 export const businessFacilities = mysqlTable("business_facilities", {
   id: int("id").autoincrement().primaryKey(),
