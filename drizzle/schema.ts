@@ -422,6 +422,8 @@ export const bulkImports = mysqlTable("bulk_imports", {
   validRows: int("validRows").default(0).notNull(),
   failedRows: int("failedRows").default(0).notNull(),
   validationCursor: int("validationCursor").default(0).notNull(),
+  sourcePartCursor: int("sourcePartCursor").default(0).notNull(),
+  csvParserState: json("csvParserState"),
   processedRows: int("processedRows").default(0).notNull(),
   progressPercent: int("progressPercent").default(0).notNull(),
   attempts: int("attempts").default(0).notNull(),

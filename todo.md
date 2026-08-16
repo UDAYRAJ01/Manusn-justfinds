@@ -238,12 +238,18 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Add bounded per-chunk storage-read timeouts so a stalled signed download cannot keep the import in processing indefinitely.
 
 ## Spreadsheet Value Normalization
-- [ ] Diagnose the confirmed import’s category, subcategory, city, hours, and FAQ validation failures and safely accept unambiguous source formats.
+- [x] Diagnose the confirmed import’s category, subcategory, city, hours, and FAQ validation failures and safely accept unambiguous source formats.
+- [x] Add auditable fallbacks for locality-style city labels and uniquely matched business-type labels without guessing ambiguous classifications.
 
 ## Low-Memory Large Import Path
 - [x] Implement streamed CSV validation for large imports and present truthful XLS/XLSX size guidance for the managed worker memory limit.
 - [ ] Validate a large CSV through staging, streamed validation, and background listing creation.
 - [x] Suppress retry controls for workbook jobs that are terminal due to the managed format-size limit.
+
+## Background-Resumable CSV Validation
+- [x] Move confirmed large-CSV validation into the scheduled processor with bounded streaming reads so progress survives browser closure.
+- [x] Apply the additive parser checkpoint migration for resumable CSV validation.
+- [ ] Resume the active confirmed CSV import through the background processor and verify progress without an open browser.
 
 ## CSV-First Production Import Contract
 - [x] Finalize self-service CSV-first recovery guidance, including an in-product downloadable header template, Excel export steps, and immediate workbook-size feedback.

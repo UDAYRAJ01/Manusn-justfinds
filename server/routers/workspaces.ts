@@ -9,7 +9,7 @@ import { storageGetSignedUrl, storagePut } from "../storage";
 import { numberedSlug, preferredBusinessSlug } from "../domain/slug";
 import { normalizeCategorySlug } from "../domain/categorySlug";
 import { findApprovedIndiaCity } from "../domain/approvedIndiaCities";
-import { normalizeBulkListingRow, parseImportedFaqs, parseImportedHours, type NormalizedBulkListing } from "../domain/bulkListingImport";
+import { importCityCandidates, importLookupKeys, normalizeBulkListingRow, parseImportedFaqs, parseImportedHours, type NormalizedBulkListing } from "../domain/bulkListingImport";
 import { validateBulkListingRow, type ImportRow } from "../domain/importValidation";
 import { normalizeDuplicateText, scoreDuplicateCandidate } from "../domain/duplicateCheck";
 import { HIGH_VOLUME_FILE_LIMIT, HIGH_VOLUME_IMPORT_CHUNK, HIGH_VOLUME_ROW_LIMIT, HIGH_VOLUME_VALIDATION_CHUNK, highVolumeProgress, isSupportedImportFilename, sourceQueueIssue } from "../domain/highVolumeImportPolicy";
@@ -18,6 +18,7 @@ import { HIGH_VOLUME_IMPORT_CALLBACK_PATH, HIGH_VOLUME_IMPORT_CRON } from "../do
 import { heartbeatSessionFromHeaders } from "../domain/heartbeatSession";
 import { mapWithConcurrency } from "../domain/asyncPool";
 import { withRequestDeadline } from "../domain/requestDeadline";
+import { parseServerCsvChunk, type ServerCsvParserState } from "../domain/streamCsv";
 import { protectedProcedure, router } from "../_core/trpc";
 import { createHeartbeatJob, updateHeartbeatJob } from "../_core/heartbeat";
 import { COOKIE_NAME } from "@shared/const";
@@ -115,6 +116,7 @@ type TaxonomyLookup = {
   categoriesByName: Map<string, { id: number; name: string }>;
   subcategoriesByCategoryAndName: Map<string, { id: number; name: string }>;
   businessTypesBySubcategoryAndName: Map<string, { id: number; name: string }>;
+  businessTypesByAlias: Map<string, Array<{ id: number; name: string; subcategory: { id: number; name: string; categoryId: number }; category: { id: number; name: string } }>>;
   citiesByName: Map<string, { id: number; name: string; state: string | null }>;
   localitiesByCityAndName: Map<string, { id: number; name: string }>;
   candidatesByCity: Map<number, Array<{ id: number; name: string; phone: string | null; email: string | null; address: string; cityId: number; latitude: string | null; longitude: string | null }>>;
@@ -124,13 +126,11 @@ function lookupName(value: string) { return normalizeDuplicateText(value); }
 function subcategoryKey(categoryId: number, name: string) { return `${categoryId}:${lookupName(name)}`; }
 function businessTypeKey(subcategoryId: number, name: string) { return `${subcategoryId}:${lookupName(name)}`; }
 function localityKey(cityId: number, name: string) { return `${cityId}:${lookupName(name)}`; }
+function firstLookup<T>(map: Map<string, T>, value: string) { return importLookupKeys(value).map(lookupName).map(key => map.get(key)).find((match): match is T => Boolean(match)); }
 
 async function importTaxonomyLookup(db: Awaited<ReturnType<typeof getDb>> & {}, rows: ImportRow[], includeDuplicateCandidates = true): Promise<TaxonomyLookup> {
   const normalized = rows.map(normalizeBulkListingRow);
-  const cityNames = Array.from(new Set(normalized.flatMap(row => {
-    const approved = findApprovedIndiaCity(row.city);
-    return [row.city, approved?.name].filter((value): value is string => Boolean(value));
-  })));
+  const cityNames = Array.from(new Set(normalized.flatMap(row => importCityCandidates(row.city).flatMap(candidate => [candidate, findApprovedIndiaCity(candidate)?.name].filter((value): value is string => Boolean(value))))));
   const [activeCategories, activeSubcategories, activeBusinessTypes, supportedCities] = await Promise.all([
     db.select({ id: categories.id, name: categories.name }).from(categories).where(and(eq(categories.isActive, true), eq(categories.status, "active"))),
     db.select({ id: subcategories.id, categoryId: subcategories.categoryId, name: subcategories.name }).from(subcategories).where(and(eq(subcategories.isActive, true), eq(subcategories.status, "active"))),
@@ -142,10 +142,29 @@ async function importTaxonomyLookup(db: Awaited<ReturnType<typeof getDb>> & {}, 
     cityIds.length ? db.select({ id: localities.id, cityId: localities.cityId, name: localities.name }).from(localities).where(inArray(localities.cityId, cityIds)) : Promise.resolve([]),
     includeDuplicateCandidates && cityIds.length ? db.select({ id: businesses.id, name: businesses.name, phone: businesses.phone, email: businesses.email, address: businesses.address, cityId: businesses.cityId, latitude: businesses.latitude, longitude: businesses.longitude }).from(businesses).where(inArray(businesses.cityId, cityIds)) : Promise.resolve([]),
   ]);
+  const categoriesById = new Map(activeCategories.map(category => [category.id, category]));
+  const subcategoriesById = new Map(activeSubcategories.map(subcategory => [subcategory.id, subcategory]));
+  const categoriesByName = new Map<string, { id: number; name: string }>();
+  for (const category of activeCategories) for (const key of importLookupKeys(category.name)) categoriesByName.set(lookupName(key), category);
+  const subcategoriesByCategoryAndName = new Map<string, { id: number; name: string }>();
+  for (const subcategory of activeSubcategories) for (const key of importLookupKeys(subcategory.name)) subcategoriesByCategoryAndName.set(`${subcategory.categoryId}:${lookupName(key)}`, subcategory);
+  const businessTypesBySubcategoryAndName = new Map<string, { id: number; name: string }>();
+  const businessTypesByAlias = new Map<string, Array<{ id: number; name: string; subcategory: { id: number; name: string; categoryId: number }; category: { id: number; name: string } }>>();
+  for (const type of activeBusinessTypes) {
+    const subcategory = subcategoriesById.get(type.subcategoryId);
+    const category = subcategory ? categoriesById.get(subcategory.categoryId) : undefined;
+    if (!subcategory || !category) continue;
+    for (const key of importLookupKeys(type.name)) {
+      businessTypesBySubcategoryAndName.set(`${subcategory.id}:${lookupName(key)}`, type);
+      const alias = lookupName(key);
+      businessTypesByAlias.set(alias, [...(businessTypesByAlias.get(alias) ?? []), { ...type, subcategory, category }]);
+    }
+  }
   return {
-    categoriesByName: new Map(activeCategories.map(category => [lookupName(category.name), category])),
-    subcategoriesByCategoryAndName: new Map(activeSubcategories.map(subcategory => [subcategoryKey(subcategory.categoryId, subcategory.name), subcategory])),
-    businessTypesBySubcategoryAndName: new Map(activeBusinessTypes.map(type => [businessTypeKey(type.subcategoryId, type.name), type])),
+    categoriesByName,
+    subcategoriesByCategoryAndName,
+    businessTypesBySubcategoryAndName,
+    businessTypesByAlias,
     citiesByName: new Map(supportedCities.flatMap(city => {
       const approved = findApprovedIndiaCity(city.name);
       return [[lookupName(city.name), city], ...(approved?.aliases ?? []).map(alias => [lookupName(alias), city] as [string, typeof city])];
@@ -159,16 +178,30 @@ function validateImportListing(raw: ImportRow, rowNumber: number, lookup: Taxono
   const listing = normalizeBulkListingRow(raw);
   const errors: string[] = [];
   const warnings: string[] = [];
-  const category = lookup.categoriesByName.get(lookupName(listing.mainCategory));
-  const knownCity = findApprovedIndiaCity(listing.city);
-  const city = lookup.citiesByName.get(lookupName(knownCity?.name ?? listing.city));
+  let category = firstLookup(lookup.categoriesByName, listing.mainCategory);
+  let city = importCityCandidates(listing.city).map(candidate => {
+    const knownCity = findApprovedIndiaCity(candidate);
+    return lookup.citiesByName.get(lookupName(knownCity?.name ?? candidate));
+  }).find((match): match is { id: number; name: string; state: string | null } => Boolean(match));
+  if (city && lookupName(city.name) !== lookupName(listing.city)) warnings.push(`City matched to supported city “${city.name}” from the source location value.`);
   const basic = validateBulkListingRow({ businessName: listing.businessName, category: category?.name ?? listing.mainCategory, city: city?.name ?? listing.city, address: listing.address, phone: listing.phone, email: listing.email, website: listing.website, latitude: listing.latitude || undefined, longitude: listing.longitude || undefined }, Array.from(lookup.categoriesByName.values()).map(value => value.name), Array.from(lookup.citiesByName.values()).map(value => value.name));
   errors.push(...basic.errors);
   if (listing.country && !/^(india|in)$/i.test(listing.country)) errors.push("Only India listings can be imported.");
   if (city && listing.state && lookupName(listing.state) !== lookupName(city.state ?? "")) errors.push(`State does not match the supported city (${city.state ?? city.name}).`);
-  const subcategory = category && listing.subcategory ? lookup.subcategoriesByCategoryAndName.get(subcategoryKey(category.id, listing.subcategory)) : undefined;
+  let subcategory = category && listing.subcategory ? firstLookup(new Map(Array.from(lookup.subcategoriesByCategoryAndName.entries()).filter(([key]) => key.startsWith(`${category?.id}:`)).map(([key, value]) => [key.slice(String(category?.id).length + 1), value])), listing.subcategory) : undefined;
+  let businessType = subcategory && listing.businessType ? firstLookup(new Map(Array.from(lookup.businessTypesBySubcategoryAndName.entries()).filter(([key]) => key.startsWith(`${subcategory?.id}:`)).map(([key, value]) => [key.slice(String(subcategory?.id).length + 1), value])), listing.businessType) : undefined;
+  if (!category || (listing.subcategory && !subcategory)) {
+    const labels = [listing.businessType, listing.subcategory].flatMap(importLookupKeys).map(lookupName);
+    const matches = Array.from(new Map(labels.flatMap(label => lookup.businessTypesByAlias.get(label) ?? []).map(match => [`${match.category.id}:${match.subcategory.id}:${match.id}`, match] as const)).values());
+    if (matches.length === 1) {
+      const match = matches[0]!;
+      category = match.category;
+      subcategory = match.subcategory;
+      businessType = match;
+      warnings.push(`Source taxonomy matched the single supported path “${match.category.name} → ${match.subcategory.name} → ${match.name}”.`);
+    }
+  }
   if (listing.subcategory && !subcategory) errors.push("Subcategory is invalid for the selected main category.");
-  const businessType = subcategory && listing.businessType ? lookup.businessTypesBySubcategoryAndName.get(businessTypeKey(subcategory.id, listing.businessType)) : undefined;
   if (listing.businessType && !businessType) errors.push("Business Type is invalid for the selected subcategory.");
   const locality = city && listing.locality ? lookup.localitiesByCityAndName.get(localityKey(city.id, listing.locality)) : undefined;
   if (listing.locality && !locality) warnings.push("Locality was not matched in the supported city and will remain unset until an administrator selects it.");
@@ -278,6 +311,59 @@ async function validateHighVolumeChunk(db: NonNullable<Awaited<ReturnType<typeof
   return { importId: job.id, phase: ready ? "ready" : "validating", processed: prepared.length, totalRows };
 }
 
+async function persistValidatedImportRows(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, job: typeof bulkImports.$inferSelect, sourceRows: ImportRow[], offset: number) {
+  if (!sourceRows.length) return { validAdded: 0, invalidAdded: 0 };
+  if (offset + sourceRows.length > HIGH_VOLUME_ROW_LIMIT) throw new Error(`This import exceeds the ${HIGH_VOLUME_ROW_LIMIT.toLocaleString()} row limit.`);
+  const lookup = await importTaxonomyLookup(db, sourceRows);
+  const priorRows = offset ? await db.select({ rowNumber: bulkImportRows.rowNumber, fingerprint: bulkImportRows.fingerprint }).from(bulkImportRows).where(and(eq(bulkImportRows.importId, job.id), lt(bulkImportRows.rowNumber, offset + 2))) : [];
+  const seenRows = new Map(priorRows.flatMap(row => row.fingerprint ? [[row.fingerprint, row.rowNumber] as [string, number]] : []));
+  const prepared = sourceRows.map((raw, index) => validateImportListing(raw, offset + index + 2, lookup, seenRows));
+  for (let index = 0; index < prepared.length; index += 500) {
+    const batch = prepared.slice(index, index + 500).map(row => ({
+      importId: job.id,
+      rowNumber: row.rowNumber,
+      fingerprint: row.errors.some(error => error.startsWith("Duplicate of spreadsheet row")) ? null : importRowFingerprint(row.listing, row.city?.id),
+      data: importPayload(row),
+      validationErrors: row.errors.length ? row.errors : null,
+      duplicateCandidateId: row.duplicateCandidateId,
+      status: row.valid ? "valid" as const : row.duplicateCandidateId && row.errors.some(error => error.startsWith("Likely duplicate")) ? "duplicate" as const : "invalid" as const,
+    }));
+    await db.insert(bulkImportRows).values(batch);
+  }
+  const validAdded = prepared.filter(row => row.valid).length;
+  return { validAdded, invalidAdded: prepared.length - validAdded };
+}
+
+async function validateHighVolumeCsvPart(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, job: typeof bulkImports.$inferSelect) {
+  const stagingIssue = sourceQueueIssue(job.sourceUploadedAt);
+  if (stagingIssue) throw new Error(stagingIssue);
+  const parts = await db.select().from(bulkImportSourceChunks).where(eq(bulkImportSourceChunks.importId, job.id)).orderBy(asc(bulkImportSourceChunks.partNumber));
+  const totalParts = highVolumeUploadPartCount(job.sourceFileSize);
+  if (!totalParts || parts.length !== totalParts) throw new Error("The staged CSV is incomplete. Upload the file again to create a new import.");
+  const part = parts[job.sourcePartCursor];
+  if (!part) throw new Error("The CSV parser cursor is outside the confirmed source file.");
+  const bytes = await readConfirmedSourcePart(part.storageKey, part.byteSize);
+  const parsed = parseServerCsvChunk(job.csvParserState as ServerCsvParserState | null, bytes, job.sourcePartCursor === totalParts - 1);
+  const persisted = await persistValidatedImportRows(db, job, parsed.rows, job.validationCursor);
+  const nextCursor = job.validationCursor + parsed.rows.length;
+  const complete = job.sourcePartCursor + 1 >= totalParts;
+  await db.update(bulkImports).set({
+    status: complete ? "pending" : "queued",
+    phase: complete ? "ready" : "validating",
+    sourcePartCursor: job.sourcePartCursor + 1,
+    csvParserState: complete ? null : parsed.state,
+    validationCursor: nextCursor,
+    totalRows: complete ? nextCursor : 0,
+    validRows: job.validRows + persisted.validAdded,
+    failedRows: job.failedRows + persisted.invalidAdded,
+    progressPercent: complete ? 100 : Math.min(44, Math.floor(((job.sourcePartCursor + 1) / totalParts) * 45)),
+    finishedAt: complete ? new Date() : null,
+    errorMessage: null,
+    errorCategory: null,
+  }).where(eq(bulkImports.id, job.id));
+  return { importId: job.id, phase: complete ? "ready" : "validating", processed: parsed.rows.length, totalRows: complete ? nextCursor : null };
+}
+
 async function importHighVolumeChunk(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, job: typeof bulkImports.$inferSelect) {
   const readyRows = await db.select().from(bulkImportRows).where(and(eq(bulkImportRows.importId, job.id), eq(bulkImportRows.status, "valid"))).orderBy(asc(bulkImportRows.rowNumber)).limit(HIGH_VOLUME_IMPORT_CHUNK);
   if (!readyRows.length) {
@@ -321,7 +407,7 @@ export async function processNextHighVolumeImportChunk(taskUid: string) {
   if (!job) return { processed: false, reason: "no_owned_queued_import" as const };
   await db.update(bulkImports).set({ status: "processing", startedAt: job.startedAt ?? new Date(), attempts: job.attempts + 1 }).where(eq(bulkImports.id, job.id));
   try {
-    const result = job.phase === "validating" ? await validateHighVolumeChunk(db, job) : await importHighVolumeChunk(db, job);
+    const result = job.phase === "validating" ? (job.filename.toLowerCase().endsWith(".csv") ? await validateHighVolumeCsvPart(db, job) : await validateHighVolumeChunk(db, job)) : await importHighVolumeChunk(db, job);
     return { workerRan: true, ...result };
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 1000) : "The background import processor failed.";

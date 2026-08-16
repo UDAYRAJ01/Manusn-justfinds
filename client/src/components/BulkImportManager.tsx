@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { streamCsvInBatches } from "@/lib/streamCsv";
 import { COOKIE_NAME } from "@shared/const";
 import { AlertCircle, CheckCircle2, FileSpreadsheet, LoaderCircle, Send, ShieldCheck, UploadCloud } from "lucide-react";
 import { useState } from "react";
@@ -60,7 +59,6 @@ export function BulkImportManager() {
   const commit = trpc.workspace.commitBulkImport.useMutation({ onSuccess: () => { void utils.workspace.bulkImportHistory.invalidate(); } });
   const beginHighVolume = trpc.workspace.beginHighVolumeImport.useMutation();
   const queueHighVolume = trpc.workspace.queueHighVolumeValidation.useMutation({ onSuccess: () => { void utils.workspace.bulkImportHistory.invalidate(); } });
-  const validateHighVolumeCsvBatch = trpc.workspace.validateHighVolumeCsvBatch.useMutation();
   const startHighVolume = trpc.workspace.startHighVolumeImport.useMutation({ onSuccess: () => { void utils.workspace.bulkImportHistory.invalidate(); } });
   const retryHighVolume = trpc.workspace.retryHighVolumeImport.useMutation({ onSuccess: () => { void utils.workspace.bulkImportHistory.invalidate(); } });
   const cancelHighVolume = trpc.workspace.cancelHighVolumeImport.useMutation({ onSuccess: () => { void utils.workspace.bulkImportHistory.invalidate(); } });
@@ -117,17 +115,7 @@ export function BulkImportManager() {
         completed = Boolean(payload?.complete);
       }
       if (!completed) throw new Error("The spreadsheet upload did not finish securely. Please select the file again.");
-      if (stagedUpload.validatesCsvInBrowser) {
-        let rowOffset = 0;
-        await streamCsvInBatches(file, async (csvRows, bytesRead) => {
-          await validateHighVolumeCsvBatch.mutateAsync({ importId: stagedUpload.importId, rowOffset, sourceBytesRead: bytesRead, rows: csvRows, final: false });
-          rowOffset += csvRows.length;
-          setHighVolumeUploadProgress({ uploadedParts: Math.min(totalParts, Math.max(1, Math.ceil(bytesRead / HIGH_VOLUME_UPLOAD_CHUNK_BYTES))), totalParts });
-        });
-        await validateHighVolumeCsvBatch.mutateAsync({ importId: stagedUpload.importId, rowOffset, sourceBytesRead: file.size, rows: [], final: true });
-      } else {
-        await queueHighVolume.mutateAsync({ importId: stagedUpload.importId });
-      }
+      await queueHighVolume.mutateAsync({ importId: stagedUpload.importId });
       await utils.workspace.bulkImportHistory.invalidate();
       setHighVolumeFile(null);
     } catch (error) {
@@ -149,10 +137,10 @@ export function BulkImportManager() {
       </div>
       <div className="rounded-[24px] border border-slate-200 bg-white p-6"><div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 size-5 text-[#1f51c8]" /><div><h2 className="font-semibold text-slate-900">Import rules</h2><p className="mt-1 text-xs leading-5 text-slate-500">Main Category must match an active category. Subcategory and Business Type are validated against that category hierarchy. City must match an active Indian city in the platform catalogue; common city aliases are also recognised.</p></div></div><p className="mt-4 text-xs font-semibold uppercase tracking-[.12em] text-slate-500">Supported columns</p><div className="mt-3 flex flex-wrap gap-2">{expectedColumns.map(column => <span key={column} className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600">{column}</span>)}</div><p className="mt-4 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">**Rating**, **Total Reviews**, and **FAQs** are never turned into customer reviews. Ratings and totals stay only in the private import audit; FAQs are held for administrator review.</p></div>
       <div className="rounded-[24px] border border-indigo-100 bg-indigo-50/30 p-6 shadow-sm">
-        <div className="flex items-start gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-indigo-100 text-indigo-700"><UploadCloud className="size-5" /></span><div><h2 className="font-semibold text-slate-900">Large file import</h2><p className="mt-1 text-xs leading-5 text-slate-600">For up to <strong>100,000 listings</strong>. Use <strong>CSV UTF-8</strong> for files larger than 25 MB; CSV validates in small batches without loading the whole file into the 512 MB worker. XLS/XLSX remain available up to 25 MB.</p><Button type="button" variant="outline" size="sm" className="mt-3 h-8 rounded-lg border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50" onClick={downloadLargeCsvTemplate}>Download CSV header template</Button></div></div>
+        <div className="flex items-start gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-indigo-100 text-indigo-700"><UploadCloud className="size-5" /></span><div><h2 className="font-semibold text-slate-900">Large file import</h2><p className="mt-1 text-xs leading-5 text-slate-600">For up to <strong>100,000 listings</strong>. Use <strong>CSV UTF-8</strong> for files larger than 25 MB; CSV validation runs one secured source part at a time in the background without loading the whole file into the 512 MB worker. XLS/XLSX remain available up to 25 MB.</p><Button type="button" variant="outline" size="sm" className="mt-3 h-8 rounded-lg border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50" onClick={downloadLargeCsvTemplate}>Download CSV header template</Button></div></div>
         <p className="mt-4 rounded-xl bg-white/80 p-3 text-xs leading-5 text-slate-600"><strong>Excel steps:</strong> File → Save As → choose <strong>CSV UTF-8 (Comma delimited) (*.csv)</strong> → save → select that CSV below. The column headers must remain unchanged.</p>
         <label className="mt-5 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-indigo-200 bg-white/80 px-4 py-7 text-center transition hover:border-indigo-500"><FileSpreadsheet className="size-7 text-indigo-600" /><span className="mt-3 text-sm font-semibold text-slate-700">{highVolumeFile?.name || "Choose a large CSV file"}</span><span className="mt-1 text-xs text-slate-500">CSV: up to 100,000 rows / {HIGH_VOLUME_FILE_LIMIT_LABEL}; XLS/XLSX: up to 25 MB</span><input className="sr-only" type="file" accept=".csv,.xlsx,.xls" disabled={beginHighVolume.isPending || queueHighVolume.isPending || Boolean(highVolumeUploadProgress)} onChange={event => void stageHighVolumeFile(event.target.files?.[0])} /></label>
-        {highVolumeUploadProgress && <p className="mt-3 flex items-center gap-2 text-xs text-indigo-700"><LoaderCircle className="size-4 animate-spin" />Securely uploading and validating part {highVolumeUploadProgress.uploadedParts} of {highVolumeUploadProgress.totalParts}. Keep this page open until the import reaches “ready”.</p>}
+        {highVolumeUploadProgress && <p className="mt-3 flex items-center gap-2 text-xs text-indigo-700"><LoaderCircle className="size-4 animate-spin" />Securely uploading part {highVolumeUploadProgress.uploadedParts} of {highVolumeUploadProgress.totalParts}. Keep this page open until upload completes; validation then continues in the background.</p>}
         {(beginHighVolume.isPending || queueHighVolume.isPending) && <p className="mt-3 flex items-center gap-2 text-xs text-indigo-700"><LoaderCircle className="size-4 animate-spin" />Staging complete; placing the validation job in the background queue…</p>}
         {highVolumeError && <p className="mt-3 rounded-xl bg-rose-50 p-3 text-xs leading-5 text-rose-700">{highVolumeError}</p>}
       </div>

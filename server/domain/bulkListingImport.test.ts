@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { missingRequiredBulkHeaders, normalizeBulkListingRow, parseImportedFaqs, parseImportedHours } from "./bulkListingImport";
+import { importCityCandidates, importLookupKeys, missingRequiredBulkHeaders, normalizeBulkListingRow, parseImportedFaqs, parseImportedHours } from "./bulkListingImport";
 
 describe("Excel bulk listing normalization", () => {
   it("maps the supplied spreadsheet headers into a taxonomy-aware listing", () => {
@@ -28,6 +28,12 @@ describe("Excel bulk listing normalization", () => {
 
   it("reports only missing required user-supplied headers and treats Business Type as optional", () => {
     expect(missingRequiredBulkHeaders(["Business Name", "Main Category", "Subcategory", "Description (About)", "Address", "City", "Locality", "State", "Country", "Latitude", "Longitude", "Phone", "Email", "Website", "Hours", "Rating", "Total Reviews", "FAQs"])).toEqual([]);
+  });
+
+  it("keeps only conservative taxonomy aliases and trailing city segments for server-side matching", () => {
+    expect(importLookupKeys("Zumba Classes")).toContain("zumba");
+    expect(importLookupKeys("Dentists")).toContain("dentist");
+    expect(importCityCandidates("matabari, udaipur")).toEqual(["matabari, udaipur", "udaipur", "matabari"]);
   });
 });
 

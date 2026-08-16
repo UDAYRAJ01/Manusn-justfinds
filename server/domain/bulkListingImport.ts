@@ -95,8 +95,26 @@ function headerKey(value: string) {
     .replace(/\s+/g, " ");
 }
 
+/** Returns exact plus conservative singular/class-stripped lookup labels for source taxonomy values. */
+export function importLookupKeys(value: string) {
+  const exact = headerKey(value);
+  const normalized = exact
+    .replace(/\bclasses?\b/g, "")
+    .replace(/\b([a-z]{4,})s\b/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+  return Array.from(new Set([exact, normalized].filter(Boolean)));
+}
+
 function stringValue(value: unknown) {
   return value === null || value === undefined ? "" : String(value).trim();
+}
+
+/** A locality-style source city may safely use a trailing canonical city segment, never a guessed prefix. */
+export function importCityCandidates(value: string) {
+  const raw = stringValue(value);
+  const parts = raw.split(",").map(part => part.trim()).filter(Boolean);
+  return Array.from(new Set([raw, ...parts.slice().reverse()]));
 }
 
 export function normalizeBulkListingRow(row: ImportRow): NormalizedBulkListing {
