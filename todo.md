@@ -310,3 +310,8 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Inspect the configured server-side AI provider and confirm that rewrite jobs use a real API without exposing a key in the browser.
 - [x] Validate a factual, structured business-profile generation request through the live provider path.
 - [x] Repair the provider integration or configure a required secure credential, then run regression tests and publish the verified connection.
+
+## GitHub Source Export
+- [ ] Export the current Just Finds main branch and commit history to the user-confirmed empty GitHub repository.
+- [ ] Verify the remote repository contains the exported source without altering the deployed project state.
+- [ ] Use the updated target repository `https://github.com/justfindsseo/manusjust.git` for the confirmed source export.
