@@ -315,3 +315,4 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [ ] Export the current Just Finds main branch and commit history to the user-confirmed empty GitHub repository.
 - [ ] Verify the remote repository contains the exported source without altering the deployed project state.
 - [ ] Use the updated target repository `https://github.com/justfindsseo/manusjust.git` for the confirmed source export.
+- [ ] Replace the superseded target with `https://github.com/UDAYRAJ01/Manusn-justfinds.git` and push the complete committed main branch there.
