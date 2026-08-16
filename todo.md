@@ -321,3 +321,9 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Compare the current local project against the authorized GitHub main branch to identify any missing tracked pages or project files.
 - [x] Confirm that no tracked source files are missing; the local and remote main trees both contain 383 tracked files.
 - [x] Verify the final GitHub tree and report the complete source-export status.
+
+## Latest GitHub Source Reconciliation
+
+- [x] Compare the currently deployed Just Finds source, local working tree, and GitHub `main` branch to identify any current files or commits that are not present in GitHub.
+- [ ] Commit and upload every intended missing latest tracked source file to the authorized GitHub repository without including secrets, dependencies, or build artifacts.
+- [ ] Verify the remote GitHub commit and full tree after synchronization, then report the final source-export status.
