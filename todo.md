@@ -244,3 +244,6 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Implement streamed CSV validation for large imports and present truthful XLS/XLSX size guidance for the managed worker memory limit.
 - [ ] Validate a large CSV through staging, streamed validation, and background listing creation.
 - [x] Suppress retry controls for workbook jobs that are terminal due to the managed format-size limit.
+
+## CSV-First Production Import Contract
+- [x] Finalize self-service CSV-first recovery guidance, including an in-product downloadable header template, Excel export steps, and immediate workbook-size feedback.
