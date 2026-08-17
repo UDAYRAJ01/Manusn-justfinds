@@ -374,3 +374,9 @@
 - [x] Implement a compact factual Jobs discovery workspace with role/title search, approved-city/job-type filtering, and real-record-only cards
 - [x] Implement a focused normal-user authentication entry with secure sign-in, privacy/support microcopy, discovery return path, and no administrator access mixing
 - [x] Add/update focused tests and validate job truthfulness, filter states, mobile filter sheet, authentication routes, accessibility, TypeScript, and regressions before publishing
+
+## Token-scoped customer appointment tracker refinement
+- [x] Audit the appointment-token contract, current customer status page, token-permitted actions, calendar controls, and private-field boundaries
+- [x] Implement a factual business/request/status tracker with a compact requested-to-resolution timeline and only token-permitted actions
+- [x] Implement explicit cancellation confirmation plus conditional proposed-time, reschedule, and calendar-download controls without exposing owner-only details
+- [x] Add/update focused tests and validate token privacy, permitted status transitions, cancellation protection, responsive layout, accessibility, TypeScript, and regressions before publishing

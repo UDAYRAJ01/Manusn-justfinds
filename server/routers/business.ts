@@ -43,6 +43,7 @@ import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storageGetSignedUrl, storagePut } from "../storage";
 import { numberedSlug, preferredBusinessSlug } from "../domain/slug";
 import { scoreDuplicateCandidate } from "../domain/duplicateCheck";
+import { customerAppointmentRequestView } from "../domain/customerAppointmentPresentation";
 import { assertTimeZone, isValidIsoDate, isValidTime, slotsForAvailability } from "../domain/appointmentAvailability";
 import { calculateProfileCompletion } from "../domain/profileCompletion";
 
@@ -396,7 +397,7 @@ export const businessRouter = router({
     const appointment = await appointmentByCustomerToken(db, input.customerAccessToken);
     if (!appointment) throw new TRPCError({ code: "NOT_FOUND", message: "Appointment request not found." });
     const events = await db.select({ eventType: businessAppointmentEvents.eventType, toStatus: businessAppointmentEvents.toStatus, startsAt: businessAppointmentEvents.startsAt, endsAt: businessAppointmentEvents.endsAt, createdAt: businessAppointmentEvents.createdAt }).from(businessAppointmentEvents).where(eq(businessAppointmentEvents.requestId, appointment.request.id)).orderBy(desc(businessAppointmentEvents.createdAt));
-    return { business: appointment.business, lead: { name: appointment.lead.name }, request: appointment.request, events };
+    return { business: appointment.business, lead: { name: appointment.lead.name }, request: customerAppointmentRequestView(appointment.request), events };
   }),
 
   customerAppointmentAction: publicProcedure.input(z.object({ customerAccessToken: z.string().uuid(), action: z.enum(["accept_proposal", "request_reschedule", "cancel"]), preferredStartsAt: z.string().datetime().optional(), customerNote: z.string().trim().max(2000).optional() })).mutation(async ({ input }) => {

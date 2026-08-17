@@ -72,3 +72,9 @@
 - Desktop verification of `/jobs` confirmed the role/title search control, factual published-job count, approved-city and employment-type filters, and an empty state that explains why no roles are present without creating a sample job, salary, rating, or urgency label. The filter rail uses only the supported city and job-type contract.
 - Mobile verification at 375px confirmed a compact stacked role search control and a clearly reachable Filters trigger for the bottom-sheet job filters. The no-jobs state remains legible and the page has no horizontal overflow.
 - Desktop and mobile verification of `/login` confirmed a low-distraction identity-only shell: compact Just Finds mark, direct return to discovery, a centered appropriately sized secure-sign-in card, privacy microcopy, and a single `Continue to secure sign-in` action. The normal entry path does not surface administrator navigation or role-selection controls.
+
+## Customer appointment tracker validation
+
+- The customer appointment route now consumes a narrowed, token-scoped response that excludes internal request identifiers, owner notes, customer notes, and the access token itself. Its event projection continues to omit private event notes and actor identities.
+- Unit coverage verifies the response mapper preserves only appointment timing, timezone, status, proposal, and resolution timestamps. The tracker presents requested-to-resolution status steps, and only renders proposal acceptance, reschedule, cancellation, or confirmed-calendar actions when the request status permits them.
+- Desktop and 375px mobile verification used an invalid UUID to validate the privacy-safe unavailable path: it reveals no business, customer, owner, or appointment data; gives a concise explanation; and retains a touch-safe return to public discovery without overflow.
