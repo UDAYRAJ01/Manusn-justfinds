@@ -310,3 +310,10 @@
 - [x] Audit the current Just Finds public discovery, user/owner, and administrator page families for the redesign prompt
 - [x] Define a modern cross-product direction combining Google-style software clarity with Swiggy/Zomato-style discovery and conversion patterns
 - [x] Write implementation-ready prompt blocks for every page family, desktop/mobile behavior, accessibility, states, and non-negotiable functional constraints
+
+## Premium India-first visual redesign
+- [x] Audit current shared public, owner, and admin UI foundations against the approved premium design brief
+- [x] Establish the shared off-white, ink, cobalt, and warm-accent visual system with responsive reusable interface primitives
+- [x] Redesign public discovery, search, category, business-detail, and appointment surfaces without changing their data or route contracts
+- [x] Redesign owner and administrator workspace shells and core dashboard surfaces without weakening role or ownership boundaries
+- [x] Add or update UI regression coverage, validate desktop/mobile states, and publish the completed redesign
