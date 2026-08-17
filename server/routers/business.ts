@@ -485,10 +485,22 @@ export const businessRouter = router({
   verificationQueue: protectedProcedure.query(async ({ ctx }) => {
     if (!canModerate(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "Administrator access is required." });
     const db = await dbOrThrow();
-    const rows = await db.select({ verification: businessVerifications, business: businesses, ownerName: users.name }).from(businessVerifications).innerJoin(businesses, eq(businessVerifications.businessId, businesses.id)).leftJoin(users, eq(businesses.ownerId, users.id)).where(eq(businessVerifications.status, "pending")).orderBy(asc(businessVerifications.submittedAt));
+    const rows = await db.select({
+      verification: businessVerifications,
+      business: {
+        id: businesses.id,
+        name: businesses.name,
+        status: businesses.status,
+        address: businesses.address,
+        isVerified: businesses.isVerified,
+      },
+      categoryName: categories.name,
+      cityName: cities.name,
+    }).from(businessVerifications).innerJoin(businesses, eq(businessVerifications.businessId, businesses.id)).leftJoin(categories, eq(businesses.categoryId, categories.id)).leftJoin(cities, eq(businesses.cityId, cities.id)).where(eq(businessVerifications.status, "pending")).orderBy(asc(businessVerifications.submittedAt));
     return Promise.all(rows.map(async row => {
       const documents = await db.select({ id: businessVerificationDocuments.id, documentType: businessVerificationDocuments.documentType, fileName: businessVerificationDocuments.fileName, mimeType: businessVerificationDocuments.mimeType, fileSize: businessVerificationDocuments.fileSize }).from(businessVerificationDocuments).where(eq(businessVerificationDocuments.verificationId, row.verification.id)).orderBy(desc(businessVerificationDocuments.createdAt));
-      return { ...row, documents };
+      const events = await db.select({ id: businessVerificationEvents.id, action: businessVerificationEvents.action, note: businessVerificationEvents.note, createdAt: businessVerificationEvents.createdAt }).from(businessVerificationEvents).where(eq(businessVerificationEvents.verificationId, row.verification.id)).orderBy(asc(businessVerificationEvents.createdAt));
+      return { ...row, documents, events };
     }));
   }),
 

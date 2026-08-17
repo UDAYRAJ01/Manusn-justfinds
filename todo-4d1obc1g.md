@@ -427,3 +427,9 @@
 - [x] Implement factual date-scoped analytics with concise KPI, chart, activity, unavailable-data, and recovery states using recorded data only
 - [x] Implement form-first profile/settings surfaces that separate account-level identity and sensitive actions from normal business editing
 - [x] Add/update focused tests and validate data truthfulness, account/business boundary, responsive layout, accessibility, TypeScript, and regressions before publishing
+
+## Administrator verification-review queue refinement
+- [x] Audit the role-gated verification queue, filters, evidence records, business-fact view, decision explanations, and immutable history contracts
+- [x] Implement a privacy-aware queue/list-detail review workflow with explicit evidence-opening controls and distinct Verify and Request changes decisions
+- [x] Add required decision reasoning where supported and show only factual review state, without fabricated service levels or automatic approval cues
+- [x] Add/update focused coverage and validate authorization, owner privacy, evidence actions, history integrity, responsive layout, accessibility, TypeScript, and regressions before publishing
