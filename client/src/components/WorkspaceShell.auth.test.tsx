@@ -49,4 +49,24 @@ describe("WorkspaceShell role-gated access", () => {
     await act(async () => { root.unmount(); });
     container.remove();
   });
+
+  it("renders the distinct governed administrator navigation treatment and visible role context", async () => {
+    (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    auth.user = { name: "Admin user", role: "super_admin" };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(<WorkspaceShell title="Administration" subtitle="Govern the marketplace" requireAdmin variant="admin" items={[]}><div>Governed content</div></WorkspaceShell>);
+    });
+
+    expect(container.querySelector("aside")?.className).toContain("bg-[#0a1020]");
+    expect(container.textContent).toContain("super admin");
+    expect(container.textContent).toContain("Governance access. Decisions are server-authorised and auditable.");
+    expect(container.querySelector("nav[aria-label='Administration quick navigation']")?.className).toContain("md:hidden");
+    expect(container.querySelector("nav[aria-label='Administration quick navigation']")?.className).toContain("bg-[#0a1020]/95");
+
+    await act(async () => { root.unmount(); });
+    container.remove();
+  });
 });

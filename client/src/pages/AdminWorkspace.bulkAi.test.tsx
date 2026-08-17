@@ -8,11 +8,14 @@ const mocks = vi.hoisted(() => ({
   bulkBestProfiles: vi.fn(async () => ({ batchId: "bulk-batch", queued: 1 })),
   applyBestProfile: vi.fn(async () => ({ applied: true })),
   revertBestProfile: vi.fn(async () => ({ reverted: true })),
+  reviewBusiness: vi.fn(async () => ({ reviewed: true })),
   invalidate: vi.fn(),
 }));
 
 const business = {
   id: 901,
+  status: "submitted",
+  createdAt: new Date("2026-08-17T10:00:00.000Z"),
   businessName: "Imported example",
   mainCategory: "Education",
   subcategory: "Coaching",
@@ -34,7 +37,7 @@ const business = {
   totalReviewsAudit: 12,
   ratingAuditNote: "Audit-only source data.",
   faqs: [{ question: "Do you offer coaching?", answer: "Mathematics coaching is listed." }],
-  aiRewriteJob: { status: "completed" },
+  aiRewriteJob: { status: "completed", createdAt: new Date("2026-08-17T10:05:00.000Z") },
   aiProfile: {
     id: 11,
     status: "draft",
@@ -60,7 +63,7 @@ vi.mock("@/lib/trpc", () => ({
     useUtils: () => ({ workspace: { pendingBusinesses: { invalidate: mocks.invalidate }, adminOverview: { invalidate: mocks.invalidate } } }),
     workspace: {
       pendingBusinesses: { useQuery: () => ({ data: [business], isLoading: false }) },
-      reviewBusiness: { useMutation: () => ({ mutate: vi.fn(), isPending: false, error: null }) },
+      reviewBusiness: { useMutation: () => ({ mutate: vi.fn(), mutateAsync: mocks.reviewBusiness, isPending: false, error: null }) },
     },
     aiContent: {
       batch: { useQuery: () => ({ data: undefined }) },
@@ -99,6 +102,15 @@ describe("durable administrator AI rewrite workflow", () => {
     await act(async () => { apply.click(); });
     expect(mocks.applyBestProfile).toHaveBeenCalledWith({ versionId: 11 });
     expect(container.textContent).toContain("revert to the original factual content");
+
+    const approve = Array.from(container.querySelectorAll("button")).find(button => button.textContent?.includes("Approve listing")) as HTMLButtonElement;
+    await act(async () => { approve.click(); });
+    expect(document.body.textContent).toContain("Approve this listing?");
+    expect(mocks.reviewBusiness).not.toHaveBeenCalled();
+    const recordApproval = Array.from(document.body.querySelectorAll("button")).find(button => button.textContent?.includes("Record approval")) as HTMLButtonElement;
+    await act(async () => { recordApproval.click(); });
+    expect(mocks.reviewBusiness).toHaveBeenCalledWith({ businessId: 901, decision: "published" });
+    expect(container.textContent).toContain("Decision record");
 
     await act(async () => { root.unmount(); });
     container.remove();

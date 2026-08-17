@@ -390,3 +390,11 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Clearly separate editable design controls (theme, layout, typography, sections, CTA placement) from read-only protected business facts.
 - [x] Add clear draft/published status and a safe publish confirmation flow that cannot mutate core listing facts.
 - [x] Add regression tests and responsive visual checks for the redesigned builder; the protected builder route requires an authenticated owner session for populated preview capture.
+
+## Governed Administrator Operations Console
+
+- [x] Review the existing administrator workspace, governance endpoints, audit/evidence projections, and reusable dashboard layout components.
+- [x] Create a calm, dense desktop administrator sidebar with compact mobile drawer navigation and visible role context without credentials.
+- [x] Add a role-aware page header, operational-priority dashboard, and readable review/moderation table structure with factual counts, filters, pagination, and empty states.
+- [x] Add evidence/detail review and immutable decision-history presentation, with confirmation for any action that changes a public listing state.
+- [x] Add regression coverage and responsive verification for administrator mobile and desktop operations.
