@@ -405,4 +405,4 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Redesign category governance as a searchable, super-admin-controlled taxonomy list with activation state, icon metadata, and protected creation/edit controls.
 - [x] Redesign city governance around the curated India Tier-1/Tier-2 catalogue, including state, tier, active status, and coordinates as managed data.
 - [x] Prevent arbitrary public city creation and provide clear curated-coverage guidance with a safe feedback path for unsupported places.
-- [ ] Add regression coverage and verify the controlled governance views on desktop and mobile.
+- [x] Add regression coverage and verify the controlled governance views on desktop and mobile.
