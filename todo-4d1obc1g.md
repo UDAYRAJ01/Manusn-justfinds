@@ -336,3 +336,16 @@
 - [x] Implement the mobile sticky summary with accessible Filters and Sort sheets, plus truthful loading and empty/error states
 - [x] Refine factual result cards and map/list behavior without inventing ratings, reviews, photos, availability, or unsupported map data
 - [x] Add/update focused tests and validate desktop/mobile controls, map fallback, accessibility, TypeScript, and regressions before publishing
+
+## Factual category, city, and locality landing-page refinement
+- [x] Audit the current category, city, locality, breadcrumb, and search-route contracts against the supplied landing-page specification
+- [x] Implement lightweight factual category and city landing structures with breadcrumbs, concise context, compact approved-city search, and genuine related-navigation sections
+- [x] Implement truthful listing/low-data states that link visitors to supported categories and India Tier-1/Tier-2 cities without unsupported rankings
+- [x] Add/update focused tests and validate route behavior, accessibility, desktop/mobile layout, TypeScript, and regressions before publishing
+- [x] Correct the city/category landing listing-query limit so it respects the public discovery contract and cannot leave a loading/error state on supported pages
+
+## Searchable category-directory refinement
+- [x] Audit the current categories browser and available factual category metadata for the supplied directory specification
+- [x] Implement category search, grouped factual category cards, desktop 3–4 column layout, and two-column mobile touch-target grid
+- [x] Add meaningful no-results and empty states without fabricated counts, images, or decorative gradients
+- [x] Add/update focused tests and validate category search, accessibility, TypeScript, desktop/mobile layout, and regressions before publishing

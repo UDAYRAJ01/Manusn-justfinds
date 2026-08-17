@@ -40,3 +40,9 @@
 - Desktop verification confirmed that the compact query/city control, factual published-result count, filter rail, recommended sort control, location affordance, and compact business profile card remain scannable without rating or review claims.
 - Mobile verification confirmed a visible result summary plus touch-safe Filters and Sort actions, a compact card hierarchy, retained query/city context, no horizontal overflow, and the existing factual fallback behavior for unavailable map data.
 - The search UI only presents category, verification, and distance controls when supported by the current discovery contract; it does not create unsupported filters, fabricated availability, ratings, or review totals.
+
+## Category directory and local-exploration landing validation
+
+- Desktop verification confirmed that `/categories` presents a concise breadcrumb/title/search entry with a factual category count and a compact 3-column card directory. Cards have neutral icons, category names, directional cues, and no invented listing counts, image tiles, or ranking claims.
+- Desktop category and city landings show the shared compact discovery search, factual page context, genuine subcategory/locality sections when available, and published-listing or constructive low-data states rather than article-like content or unsupported “best” claims.
+- Mobile verification confirmed a readable two-column category grid with touch-safe cards, a compact search field, no horizontal overflow, and a stacked city landing that retains approved-city context and its factual published-profile recovery behavior.
