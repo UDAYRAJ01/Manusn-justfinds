@@ -78,3 +78,9 @@
 - The customer appointment route now consumes a narrowed, token-scoped response that excludes internal request identifiers, owner notes, customer notes, and the access token itself. Its event projection continues to omit private event notes and actor identities.
 - Unit coverage verifies the response mapper preserves only appointment timing, timezone, status, proposal, and resolution timestamps. The tracker presents requested-to-resolution status steps, and only renders proposal acceptance, reschedule, cancellation, or confirmed-calendar actions when the request status permits them.
 - Desktop and 375px mobile verification used an invalid UUID to validate the privacy-safe unavailable path: it reveals no business, customer, owner, or appointment data; gives a concise explanation; and retains a touch-safe return to public discovery without overflow.
+
+## Verification and utility-page validation
+
+- Desktop and mobile verification checks confirmed that an unavailable public verification link uses a concise, serious recovery card. It explains that secure evidence and private review data are not shown publicly and offers only discovery recovery actions.
+- The verified-record interface is driven solely by the existing public certificate contract. Where a published verification certificate exists, it presents the actual business identity and public verification state; no evidence documents, owner notes, reviewer data, or upload details are exposed.
+- The 404 page was verified at desktop and 375px mobile widths. It provides a light recovery card with Search businesses, Go home, and Browse categories actions, no decorative illustration, readable hierarchy, and no horizontal overflow.

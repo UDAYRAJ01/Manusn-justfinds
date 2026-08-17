@@ -380,3 +380,9 @@
 - [x] Implement a factual business/request/status tracker with a compact requested-to-resolution timeline and only token-permitted actions
 - [x] Implement explicit cancellation confirmation plus conditional proposed-time, reschedule, and calendar-download controls without exposing owner-only details
 - [x] Add/update focused tests and validate token privacy, permitted status transitions, cancellation protection, responsive layout, accessibility, TypeScript, and regressions before publishing
+
+## Verification and 404 utility-page refinement
+- [x] Audit the public verification route, authenticated evidence workflow, upload/submission states, and current 404 route behavior
+- [x] Implement serious business-identity, permitted-steps, evidence-guidance, secure-upload, and submission-state interfaces without decorative claims
+- [x] Implement a friendly factual 404 recovery card with search, home, and categories paths
+- [x] Add/update focused tests and validate verification access/state feedback, 404 recovery links, responsive layout, accessibility, TypeScript, and regressions before publishing
