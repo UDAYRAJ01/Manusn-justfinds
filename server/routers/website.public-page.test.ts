@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { businessImages, businessReviews, businesses, businessServices, pageSections } from "../../drizzle/schema";
+import { businessHours, businessImages, businessReviews, businesses, businessServices, pageSections, pageVersions } from "../../drizzle/schema";
 
 const mocks = vi.hoisted(() => ({ getDb: vi.fn(), publicLookupCondition: null as unknown }));
 
@@ -20,7 +20,9 @@ describe("public website resolution", () => {
       page: { id: 9, businessId: 7, slug: "hospital-site", status: "published" },
       business: { id: 7, slug: "hospital", status: "published", name: "Hospital" },
       category: "Hospital",
+      categorySlug: "hospital",
       city: "Kanpur",
+      citySlug: "kanpur",
     };
     mocks.getDb.mockResolvedValue({
       select: () => ({
@@ -29,6 +31,8 @@ describe("public website resolution", () => {
           if (table === businessServices) return { where: () => ({ orderBy: async () => [] }) };
           if (table === businessImages) return { where: () => ({ orderBy: async () => [] }) };
           if (table === businessReviews) return { where: async () => [] };
+          if (table === businessHours) return { where: () => ({ orderBy: async () => [] }) };
+          if (table === pageVersions) return { where: () => ({ orderBy: async () => [{ id: 12, versionNumber: 1, status: "published", designConfig: { theme: "minimal" } }] }) };
           return {
             innerJoin: () => ({
               leftJoin: () => ({
@@ -47,6 +51,9 @@ describe("public website resolution", () => {
     const result = await websiteRouter.createCaller({} as never).publicPage({ slug: "hospital" });
     expect(result.page.slug).toBe("hospital-site");
     expect(result.business.slug).toBe("hospital");
+    expect(result.categorySlug).toBe("hospital");
+    expect(result.citySlug).toBe("kanpur");
+    expect(result.designConfig).toEqual({ theme: "minimal" });
     expect(includesReference(mocks.publicLookupCondition, businesses.slug)).toBe(true);
   });
 });

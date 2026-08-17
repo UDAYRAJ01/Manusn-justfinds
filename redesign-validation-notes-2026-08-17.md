@@ -53,3 +53,10 @@
 - The profile hides photos, services, hours, website, offers, details, and native review sections whenever the corresponding published data is unavailable. Its section navigation now contains only the factual Overview and Location sections for this profile, with Overview selected by default.
 - The location section falls back to the supplied address and a real Maps-directions link when a map preview cannot render. The supporting listing-information panel states factual status and source cues instead of displaying reputation scores or third-party rating products.
 - Mobile verification at 375px confirmed a compact identity card, a readable sequential action panel, touch-safe controls, no horizontal page overflow, and a fixed bottom action bar limited to genuine available contact/directions/booking/quote-style paths. This profile's fixed bar is rendered with Call and Directions only.
+
+## Public business-website mini-site validation
+
+- Desktop verification of the published VISHNOI FACE HOSPITAL website confirmed a clean owner-selected-design mini-site: a compact Just Finds header with a visible listing return path, factual business identity/category/city, genuine call/contact actions, and card-based About and Contact sections sourced from the listing.
+- The sample profile has no enabled service, hours, gallery, or appointment availability records, so those sections and actions are correctly absent rather than replaced with placeholder content. The enquiry form remains available because the business has real contact information and an enabled contact path.
+- Mobile verification at 375px confirmed readable hierarchy, stacked action controls, full-width safe enquiry submission control, non-stretched layout, and a clear footer link back to the Just Finds listing.
+- The unavailable-route verification rendered the calm “Website not published” state with a public discovery exit. The active browser session had a super-administrator role, so it additionally displayed the authorized administrator recovery path; automated coverage confirms ordinary users receive no workspace recovery action.

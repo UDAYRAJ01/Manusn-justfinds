@@ -356,3 +356,9 @@
 - [x] Implement compact mobile identity/actions and conditionally available sticky contact, booking, quote, or website actions
 - [x] Apply factual source/status cues, conditional Overview/Services/Hours/Location/Photos/Website sections, and a clear map-failure location fallback
 - [x] Add/update focused tests and validate action availability, data-conditional sections, accessibility, desktop/mobile layout, TypeScript, and regressions before publishing
+
+## Factual public business-website refinement
+- [x] Audit the public website renderer, selected theme/layout configuration, published page contract, and unauthorized unpublished state
+- [x] Implement a polished selected-design mini-site with factual identity, services, about, hours/contact, conditional booking/contact CTA, and a Just Finds listing return path
+- [x] Refine published and unpublished states so ownership/admin guidance appears only to authorized users and no business facts or claims are invented
+- [x] Add/update focused tests and validate public/unpublished behavior, responsive layout, accessibility, TypeScript, and regressions before publishing

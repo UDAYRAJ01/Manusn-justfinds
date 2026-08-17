@@ -332,16 +332,19 @@ export const websiteRouter = router({
   }),
   publicPage: publicProcedure.input(z.object({ slug: z.string().min(2).max(240) })).query(async ({ input }) => {
     const db = await dbOrThrow();
-    const rows = await db.select({ page: businessPages, business: businesses, category: categories.name, city: cities.name }).from(businessPages).innerJoin(businesses, eq(businessPages.businessId, businesses.id)).leftJoin(categories, eq(businesses.categoryId, categories.id)).leftJoin(cities, eq(businesses.cityId, cities.id)).where(and(eq(businesses.slug, input.slug), eq(businessPages.status, "published"))).limit(1);
+    const rows = await db.select({ page: businessPages, business: businesses, category: categories.name, categorySlug: categories.slug, city: cities.name, citySlug: cities.slug }).from(businessPages).innerJoin(businesses, eq(businessPages.businessId, businesses.id)).leftJoin(categories, eq(businesses.categoryId, categories.id)).leftJoin(cities, eq(businesses.cityId, cities.id)).where(and(eq(businesses.slug, input.slug), eq(businessPages.status, "published"))).limit(1);
     const row = rows[0];
     if (!row || !["approved", "published"].includes(row.business.status)) throw new TRPCError({ code: "NOT_FOUND", message: "Published website not found." });
-    const [sections, services, images, reviews] = await Promise.all([
+    const [sections, services, images, reviews, hours, versions] = await Promise.all([
       db.select().from(pageSections).where(and(eq(pageSections.pageId, row.page.id), eq(pageSections.enabled, true))).orderBy(asc(pageSections.displayOrder)),
       db.select().from(businessServices).where(and(eq(businessServices.businessId, row.business.id), eq(businessServices.isEnabled, true))).orderBy(asc(businessServices.sortOrder)),
       db.select().from(businessImages).where(eq(businessImages.businessId, row.business.id)).orderBy(asc(businessImages.sortOrder)),
       db.select().from(businessReviews).where(and(eq(businessReviews.businessId, row.business.id), eq(businessReviews.status, "published"))),
+      db.select().from(businessHours).where(eq(businessHours.businessId, row.business.id)).orderBy(asc(businessHours.dayOfWeek)),
+      db.select().from(pageVersions).where(eq(pageVersions.pageId, row.page.id)).orderBy(desc(pageVersions.versionNumber)),
     ]);
-    return { ...row, sections, services, images, reviews };
+    const designConfig = versions.find(version => version.status === "published")?.designConfig ?? defaultDesignConfig;
+    return { ...row, sections, services, images, reviews, hours, designConfig };
   }),
   track: publicProcedure.input(z.object({ pageId: z.number().int().positive(), businessId: z.number().int().positive(), eventType: z.enum(["page_view", "cta_click", "lead_start", "lead_submit", "call_click", "whatsapp_click", "website_click", "directions", "scroll_depth", "section_interaction"]), sectionId: z.number().int().positive().optional(), source: z.string().max(100).optional(), campaign: z.string().max(120).optional(), metadata: z.record(z.string(), z.unknown()).optional() })).mutation(async ({ input }) => {
     const db = await dbOrThrow();
