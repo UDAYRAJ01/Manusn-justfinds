@@ -381,3 +381,12 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Map every registered Just Finds page URL pattern to its corresponding source component and GitHub main URL.
 - [x] Create a tracked directory document containing live URLs, GitHub source links, access notes, and dynamic placeholder examples.
 - [x] Verify every cited source file locally, push the document, and confirm `docs/GITHUB_PAGE_LINKS.md` resolves on the current GitHub main commit.
+
+## Website Builder Professional Editing Studio
+
+- [ ] Review the existing Website Builder UI, its design configuration model, protected listing-fact handling, publish workflow, and current tests.
+- [ ] Redesign desktop as a three-zone studio: design-settings rail, responsive central preview, and contextual inspector or clean drawer.
+- [ ] Keep Desktop, Tablet, and Mobile selectors visible; implement focused mobile section editing with live preview updates.
+- [ ] Clearly separate editable design controls (theme, layout, typography, sections, CTA placement) from read-only protected business facts.
+- [ ] Add clear draft/published status and a safe publish confirmation flow that cannot mutate core listing facts.
+- [ ] Add regression tests and responsive visual checks for the redesigned builder.

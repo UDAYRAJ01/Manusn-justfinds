@@ -82,7 +82,7 @@ describe("WebsiteBuilder section interactions", () => {
     const about = Array.from(container.querySelectorAll("button")).find(button => button.textContent === "about") as HTMLButtonElement;
     expect(about).toBeTruthy();
     await act(async () => { about.click(); });
-    expect(container.textContent).toContain("Saved design");
+    expect(container.textContent).toContain("Contextual inspector");
     expect(container.textContent).toContain("Section label");
     const hide = Array.from(container.querySelectorAll("button")).find(button => button.textContent === "Hide") as HTMLButtonElement;
     expect(hide).toBeTruthy();
@@ -116,6 +116,35 @@ describe("WebsiteBuilder section interactions", () => {
     expect(suggestPhotos).toBeTruthy();
     await act(async () => { suggestPhotos.click(); });
     expect(mocks.suggestSectionImages).toHaveBeenCalledWith(expect.objectContaining({ businessId: 5, sectionType: "about" }));
+    await act(async () => { root.unmount(); });
+    container.remove();
+  });
+  it("keeps all responsive device labels visible and separates protected listing facts from design inputs", async () => {
+    (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => { root.render(<WebsiteBuilder businessId={5} />); });
+    expect(container.textContent).toContain("Desktop");
+    expect(container.textContent).toContain("Tablet");
+    expect(container.textContent).toContain("Mobile");
+    expect(container.textContent).toContain("Protected business facts");
+    expect(container.textContent).toContain("Read-only in Website Builder");
+    expect(container.querySelector('input[value="Test business"]')).toBeNull();
+    expect(container.querySelector('input[value="Owner-supplied address"]')).toBeNull();
+    await act(async () => { root.unmount(); });
+    container.remove();
+  });
+  it("keeps publishing gated behind a saved draft and explains the protected-facts boundary in confirmation", async () => {
+    (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => { root.render(<WebsiteBuilder businessId={5} />); });
+    const publishButton = Array.from(container.querySelectorAll("button")).find(button => button.textContent === "Publish website") as HTMLButtonElement;
+    expect(publishButton).toBeTruthy();
+    expect(publishButton.disabled).toBe(true);
+    expect(container.textContent).toContain("Publishing");
     await act(async () => { root.unmount(); });
     container.remove();
   });
