@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray, lt, or } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { approvalQueue, businesses, businessAiContent, businessFieldValues, businessHours, businessNotifications, businessServices, businessTypes, bulkImportRows, bulkImports, bulkImportSourceChunks, categories, categoryFields, cities, localities, subcategories, users } from "../../drizzle/schema";
+import { approvalQueue, businesses, businessAiContent, businessFieldValues, businessHours, businessNotifications, businessReviewReports, businessReviews, businessServices, businessTypes, bulkImportRows, bulkImports, bulkImportSourceChunks, categories, categoryFields, cities, googlePlaceCategoryMappings, localities, subcategories, users } from "../../drizzle/schema";
 import { deleteInternalValidationBusiness, getAdminCounts, getCategorySchemas, getDb, getInternalValidationBusinesses, getOwnerBusinesses, getPendingBusinesses } from "../db";
 import { canManageAdmins, canManageBusiness, canModerate } from "../domain/permissions";
 import { buildVoiceIntroductionScript } from "../domain/voiceScript";
@@ -459,6 +459,51 @@ export const workspaceRouter = router({
   adminOverview: protectedProcedure.query(async ({ ctx }) => {
     requireModerator(ctx.user.role);
     return getAdminCounts();
+  }),
+  adminGoogleCategoryMappings: protectedProcedure.query(async ({ ctx }) => {
+    requireModerator(ctx.user.role);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The mapping configuration service is temporarily unavailable." });
+    const [mappings, activeCategories, activeSubcategories] = await Promise.all([
+      db.select({ id: googlePlaceCategoryMappings.id, googlePrimaryType: googlePlaceCategoryMappings.googlePrimaryType, categoryId: googlePlaceCategoryMappings.categoryId, subcategoryId: googlePlaceCategoryMappings.subcategoryId, isActive: googlePlaceCategoryMappings.isActive, categoryName: categories.name, categoryIsActive: categories.isActive, subcategoryName: subcategories.name }).from(googlePlaceCategoryMappings).innerJoin(categories, eq(googlePlaceCategoryMappings.categoryId, categories.id)).leftJoin(subcategories, eq(googlePlaceCategoryMappings.subcategoryId, subcategories.id)).orderBy(asc(googlePlaceCategoryMappings.googlePrimaryType)),
+      db.select({ id: categories.id, name: categories.name }).from(categories).where(eq(categories.isActive, true)).orderBy(asc(categories.name)),
+      db.select({ id: subcategories.id, categoryId: subcategories.categoryId, name: subcategories.name }).from(subcategories).where(eq(subcategories.isActive, true)).orderBy(asc(subcategories.name)),
+    ]);
+    return { canEdit: ctx.user.role === "super_admin", mappings, categories: activeCategories.map(category => ({ ...category, subcategories: activeSubcategories.filter(subcategory => subcategory.categoryId === category.id) })) };
+  }),
+  upsertGoogleCategoryMapping: protectedProcedure.input(z.object({ googlePrimaryType: z.string().trim().toLowerCase().min(2).max(160).regex(/^[a-z0-9_]+$/), categoryId: z.number().int().positive(), subcategoryId: z.number().int().positive().nullable(), isActive: z.boolean() })).mutation(async ({ ctx, input }) => {
+    requireSuperAdmin(ctx.user.role);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The mapping configuration service is temporarily unavailable." });
+    const [category] = await db.select({ id: categories.id }).from(categories).where(and(eq(categories.id, input.categoryId), eq(categories.isActive, true))).limit(1);
+    if (!category) throw new TRPCError({ code: "BAD_REQUEST", message: "Choose an active Just Finds category before saving this mapping." });
+    if (input.subcategoryId) {
+      const [subcategory] = await db.select({ id: subcategories.id }).from(subcategories).where(and(eq(subcategories.id, input.subcategoryId), eq(subcategories.categoryId, input.categoryId), eq(subcategories.isActive, true))).limit(1);
+      if (!subcategory) throw new TRPCError({ code: "BAD_REQUEST", message: "Choose an active subcategory that belongs to the selected category." });
+    }
+    await db.insert(googlePlaceCategoryMappings).values({ googlePrimaryType: input.googlePrimaryType, categoryId: input.categoryId, subcategoryId: input.subcategoryId, isActive: input.isActive }).onDuplicateKeyUpdate({ set: { categoryId: input.categoryId, subcategoryId: input.subcategoryId, isActive: input.isActive, updatedAt: new Date() } });
+    return { success: true, message: input.isActive ? "The mapping was saved for future private Google import drafts. No existing listing changed." : "The mapping was saved as inactive. It will not be used for future Google import drafts." };
+  }),
+  adminModerationReports: protectedProcedure.query(async ({ ctx }) => {
+    requireModerator(ctx.user.role);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The moderation service is temporarily unavailable." });
+    return db.select({ report: { id: businessReviewReports.id, reason: businessReviewReports.reason, details: businessReviewReports.details, createdAt: businessReviewReports.createdAt }, review: { id: businessReviews.id, content: businessReviews.content, status: businessReviews.status }, business: { id: businesses.id, name: businesses.name }, categoryName: categories.name, cityName: cities.name }).from(businessReviewReports).innerJoin(businessReviews, eq(businessReviewReports.reviewId, businessReviews.id)).innerJoin(businesses, eq(businessReviews.businessId, businesses.id)).leftJoin(categories, eq(businesses.categoryId, categories.id)).leftJoin(cities, eq(businesses.cityId, cities.id)).where(eq(businessReviewReports.status, "pending")).orderBy(asc(businessReviewReports.createdAt)).limit(100);
+  }),
+  resolveModerationReport: protectedProcedure.input(z.object({ reportId: z.number().int().positive(), decision: z.enum(["dismiss", "remove_review"]), confirmation: z.enum(["DISMISS REPORT", "REMOVE REVIEW"]) })).mutation(async ({ ctx, input }) => {
+    requireModerator(ctx.user.role);
+    if ((input.decision === "dismiss" && input.confirmation !== "DISMISS REPORT") || (input.decision === "remove_review" && input.confirmation !== "REMOVE REVIEW")) throw new TRPCError({ code: "BAD_REQUEST", message: "Confirm the moderation decision before continuing." });
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The moderation service is temporarily unavailable." });
+    const [report] = await db.select({ id: businessReviewReports.id, reviewId: businessReviewReports.reviewId, status: businessReviewReports.status }).from(businessReviewReports).where(eq(businessReviewReports.id, input.reportId)).limit(1);
+    if (!report || report.status !== "pending") throw new TRPCError({ code: "NOT_FOUND", message: "That pending moderation report is no longer available." });
+    if (input.decision === "remove_review") {
+      await db.update(businessReviews).set({ status: "removed" }).where(eq(businessReviews.id, report.reviewId));
+      await db.update(businessReviewReports).set({ status: "reviewed" }).where(and(eq(businessReviewReports.reviewId, report.reviewId), eq(businessReviewReports.status, "pending")));
+      return { message: "The reported review was removed and related pending reports were marked reviewed." };
+    }
+    await db.update(businessReviewReports).set({ status: "dismissed" }).where(eq(businessReviewReports.id, report.id));
+    return { message: "The report was dismissed. The review remains unchanged." };
   }),
   pendingBusinesses: protectedProcedure.query(async ({ ctx }) => {
     requireModerator(ctx.user.role);

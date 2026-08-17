@@ -433,3 +433,9 @@
 - [x] Implement a privacy-aware queue/list-detail review workflow with explicit evidence-opening controls and distinct Verify and Request changes decisions
 - [x] Add required decision reasoning where supported and show only factual review state, without fabricated service levels or automatic approval cues
 - [x] Add/update focused coverage and validate authorization, owner privacy, evidence actions, history integrity, responsive layout, accessibility, TypeScript, and regressions before publishing
+
+## Administrator moderation, imported-data mapping, and settings refinement
+- [x] Audit moderation, Google category mapping, activation, review, and administrative settings routes, contracts, and current feedback states
+- [x] Implement conservative mapping and settings controls with source type, mapped category, activation state, explicit review, and safe save feedback
+- [x] Add warnings and confirmation where a change can affect public behavior, while preserving owner-data boundaries and prohibiting silent publishing or automatic import success
+- [x] Add/update focused coverage and validate authorization, factual state, privacy boundaries, responsive layout, accessibility, TypeScript, and regressions before publishing
