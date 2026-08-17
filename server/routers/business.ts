@@ -1,7 +1,6 @@
-import { and, asc, desc, eq, like, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, like, ne, or, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { inArray, ne } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import {
   businessAiContent,
@@ -32,6 +31,7 @@ import {
   businessServices,
   businessSpecialHours,
   businesses,
+  searchInteractions,
   users,
   categories,
   cities,
@@ -751,10 +751,27 @@ export const businessRouter = router({
     await db.insert(ownerNotificationPrefs).values({ userId: ctx.user.id, ...input }).onDuplicateKeyUpdate({ set: input });
     return { success: true };
   }),
-  analytics: protectedProcedure.input(businessIdInput).query(async ({ ctx, input }) => {
+  analytics: protectedProcedure.input(businessIdInput.extend({ rangeDays: z.union([z.literal(7), z.literal(30), z.literal(90)]).default(30) })).query(async ({ ctx, input }) => {
     const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
-    const rows = await db.select({ action: sql<string>`${sql.raw("action")}`, count: sql<number>`COUNT(*)` }).from(sql.raw("search_interactions") as never).where(sql`businessId = ${input.businessId}`).groupBy(sql.raw("action"));
-    return rows;
+    const rangeStart = new Date();
+    rangeStart.setUTCDate(rangeStart.getUTCDate() - input.rangeDays + 1);
+    rangeStart.setUTCHours(0, 0, 0, 0);
+    const baseCondition = and(eq(searchInteractions.businessId, input.businessId), gte(searchInteractions.createdAt, rangeStart));
+    const activityDay = sql<string>`DATE(\`createdAt\`)`;
+    const [actionRows, dailyRows, activity] = await Promise.all([
+      db.select({ action: searchInteractions.action, count: sql<number>`COUNT(*)` }).from(searchInteractions).where(baseCondition).groupBy(searchInteractions.action),
+      db.select({ day: activityDay, count: sql<number>`COUNT(*)` }).from(searchInteractions).where(baseCondition).groupBy(activityDay).orderBy(activityDay),
+      db.select({ id: searchInteractions.id, action: searchInteractions.action, createdAt: searchInteractions.createdAt }).from(searchInteractions).where(baseCondition).orderBy(desc(searchInteractions.createdAt)).limit(30),
+    ]);
+    const actions = actionRows.map(row => ({ action: row.action, count: Number(row.count) }));
+    return {
+      rangeDays: input.rangeDays,
+      rangeStart,
+      totalInteractions: actions.reduce((sum, row) => sum + row.count, 0),
+      actions,
+      daily: dailyRows.map(row => ({ day: String(row.day), count: Number(row.count) })),
+      activity,
+    };
   }),
 
   notifications: protectedProcedure.query(async ({ ctx }) => {

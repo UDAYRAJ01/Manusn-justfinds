@@ -421,3 +421,9 @@
 - [x] Audit the existing weekly schedule, timezone, slot, notice, booking-window, blackout, request, and publication-state contracts
 - [x] Implement a clear responsive availability configuration with real operational state, readable time-zone context, conflict guidance, preview, and request-rule explanation
 - [x] Add focused presentation coverage and validate save/error feedback, responsive layout, accessibility, TypeScript, and regressions before publishing
+
+## Owner analytics and profile/settings refinement
+- [x] Audit the analytics, profile, account identity, notification preference, and support contracts and existing responsive UI states
+- [x] Implement factual date-scoped analytics with concise KPI, chart, activity, unavailable-data, and recovery states using recorded data only
+- [x] Implement form-first profile/settings surfaces that separate account-level identity and sensitive actions from normal business editing
+- [x] Add/update focused tests and validate data truthfulness, account/business boundary, responsive layout, accessibility, TypeScript, and regressions before publishing

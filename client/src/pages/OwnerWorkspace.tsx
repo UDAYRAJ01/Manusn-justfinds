@@ -8,7 +8,7 @@ import { getOwnerListingPath } from "@/lib/ownerListingNavigation";
 import { hasValidCoordinates, isApprovalReadyDescription } from "@/lib/onboarding";
 import { voiceFailureMessage } from "@/lib/voiceFeedback";
 import { AlertCircle, Bot, Building2, CheckCircle2, ClipboardList, FileText, Globe2, LayoutDashboard, LoaderCircle, MapPin, Plus, Radio, Send, Settings2, Sparkles, UsersRound } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 
 const ownerNav = [
@@ -23,8 +23,9 @@ const ownerNav = [
 export default function OwnerWorkspace() {
   const [location] = useLocation();
   const { user } = useAuth();
-  const { data, isLoading, error } = trpc.workspace.ownerOverview.useQuery(undefined, { enabled: Boolean(user) });
-  const title = location === "/owner" || location === "/dashboard" || location === "/business" ? "Your local presence, in one view." : ownerNav.find(item => location.startsWith(item.href))?.label ?? "Business workspace";
+  const needsBusinessOverview = location !== "/owner/settings";
+  const { data, isLoading, error } = trpc.workspace.ownerOverview.useQuery(undefined, { enabled: Boolean(user) && needsBusinessOverview });
+  const title = location === "/owner" || location === "/dashboard" || location === "/business" ? "Your local presence, in one view." : ownerNav.find(item => item.href !== "/owner" && location.startsWith(item.href))?.label ?? "Business workspace";
 
   if (error) return <WorkspaceShell title="Business workspace" subtitle="Manage your Just Finds presence" items={ownerNav}><div className="mx-auto max-w-xl rounded-[24px] border border-slate-200 bg-white p-7 text-center"><AlertCircle className="mx-auto size-8 text-orange-600" /><h1 className="mt-4 text-xl font-semibold text-slate-900">Sign in to manage a business</h1><p className="mt-2 text-sm leading-6 text-slate-500">Business profiles, leads, and draft content are available only to their authenticated owner.</p><Button onClick={() => startLogin()} className="mt-5 rounded-xl">Continue to secure sign-in</Button></div></WorkspaceShell>;
 
@@ -32,7 +33,7 @@ export default function OwnerWorkspace() {
     <div className="mx-auto max-w-6xl">
       <p className="eyebrow">Owner control centre</p><h1 className="mt-2 text-3xl font-semibold tracking-[-.05em] text-slate-950">{title}</h1>
       <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">Business, lead, and listing data is scoped to the signed-in owner. Public visibility begins only after administrator review and publication.</p>
-      {isLoading ? <div className="mt-8 h-64 animate-pulse rounded-[24px] bg-slate-100" /> : <OwnerContent path={location} businesses={data?.businesses ?? []} />}
+      {needsBusinessOverview && isLoading ? <div className="mt-8 h-64 animate-pulse rounded-[24px] bg-slate-100" /> : <OwnerContent path={location} businesses={data?.businesses ?? []} />}
     </div>
   </WorkspaceShell>;
 }
@@ -42,9 +43,30 @@ function OwnerContent({ path, businesses }: { path: string; businesses: Array<{ 
   if (path === "/owner/leads") return <InfoPanel icon={UsersRound} title="Private lead inbox" detail="When a published business receives an enquiry, it is recorded against that business only. There are no cross-owner lead feeds." action="Published lead forms can be enabled once a business has been approved." />;
   if (path === "/owner/content") return <div className="grid gap-8"><AiContentWorkspace businesses={businesses.map(({ id, name, status }) => ({ id, name, status }))} /><VoiceIntroductionStudio businesses={businesses} /></div>;
   if (path === "/owner/jobs") return <InfoPanel icon={ClipboardList} title="Employer job workflow" detail="Create a draft, submit it for Just Finds review, then manage applications privately once the role is published." action="No job records exist for this owner yet." />;
-  if (path === "/owner/settings") return <InfoPanel icon={Globe2} title="Custom domain and landing settings" detail="Domain requests, DNS verification, and landing page settings are held separately from business approval." action="Domain verification requires a DNS provider connection before a custom domain can be activated." />;
+  if (path === "/owner/settings") return <OwnerSettings />;
   return <><div className="mt-8 grid gap-4 sm:grid-cols-3"><Stat label="Managed profiles" value={String(businesses.length)} helper="Owned by this account" /><Stat label="Submitted for review" value={String(businesses.filter(item => item.status === "submitted").length)} helper="Awaiting moderation" /><Stat label="Published profiles" value={String(businesses.filter(item => item.status === "published").length)} helper="Visible publicly" /></div><section className="mt-6 rounded-[24px] border border-slate-200 bg-white p-5"><div className="flex items-center justify-between"><div><h2 className="font-semibold text-slate-900">Business profiles</h2><p className="mt-1 text-xs text-slate-500">Create a database-backed draft and submit it through the review workflow.</p></div><Link href="/business" className="rounded-xl bg-[#173d9c] px-3.5 py-2.5 text-xs font-semibold text-white">Open listing manager</Link></div><div className="mt-5 grid gap-3">{businesses.length ? businesses.map(business => <BusinessRow key={business.id} business={business} />) : <Empty icon={Building2} label="No business profile yet. Create your first draft from a category and city managed by Just Finds administrators." />}</div></section></>;
 }
+
+function OwnerSettings() {
+  const { user, logout } = useAuth();
+  const utils = trpc.useUtils();
+  const preferences = trpc.business.getSettings.useQuery();
+  const [draft, setDraft] = useState({ emailEnabled: true, leadAlerts: true, reviewAlerts: true, statusAlerts: true });
+  const [notice, setNotice] = useState<string | null>(null);
+  const save = trpc.business.saveSettings.useMutation({ onSuccess: () => { void utils.business.getSettings.invalidate(); setNotice("Notification preferences saved."); }, onError: () => setNotice("Preferences could not be saved. Your current settings were kept.") });
+  useEffect(() => { if (preferences.data) setDraft(preferences.data); }, [preferences.data]);
+  useEffect(() => { if (!notice) return; const timeout = window.setTimeout(() => setNotice(null), 4000); return () => window.clearTimeout(timeout); }, [notice]);
+  const controls: Array<{ key: keyof typeof draft; label: string; detail: string }> = [
+    { key: "emailEnabled", label: "Email notifications", detail: "Allow operational notifications to be sent to the managed account email." },
+    { key: "leadAlerts", label: "Lead alerts", detail: "Receive a notice when an owner-scoped customer enquiry is recorded." },
+    { key: "reviewAlerts", label: "Review alerts", detail: "Receive notices about moderation activity for your submitted reviews." },
+    { key: "statusAlerts", label: "Listing status alerts", detail: "Receive notices when a listing moves through review or publication." },
+  ];
+  const change = (key: keyof typeof draft, value: boolean) => { const next = { ...draft, [key]: value }; setDraft(next); setNotice(null); save.mutate(next); };
+  return <div className="mt-8 grid max-w-4xl gap-5"><section className="rounded-[24px] border border-slate-200 bg-white p-6"><p className="eyebrow">Account identity</p><h2 className="mt-2 text-xl font-semibold tracking-[-.04em] text-slate-900">Secure sign-in account</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Your identity is managed through secure Just Finds sign-in. It is separate from business profile details and cannot change a listing.</p><dl className="mt-5 grid gap-3 sm:grid-cols-2"><AccountFact label="Account name" value={user?.name ?? "Not available"} /><AccountFact label="Account email" value={user?.email ?? "Not available"} /></dl></section><section className="rounded-[24px] border border-slate-200 bg-white p-6"><p className="eyebrow">Notifications</p><h2 className="mt-2 text-xl font-semibold tracking-[-.04em] text-slate-900">Notification preferences</h2><p className="mt-2 text-sm leading-6 text-slate-600">Choose which recorded operational events can notify this account. These settings do not edit business facts or publication status.</p>{preferences.isLoading ? <div className="mt-5 h-44 animate-pulse rounded-2xl bg-slate-100" /> : preferences.error ? <div className="mt-5 rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm text-rose-800">Notification preferences could not be loaded. Retry this page to review the current account settings.</div> : <div className="mt-5 divide-y divide-slate-100 rounded-2xl border border-slate-200">{controls.map(control => <label key={control.key} className="flex min-h-20 cursor-pointer items-center justify-between gap-4 px-4 py-4"><span><span className="block text-sm font-semibold text-slate-900">{control.label}</span><span className="mt-1 block max-w-xl text-xs leading-5 text-slate-500">{control.detail}</span></span><input type="checkbox" checked={draft[control.key]} disabled={save.isPending} onChange={event => change(control.key, event.target.checked)} className="size-5 rounded border-slate-300 text-[#2563eb] focus:ring-[#2563eb]" aria-label={control.label} /></label>)}</div>}{notice && <p className={`mt-4 rounded-xl px-4 py-3 text-sm ${save.isError ? "border border-rose-100 bg-rose-50 text-rose-800" : "border border-emerald-100 bg-emerald-50 text-emerald-800"}`} role="status">{notice}</p>}</section><section className="rounded-[24px] border border-slate-200 bg-slate-50 p-6"><p className="eyebrow">Support and account access</p><h2 className="mt-2 text-xl font-semibold tracking-[-.04em] text-slate-900">Keep account actions separate</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Business profile editing, services, and appointments remain in the selected business workspace. For support, use your established Just Finds support channel and include the business name or ID where relevant.</p><div className="mt-5 flex flex-wrap gap-3"><Link href="/business" className="inline-flex min-h-11 items-center rounded-xl border border-blue-200 bg-white px-4 text-sm font-bold text-[#2559d6] hover:bg-blue-50">Open business profiles</Link><button type="button" onClick={logout} className="min-h-11 rounded-xl border border-rose-200 bg-white px-4 text-sm font-bold text-rose-700 hover:bg-rose-50">Sign out of this account</button></div></section></div>;
+}
+
+function AccountFact({ label, value }: { label: string; value: string }) { return <div className="rounded-2xl bg-slate-50 px-4 py-3"><dt className="text-xs font-bold text-slate-500">{label}</dt><dd className="mt-1 truncate text-sm font-semibold text-slate-900">{value}</dd></div>; }
 
 export function ProfileManager({ businesses }: { businesses: Array<{ id: number; name: string; status: string; shortDescription: string | null; approvedDescription: string | null; phone: string | null; email: string | null; voiceIntroductionUrl: string | null }> }) {
   return <section className="mt-8 rounded-[24px] border border-slate-200 bg-white p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="eyebrow">Unified listing manager</p><h2 className="mt-2 text-xl font-semibold text-slate-900">Manage your business profiles in one place</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Start a new listing with basic information, then keep completing the same profile with its live completion percentage. This page no longer hosts a second onboarding form.</p></div><Link href="/business" className="inline-flex shrink-0 items-center rounded-xl bg-[#173d9c] px-4 py-2.5 text-xs font-semibold text-white">Open listing manager</Link></div><div className="mt-6 grid gap-3">{businesses.length ? businesses.map(business => <BusinessRow key={business.id} business={business} />) : <Empty icon={Building2} label="Open the listing manager to create your first private draft." />}</div></section>;
