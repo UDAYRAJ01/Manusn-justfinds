@@ -349,3 +349,10 @@
 - [x] Implement category search, grouped factual category cards, desktop 3–4 column layout, and two-column mobile touch-target grid
 - [x] Add meaningful no-results and empty states without fabricated counts, images, or decorative gradients
 - [x] Add/update focused tests and validate category search, accessibility, TypeScript, desktop/mobile layout, and regressions before publishing
+
+## Factual business-detail trust and conversion refinement
+- [x] Audit the current public business detail, map fallback, gallery, contact, booking, quote, and website action contracts against the supplied specification
+- [x] Implement desktop information/gallery and sticky action-panel hierarchy using only factual business fields and owner-provided media
+- [x] Implement compact mobile identity/actions and conditionally available sticky contact, booking, quote, or website actions
+- [x] Apply factual source/status cues, conditional Overview/Services/Hours/Location/Photos/Website sections, and a clear map-failure location fallback
+- [x] Add/update focused tests and validate action availability, data-conditional sections, accessibility, desktop/mobile layout, TypeScript, and regressions before publishing
