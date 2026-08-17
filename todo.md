@@ -384,9 +384,9 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 
 ## Website Builder Professional Editing Studio
 
-- [ ] Review the existing Website Builder UI, its design configuration model, protected listing-fact handling, publish workflow, and current tests.
-- [ ] Redesign desktop as a three-zone studio: design-settings rail, responsive central preview, and contextual inspector or clean drawer.
-- [ ] Keep Desktop, Tablet, and Mobile selectors visible; implement focused mobile section editing with live preview updates.
-- [ ] Clearly separate editable design controls (theme, layout, typography, sections, CTA placement) from read-only protected business facts.
-- [ ] Add clear draft/published status and a safe publish confirmation flow that cannot mutate core listing facts.
-- [ ] Add regression tests and responsive visual checks for the redesigned builder.
+- [x] Review the existing Website Builder UI, its design configuration model, protected listing-fact handling, publish workflow, and current tests.
+- [x] Redesign desktop as a three-zone studio: design-settings rail, responsive central preview, and contextual inspector or clean drawer.
+- [x] Keep Desktop, Tablet, and Mobile selectors visible; implement focused mobile section editing with live preview updates.
+- [x] Clearly separate editable design controls (theme, layout, typography, sections, CTA placement) from read-only protected business facts.
+- [x] Add clear draft/published status and a safe publish confirmation flow that cannot mutate core listing facts.
+- [x] Add regression tests and responsive visual checks for the redesigned builder; the protected builder route requires an authenticated owner session for populated preview capture.
