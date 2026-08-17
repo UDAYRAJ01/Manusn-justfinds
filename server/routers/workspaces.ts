@@ -8,7 +8,7 @@ import { buildVoiceIntroductionScript } from "../domain/voiceScript";
 import { storageGetSignedUrl, storagePut } from "../storage";
 import { numberedSlug, preferredBusinessSlug } from "../domain/slug";
 import { normalizeCategorySlug } from "../domain/categorySlug";
-import { findApprovedIndiaCity } from "../domain/approvedIndiaCities";
+import { approvedIndiaCities, findApprovedIndiaCity } from "../domain/approvedIndiaCities";
 import { importCityCandidates, importLookupKeys, normalizeBulkListingRow, parseImportedFaqs, parseImportedHours, parseImportedServices, type NormalizedBulkListing } from "../domain/bulkListingImport";
 import { validateBulkListingRow, type ImportRow } from "../domain/importValidation";
 import { normalizeDuplicateText, scoreDuplicateCandidate } from "../domain/duplicateCheck";
@@ -428,6 +428,34 @@ export const workspaceRouter = router({
     requireModerator(ctx.user.role);
     return getCategorySchemas();
   }),
+  governanceCatalog: protectedProcedure.query(async ({ ctx }) => {
+    requireModerator(ctx.user.role);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The governance catalogue is temporarily unavailable." });
+    const [categoryRows, subcategoryRows, fieldRows, cityRows] = await Promise.all([
+      db.select().from(categories).orderBy(asc(categories.sortOrder), asc(categories.name)),
+      db.select({ id: subcategories.id, categoryId: subcategories.categoryId }).from(subcategories),
+      db.select({ id: categoryFields.id, categoryId: categoryFields.categoryId }).from(categoryFields),
+      db.select({ id: cities.id, name: cities.name, slug: cities.slug, country: cities.country, tier: cities.tier, isActive: cities.isActive }).from(cities).where(eq(cities.country, "IN")),
+    ]);
+    const cityBySlug = new Map(cityRows.map(city => [city.slug, city]));
+    return {
+      categories: categoryRows.map(category => ({
+        ...category,
+        subcategoryCount: subcategoryRows.filter(subcategory => subcategory.categoryId === category.id).length,
+        fieldCount: fieldRows.filter(field => field.categoryId === category.id).length,
+      })),
+      cities: approvedIndiaCities.map(city => {
+        const existing = cityBySlug.get(city.slug);
+        return {
+          ...city,
+          cityId: existing?.id ?? null,
+          isProvisioned: Boolean(existing),
+          isActive: existing?.isActive ?? false,
+        };
+      }),
+    };
+  }),
   adminOverview: protectedProcedure.query(async ({ ctx }) => {
     requireModerator(ctx.user.role);
     return getAdminCounts();
@@ -453,6 +481,25 @@ export const workspaceRouter = router({
     const result = await db.insert(categories).values({ ...input, status: "active", isActive: true });
     return { categoryId: Number(result[0].insertId) };
   }),
+  updateCategoryGovernance: protectedProcedure.input(z.object({
+    categoryId: z.number().int().positive(),
+    description: z.string().max(1000).nullable().optional(),
+    icon: z.string().min(1).max(100).optional(),
+    isActive: z.boolean().optional(),
+  }).refine(input => input.description !== undefined || input.icon !== undefined || input.isActive !== undefined, { message: "Choose at least one category attribute to update." })).mutation(async ({ ctx, input }) => {
+    requireSuperAdmin(ctx.user.role);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The category service is temporarily unavailable." });
+    const { categoryId, isActive, ...metadata } = input;
+    const update: { description?: string | null; icon?: string; isActive?: boolean; status?: "active" | "inactive" } = { ...metadata };
+    if (isActive !== undefined) {
+      update.isActive = isActive;
+      update.status = isActive ? "active" : "inactive";
+    }
+    const result = await db.update(categories).set(update).where(eq(categories.id, categoryId));
+    if (!result[0].affectedRows) throw new TRPCError({ code: "NOT_FOUND", message: "The category no longer exists." });
+    return { updated: true };
+  }),
   createCity: protectedProcedure.input(z.object({ name: z.string().min(2).max(120), slug: z.string().max(140).optional(), state: z.string().max(120).optional(), latitude: z.string().max(24).optional(), longitude: z.string().max(24).optional() })).mutation(async ({ ctx, input }) => {
     requireSuperAdmin(ctx.user.role);
     const citySlug = normalizeCategorySlug(input.name);
@@ -463,6 +510,15 @@ export const workspaceRouter = router({
     if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The location service is temporarily unavailable." });
     const result = await db.insert(cities).values({ name: approvedCity.name, slug: approvedCity.slug, state: approvedCity.state, country: approvedCity.country, tier: approvedCity.tier, latitude: approvedCity.latitude, longitude: approvedCity.longitude, isActive: true });
     return { cityId: Number(result[0].insertId) };
+  }),
+  setCityActive: protectedProcedure.input(z.object({ cityId: z.number().int().positive(), isActive: z.boolean() })).mutation(async ({ ctx, input }) => {
+    requireSuperAdmin(ctx.user.role);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The location service is temporarily unavailable." });
+    const [city] = await db.select({ id: cities.id, name: cities.name, slug: cities.slug, country: cities.country, tier: cities.tier }).from(cities).where(eq(cities.id, input.cityId)).limit(1);
+    if (!city || !findApprovedIndiaCity(city.slug) || city.country !== "IN" || !["tier1", "tier2"].includes(city.tier)) throw new TRPCError({ code: "NOT_FOUND", message: "Only a curated India Tier-1 or Tier-2 city can be managed here." });
+    await db.update(cities).set({ isActive: input.isActive }).where(eq(cities.id, input.cityId));
+    return { updated: true };
   }),
   createCategoryField: protectedProcedure.input(z.object({ categoryId: z.number().int().positive(), fieldKey: z.string().min(2).max(80).regex(/^[a-z][a-z0-9_]*$/), label: z.string().min(2).max(120), fieldType: z.enum(["text", "textarea", "number", "currency", "boolean", "select", "multiselect", "multi_select", "date", "time", "image", "url", "phone", "email"]), placeholder: z.string().max(240).optional(), options: z.array(z.string().max(100)).max(50).optional(), isRequired: z.boolean().default(false), isPublic: z.boolean().default(true), sortOrder: z.number().int().min(0).default(0) })).mutation(async ({ ctx, input }) => {
     requireSuperAdmin(ctx.user.role);

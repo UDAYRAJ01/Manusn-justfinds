@@ -398,3 +398,11 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Add a role-aware page header, operational-priority dashboard, and readable review/moderation table structure with factual counts, filters, pagination, and empty states.
 - [x] Add evidence/detail review and immutable decision-history presentation, with confirmation for any action that changes a public listing state.
 - [x] Add regression coverage and responsive verification for administrator mobile and desktop operations.
+
+## Category and City Governance
+
+- [x] Review current taxonomy and city-management routes, data contracts, access controls, and existing governance panels.
+- [x] Redesign category governance as a searchable, super-admin-controlled taxonomy list with activation state, icon metadata, and protected creation/edit controls.
+- [x] Redesign city governance around the curated India Tier-1/Tier-2 catalogue, including state, tier, active status, and coordinates as managed data.
+- [x] Prevent arbitrary public city creation and provide clear curated-coverage guidance with a safe feedback path for unsupported places.
+- [ ] Add regression coverage and verify the controlled governance views on desktop and mobile.

@@ -42,4 +42,18 @@ describe("city creation contract", () => {
     });
     expect(dbMocks.getDb).not.toHaveBeenCalled();
   });
+
+  it("keeps category metadata and curated city availability controls super-admin-only", async () => {
+    const caller = workspaceRouter.createCaller({ user: { id: 7, role: "admin" } } as never);
+
+    await expect(caller.updateCategoryGovernance({ categoryId: 9, icon: "HeartPulse" })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: "Super-administrator access is required.",
+    });
+    await expect(caller.setCityActive({ cityId: 4, isActive: false })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: "Super-administrator access is required.",
+    });
+    expect(dbMocks.getDb).not.toHaveBeenCalled();
+  });
 });
