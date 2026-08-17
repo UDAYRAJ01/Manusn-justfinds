@@ -673,12 +673,13 @@ export async function getPendingBusinesses() {
   });
 }
 
-export async function getPublishedJobs(query?: string, citySlug?: string) {
+export async function getPublishedJobs(query?: string, citySlug?: string, jobType?: "full_time" | "part_time" | "contract" | "internship" | "freelance") {
   const db = await getDb();
   if (!db) return [];
   const conditions = [eq(jobs.status, "published")];
   if (query?.trim()) conditions.push(or(like(jobs.title, `%${query.trim()}%`), like(jobs.category, `%${query.trim()}%`))!);
   if (citySlug) conditions.push(eq(cities.slug, citySlug));
+  if (jobType) conditions.push(eq(jobs.jobType, jobType));
   return db.select({ job: jobs, city: cities.name, citySlug: cities.slug, company: businesses.name })
     .from(jobs)
     .leftJoin(cities, eq(jobs.cityId, cities.id))
@@ -721,6 +722,35 @@ export async function getPublicSavedBusiness(userId: number, businessId: number)
   if (!db) return false;
   const row = await db.select({ id: savedBusinesses.id }).from(savedBusinesses).where(and(eq(savedBusinesses.userId, userId), eq(savedBusinesses.businessId, businessId))).limit(1);
   return Boolean(row[0]);
+}
+
+export async function getPublicSavedBusinesses(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    id: businesses.id,
+    name: businesses.name,
+    slug: businesses.slug,
+    shortDescription: businesses.shortDescription,
+    address: businesses.address,
+    phone: businesses.phone,
+    website: businesses.website,
+    isVerified: businesses.isVerified,
+    category: categories.name,
+    categorySlug: categories.slug,
+    city: cities.name,
+    citySlug: cities.slug,
+    locality: localities.name,
+    savedAt: savedBusinesses.createdAt,
+  })
+    .from(savedBusinesses)
+    .innerJoin(businesses, eq(savedBusinesses.businessId, businesses.id))
+    .innerJoin(categories, eq(businesses.categoryId, categories.id))
+    .innerJoin(cities, eq(businesses.cityId, cities.id))
+    .leftJoin(localities, eq(businesses.localityId, localities.id))
+    .where(and(eq(savedBusinesses.userId, userId), eq(businesses.status, "published")))
+    .orderBy(desc(savedBusinesses.createdAt))
+    .limit(120);
 }
 
 export async function createPublicBusinessReview(input: { userId: number; businessId: number; rating: number; content?: string }) {

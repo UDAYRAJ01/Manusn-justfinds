@@ -300,3 +300,119 @@
 - [x] Update search and location-driven city suggestion/selection so only matching approved Indian cities are offered
 - [x] Preserve owner-editable city review in manual/Google import flows while rejecting unsupported city creation through public selection paths
 - [x] Add regression coverage, validate public/owner mobile and desktop flows, and publish the India-only city experience
+
+## Latest locally runnable project backup
+- [x] Inspect the latest checkpointed project contents and identify files/configuration required for local startup
+- [x] Build a clean source backup archive with migrations and a local setup guide, excluding secrets and generated dependencies
+- [x] Validate the archive contents and deliver the latest backup with database and secret-configuration notes
+
+## Page-by-page modern UI/UX prompt
+- [x] Audit the current Just Finds public discovery, user/owner, and administrator page families for the redesign prompt
+- [x] Define a modern cross-product direction combining Google-style software clarity with Swiggy/Zomato-style discovery and conversion patterns
+- [x] Write implementation-ready prompt blocks for every page family, desktop/mobile behavior, accessibility, states, and non-negotiable functional constraints
+
+## Premium India-first visual redesign
+- [x] Audit current shared public, owner, and admin UI foundations against the approved premium design brief
+- [x] Establish the shared off-white, ink, cobalt, and warm-accent visual system with responsive reusable interface primitives
+- [x] Redesign public discovery, search, category, business-detail, and appointment surfaces without changing their data or route contracts
+- [x] Redesign owner and administrator workspace shells and core dashboard surfaces without weakening role or ownership boundaries
+- [x] Add or update UI regression coverage, validate desktop/mobile states, and publish the completed redesign
+
+## Shared interaction, accessibility, and mobile standards
+- [x] Audit shared components and critical page states against the approved action, search, loading, empty/error, accessibility, motion, and mobile rules
+- [x] Add reusable interaction primitives for focused controls, skeleton/loading states, truthful empty/error recovery, reduced-motion support, and touch-safe mobile actions
+- [x] Apply and validate the standards on public discovery and owner/admin critical flows without changing user data, routes, role gates, or query state
+- [x] Run regression and responsive validation, then publish the interaction-standard refinement
+
+## Intent-first public home-page refinement
+- [x] Audit current Home, search, category, and factual discovery-data components against the supplied page specification
+- [x] Implement the desktop 7/5 hero, single-action search, real-data discovery modules, category rail/grid, and compact sticky public header
+- [x] Implement the mobile stacked search sheet, keyboard-safe sticky search action, and horizontal category-chip affordance
+- [x] Add/update focused tests and validate factual empty/loading states, approved-city search, desktop/mobile accessibility, and regressions before publishing
+
+## High-confidence factual search-results refinement
+- [x] Audit current Search Results, filters, BusinessCard, and map-fallback contracts against the supplied page specification
+- [x] Implement the desktop filter rail/results layout with compact persistent query and approved-city controls, factual count, applied chips, and data-backed filters only
+- [x] Implement the mobile sticky summary with accessible Filters and Sort sheets, plus truthful loading and empty/error states
+- [x] Refine factual result cards and map/list behavior without inventing ratings, reviews, photos, availability, or unsupported map data
+- [x] Add/update focused tests and validate desktop/mobile controls, map fallback, accessibility, TypeScript, and regressions before publishing
+
+## Factual category, city, and locality landing-page refinement
+- [x] Audit the current category, city, locality, breadcrumb, and search-route contracts against the supplied landing-page specification
+- [x] Implement lightweight factual category and city landing structures with breadcrumbs, concise context, compact approved-city search, and genuine related-navigation sections
+- [x] Implement truthful listing/low-data states that link visitors to supported categories and India Tier-1/Tier-2 cities without unsupported rankings
+- [x] Add/update focused tests and validate route behavior, accessibility, desktop/mobile layout, TypeScript, and regressions before publishing
+- [x] Correct the city/category landing listing-query limit so it respects the public discovery contract and cannot leave a loading/error state on supported pages
+
+## Searchable category-directory refinement
+- [x] Audit the current categories browser and available factual category metadata for the supplied directory specification
+- [x] Implement category search, grouped factual category cards, desktop 3–4 column layout, and two-column mobile touch-target grid
+- [x] Add meaningful no-results and empty states without fabricated counts, images, or decorative gradients
+- [x] Add/update focused tests and validate category search, accessibility, TypeScript, desktop/mobile layout, and regressions before publishing
+
+## Factual business-detail trust and conversion refinement
+- [x] Audit the current public business detail, map fallback, gallery, contact, booking, quote, and website action contracts against the supplied specification
+- [x] Implement desktop information/gallery and sticky action-panel hierarchy using only factual business fields and owner-provided media
+- [x] Implement compact mobile identity/actions and conditionally available sticky contact, booking, quote, or website actions
+- [x] Apply factual source/status cues, conditional Overview/Services/Hours/Location/Photos/Website sections, and a clear map-failure location fallback
+- [x] Add/update focused tests and validate action availability, data-conditional sections, accessibility, desktop/mobile layout, TypeScript, and regressions before publishing
+
+## Factual public business-website refinement
+- [x] Audit the public website renderer, selected theme/layout configuration, published page contract, and unauthorized unpublished state
+- [x] Implement a polished selected-design mini-site with factual identity, services, about, hours/contact, conditional booking/contact CTA, and a Just Finds listing return path
+- [x] Refine published and unpublished states so ownership/admin guidance appears only to authorized users and no business facts or claims are invented
+- [x] Add/update focused tests and validate public/unpublished behavior, responsive layout, accessibility, TypeScript, and regressions before publishing
+
+## Factual saved-listings refinement
+- [x] Audit the saved-listings route, current personal saved-record contract, authentication state, and removal behavior
+- [x] Implement a compact personal saved-listing page with lightweight sorting, factual cards, and a discovery-linked empty state
+- [x] Implement a reversible remove control with truthful undo and failure feedback without creating placeholder records
+- [x] Add/update focused tests and validate personal data isolation, empty/remove/undo states, accessibility, responsive layout, TypeScript, and regressions before publishing
+
+## Factual jobs and normal-user authentication refinement
+- [x] Audit Jobs data routes, records, filters, mobile behavior, and the normal authentication entry routes against the supplied specifications
+- [x] Implement a compact factual Jobs discovery workspace with role/title search, approved-city/job-type filtering, and real-record-only cards
+- [x] Implement a focused normal-user authentication entry with secure sign-in, privacy/support microcopy, discovery return path, and no administrator access mixing
+- [x] Add/update focused tests and validate job truthfulness, filter states, mobile filter sheet, authentication routes, accessibility, TypeScript, and regressions before publishing
+
+## Token-scoped customer appointment tracker refinement
+- [x] Audit the appointment-token contract, current customer status page, token-permitted actions, calendar controls, and private-field boundaries
+- [x] Implement a factual business/request/status tracker with a compact requested-to-resolution timeline and only token-permitted actions
+- [x] Implement explicit cancellation confirmation plus conditional proposed-time, reschedule, and calendar-download controls without exposing owner-only details
+- [x] Add/update focused tests and validate token privacy, permitted status transitions, cancellation protection, responsive layout, accessibility, TypeScript, and regressions before publishing
+
+## Verification and 404 utility-page refinement
+- [x] Audit the public verification route, authenticated evidence workflow, upload/submission states, and current 404 route behavior
+- [x] Implement serious business-identity, permitted-steps, evidence-guidance, secure-upload, and submission-state interfaces without decorative claims
+- [x] Implement a friendly factual 404 recovery card with search, home, and categories paths
+- [x] Add/update focused tests and validate verification access/state feedback, 404 recovery links, responsive layout, accessibility, TypeScript, and regressions before publishing
+
+## Owner workspace and business-platform refinement
+- [x] Audit the owner workspace shell, business switcher, dashboard data contracts, publication/verification/completeness states, and mobile navigation
+- [x] Implement a calm desktop software workspace with selected-business hierarchy, primary navigation, account/support placement, and factual operational dashboard cards
+- [x] Implement compact mobile owner navigation and prioritize real profile, verification, publication, and next-step actions without dummy analytics
+- [x] Add/update focused tests and validate strict owner isolation, selected-business switching, factual metrics and states, responsive layout, accessibility, TypeScript, and regressions before publishing
+
+## Save-safe manual onboarding refinement
+- [x] Audit the 10-step manual route, onboarding resume/autosave behavior, field validation, approved-city picker, and pre-submission review surfaces
+- [x] Implement clear desktop stepper and mobile progress navigation with focused titles, guidance, explicit Back and Save/continue actions, and truthful saved state feedback
+- [x] Refine editable identity, category, approved city/location, contact, hours, services, facilities/offers, media, AI content, SEO, preview, and submission review steps
+- [x] Add/update focused tests and validate saved-state truthfulness, editable fact persistence, approved India Tier-1/Tier-2 city limits, submission warnings, responsive layout, accessibility, TypeScript, and regressions before publishing
+
+## Transparent Google import review refinement
+- [x] Audit official Google search/select, editable Category/City/About prefill, duplicate checking, supported-city recovery, and draft creation contracts
+- [x] Implement a clear two-stage search/select and editable review journey with inline official-source labels and factual prefill provenance
+- [x] Implement visible neutral duplicate guidance, supported-city selection for unmatched localities, and explicit no-ratings/no-reviews/no-photos import boundaries
+- [x] Add/update focused tests and validate editable prefill, source labels, duplicates, approved-city restriction, no-import safeguards, accessibility, TypeScript, and regressions before publishing
+
+## Shared business-tools shell refinement
+- [x] Audit business-tool routes, ownership guards, shared shell, supported destinations, panel actions, autosave feedback, and destructive controls
+- [x] Implement a stable business identity header, back-to-workspace path, contextual supported-tool navigation, and focused content panels
+- [x] Add truthful save confirmation and audit-friendly destructive-action confirmation across currently supported tool panels
+- [x] Add/update focused tests and validate ownership isolation, supported navigation, save and destructive feedback, responsive layout, accessibility, TypeScript, and regressions before publishing
+
+## Factual CRM and appointment pipeline refinement
+- [x] Audit lead/appointment routes, owner-scoped data contracts, stages, notes, assignees, follow-up fields, availability validation, and responsive interactions
+- [x] Implement a factual desktop list-detail CRM workspace plus compact mobile list/detail flow with lead stage, source, assignee, follow-up, notes, and timestamps
+- [x] Refine contextual appointment approve, reject, and propose-time controls with real availability validation and restrained semantic status colors
+- [x] Add/update focused tests and validate owner isolation, real-data-only pipeline states, appointment action permissions, availability feedback, responsive layout, accessibility, TypeScript, and regressions before publishing

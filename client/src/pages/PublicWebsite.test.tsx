@@ -5,10 +5,15 @@ import { describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   queryOptions: null as { retry?: boolean } | null,
+  user: null as { role?: string } | null,
 }));
 
-vi.mock("wouter", () => ({ useParams: () => ({ businessSlug: "" }) }));
+vi.mock("wouter", () => ({
+  useParams: () => ({ businessSlug: "" }),
+  Link: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) => <a href={href} {...props}>{children}</a>,
+}));
 vi.mock("@/components/WebsiteRenderer", () => ({ default: () => <div>Published website</div> }));
+vi.mock("@/_core/hooks/useAuth", () => ({ useAuth: () => ({ user: mocks.user }) }));
 vi.mock("@/lib/trpc", () => ({
   trpc: {
     website: {
@@ -23,7 +28,7 @@ vi.mock("@/lib/trpc", () => ({
   },
 }));
 
-import PublicWebsite from "./PublicWebsite";
+import PublicWebsite, { getUnavailableWebsiteAction } from "./PublicWebsite";
 
 describe("PublicWebsite unavailable-page handling", () => {
   it("renders the clear unavailable-page state immediately without retrying a published-page 404", async () => {
@@ -35,11 +40,17 @@ describe("PublicWebsite unavailable-page handling", () => {
     await act(async () => { root.render(<PublicWebsite slug="vishnoi-face-hospital" />); });
 
     expect(mocks.queryOptions).toEqual({ retry: false });
-    expect(container.textContent).toContain("Website not found");
-    expect(container.textContent).toContain("This business website is not published.");
+    expect(container.textContent).toContain("Website not published");
+    expect(container.textContent).toContain("This business has not published a public website");
+    expect(container.textContent).toContain("Explore Just Finds");
 
     await act(async () => { root.unmount(); });
     container.remove();
   });
-});
 
+  it("only returns unpublished-site workspace guidance for authorized owner or administrator roles", () => {
+    expect(getUnavailableWebsiteAction("user")).toBeNull();
+    expect(getUnavailableWebsiteAction("business_owner")).toEqual({ href: "/business", label: "Open My listings" });
+    expect(getUnavailableWebsiteAction("super_admin")).toEqual({ href: "/admin", label: "Open admin workspace" });
+  });
+});

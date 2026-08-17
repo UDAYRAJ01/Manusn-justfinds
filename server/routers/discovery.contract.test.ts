@@ -11,6 +11,7 @@ const dbMocks = vi.hoisted(() => ({
   logPublicSearch: vi.fn(async () => undefined),
   logPublicInteraction: vi.fn(async () => undefined),
   getPublicSavedBusiness: vi.fn(async () => false),
+  getPublicSavedBusinesses: vi.fn(async () => []),
   togglePublicSavedBusiness: vi.fn(async () => ({ saved: true, reason: "saved" })),
   createPublicBusinessReview: vi.fn(async () => ({ ok: true, reason: "created", review: { id: 22, status: "pending" } })),
   reportPublicBusinessReview: vi.fn(async () => ({ ok: true, reason: "reported" })),
@@ -61,10 +62,12 @@ describe("public discovery contract", () => {
   it("keeps authenticated profile actions behind the protected procedure and forwards the user id", async () => {
     const caller = discoveryRouter.createCaller({ user: { id: 7 } } as never);
     await expect(caller.saved({ businessId: 13 })).resolves.toBe(false);
+    await expect(caller.savedListings()).resolves.toEqual([]);
     await expect(caller.toggleSave({ businessId: 13 })).resolves.toEqual({ saved: true, reason: "saved" });
     await expect(caller.submitReview({ businessId: 13, rating: 5, content: "Helpful firsthand detail" })).resolves.toEqual(expect.objectContaining({ ok: true, reason: "created" }));
     await expect(caller.reportReview({ reviewId: 22, reason: "Needs review", details: "Please check this report." })).resolves.toEqual({ ok: true, reason: "reported" });
     expect(dbMocks.getPublicSavedBusiness).toHaveBeenCalledWith(7, 13);
+    expect(dbMocks.getPublicSavedBusinesses).toHaveBeenCalledWith(7);
     expect(dbMocks.togglePublicSavedBusiness).toHaveBeenCalledWith(7, 13);
     expect(dbMocks.createPublicBusinessReview).toHaveBeenCalledWith({ userId: 7, businessId: 13, rating: 5, content: "Helpful firsthand detail" });
     expect(dbMocks.reportPublicBusinessReview).toHaveBeenCalledWith({ reporterId: 7, reviewId: 22, reason: "Needs review", details: "Please check this report." });

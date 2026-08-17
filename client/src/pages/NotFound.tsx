@@ -1,52 +1,11 @@
+import React from "react";
+import { PageFrame } from "@/components/PageFrame";
+import { PageMeta } from "@/components/PageMeta";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { AlertCircle, Home } from "lucide-react";
-import { useLocation } from "wouter";
+import { notFoundRecoveryLinks } from "@/lib/utilityPageContent";
+import { Compass, Search } from "lucide-react";
+import { Link } from "wouter";
 
 export default function NotFound() {
-  const [, setLocation] = useLocation();
-
-  const handleGoHome = () => {
-    setLocation("/");
-  };
-
-  return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
-      <Card className="w-full max-w-lg mx-4 shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-        <CardContent className="pt-8 pb-8 text-center">
-          <div className="flex justify-center mb-6">
-            <div className="relative">
-              <div className="absolute inset-0 bg-red-100 rounded-full animate-pulse" />
-              <AlertCircle className="relative h-16 w-16 text-red-500" />
-            </div>
-          </div>
-
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">404</h1>
-
-          <h2 className="text-xl font-semibold text-slate-700 mb-4">
-            Page Not Found
-          </h2>
-
-          <p className="text-slate-600 mb-8 leading-relaxed">
-            Sorry, the page you are looking for doesn't exist.
-            <br />
-            It may have been moved or deleted.
-          </p>
-
-          <div
-            id="not-found-button-group"
-            className="flex flex-col sm:flex-row gap-3 justify-center"
-          >
-            <Button
-              onClick={handleGoHome}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
-            >
-              <Home className="w-4 h-4 mr-2" />
-              Go Home
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
+  return <PageFrame><PageMeta /><main className="container flex min-h-[calc(100vh-15rem)] items-center py-10 sm:py-16"><section className="mx-auto w-full max-w-xl rounded-3xl border border-[var(--jf-border)] bg-white p-6 text-center shadow-sm sm:p-10"><span className="mx-auto grid size-12 place-items-center rounded-2xl bg-blue-50 text-[var(--jf-primary)]"><Compass className="size-6" /></span><p className="mt-6 text-xs font-semibold uppercase tracking-[.16em] text-[var(--jf-muted)]">404</p><h1 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--jf-text)] sm:text-3xl">This page is not available</h1><p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[var(--jf-muted)]">The address may be incorrect, or the page may no longer be available. You can return to discovery without losing your place.</p><div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row"><Button asChild><Link href={notFoundRecoveryLinks[0].href}><Search className="mr-2 size-4" />{notFoundRecoveryLinks[0].label}</Link></Button><Button asChild variant="outline"><Link href={notFoundRecoveryLinks[1].href}>{notFoundRecoveryLinks[1].label}</Link></Button><Button asChild variant="outline"><Link href={notFoundRecoveryLinks[2].href}>{notFoundRecoveryLinks[2].label}</Link></Button></div></section></main></PageFrame>;
 }
