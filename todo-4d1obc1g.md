@@ -323,3 +323,9 @@
 - [x] Add reusable interaction primitives for focused controls, skeleton/loading states, truthful empty/error recovery, reduced-motion support, and touch-safe mobile actions
 - [x] Apply and validate the standards on public discovery and owner/admin critical flows without changing user data, routes, role gates, or query state
 - [x] Run regression and responsive validation, then publish the interaction-standard refinement
+
+## Intent-first public home-page refinement
+- [x] Audit current Home, search, category, and factual discovery-data components against the supplied page specification
+- [x] Implement the desktop 7/5 hero, single-action search, real-data discovery modules, category rail/grid, and compact sticky public header
+- [x] Implement the mobile stacked search sheet, keyboard-safe sticky search action, and horizontal category-chip affordance
+- [x] Add/update focused tests and validate factual empty/loading states, approved-city search, desktop/mobile accessibility, and regressions before publishing

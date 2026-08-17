@@ -25,7 +25,7 @@ export function PageFrame({ children, className }: { children: React.ReactNode; 
   return <div className={cn("jf-page flex min-h-screen flex-col text-[var(--jf-text)]", className)}>
     <a href="#main-content" className="skip-link" data-focused={skipFocused ? "true" : undefined} onFocus={() => setSkipFocused(true)} onBlur={() => setSkipFocused(false)}>Skip to main content</a>
     <header className="sticky top-0 z-40 border-b border-[var(--jf-border)] bg-white/95 shadow-[0_1px_0_rgba(15,23,42,.02)] backdrop-blur-xl">
-      <div className="container flex h-[68px] items-center justify-between gap-3">
+      <div className="container flex h-16 items-center justify-between gap-3 sm:h-[72px]">
         <JustFindsLogo />
         <Link href="/search" className="hidden items-center gap-2 rounded-xl border border-[var(--jf-border)] bg-slate-50/70 px-3 py-2 text-xs font-semibold text-[var(--jf-muted)] transition-colors hover:border-blue-200 hover:bg-blue-50/70 lg:inline-flex"><MapPin className="size-3.5 text-[var(--jf-primary)]" />Search by city<ChevronDown className="size-3.5 text-slate-400" /></Link>
         <nav className="hidden flex-1 items-center justify-center gap-1 md:flex" aria-label="Main navigation">
@@ -33,7 +33,7 @@ export function PageFrame({ children, className }: { children: React.ReactNode; 
         </nav>
         <div className="hidden items-center gap-2 md:flex">
           <NotificationBell />
-          <Button asChild variant="ghost" size="sm" className="px-3 text-[13px] text-slate-700 hover:text-[var(--jf-primary)]"><Link href="/business">Manage a listing</Link></Button>
+          <Button asChild variant="ghost" size="sm" className="px-3 text-[13px] text-slate-700 hover:text-[var(--jf-primary)]"><Link href="/business">List your business</Link></Button>
           {canAccessAdmin && <Button asChild variant="outline" size="sm" className="border-blue-200 px-3 text-[13px] text-[var(--jf-primary)] hover:bg-blue-50 hover:text-[var(--jf-primary)]"><Link href="/admin">Admin workspace</Link></Button>}
           <Button asChild size="sm" className="jf-action-primary px-4 text-[13px]"><Link href={primaryHref}>{primaryLabel}</Link></Button>
         </div>
@@ -41,7 +41,7 @@ export function PageFrame({ children, className }: { children: React.ReactNode; 
       </div>
       {menuOpen && <div className="border-t border-[var(--jf-border)] bg-white px-4 py-3 md:hidden"><div className="container grid gap-1 px-0">
         {links.map(link => <Link key={link.href} href={link.href} onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-[10px] px-3 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"><link.icon className="size-4 text-[var(--jf-primary)]" />{link.label}</Link>)}
-        <Link href="/business" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-[10px] px-3 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"><LayoutDashboard className="size-4 text-[var(--jf-primary)]" />Manage a listing</Link>
+        <Link href="/business" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-[10px] px-3 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"><LayoutDashboard className="size-4 text-[var(--jf-primary)]" />List your business</Link>
         {canAccessAdmin && <Link href="/admin" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-[10px] px-3 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"><LayoutDashboard className="size-4 text-[var(--jf-primary)]" />Admin workspace</Link>}
         <Link href={primaryHref} onClick={() => setMenuOpen(false)} className="jf-action-primary mt-2 flex items-center justify-center px-4 py-3 text-sm font-semibold">{primaryLabel}</Link>
       </div></div>}

@@ -24,7 +24,7 @@ describe("PageFrame managed authentication navigation", () => {
     await act(async () => { root.render(<PageFrame><div>Home</div></PageFrame>); });
 
     expect(container.querySelector('a[href="/login"]')?.textContent).toContain("Sign in");
-    expect(container.querySelector('a[href="/business"]')?.textContent).toContain("Manage a listing");
+    expect(container.querySelector('a[href="/business"]')?.textContent).toContain("List your business");
     expect(container.textContent).not.toContain("Admin workspace");
 
     await act(async () => { root.unmount(); });

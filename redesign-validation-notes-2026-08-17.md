@@ -27,3 +27,10 @@
 - Search errors retain the existing query and filters, explain that recovery is safe, and expose a clear retry action. No-result search states explain why nothing is visible and offer a filter-reset action without clearing the typed query.
 - The owner empty workspace identifies the absence of owner-scoped listings, preserves claim-search and evidence input while feedback is shown, and gives a direct creation action plus a clearly secondary claim-search path.
 - Desktop and mobile review confirmed no horizontal scrolling, readable compact result cards, 44px owner and public discovery actions, and full-width primary owner action behavior. Managed-map failures remain in the existing factual map-unavailable fallback state when Google Maps cannot load.
+
+## Intent-first home-page refinement validation
+
+- Desktop verification confirmed the 12-column discovery composition: the intent-first search hero occupies the primary content area while the factual category panel forms a clear secondary rail. The category rail, category grid, published-profile section, approved-city search field, and existing header actions remain visible and operational.
+- Mobile verification confirmed a compact header, stacked search controls, full-width primary search action, horizontal category-chip rail, compact category cards, touch-safe result cards, and safe-area-aware bottom navigation. No horizontal page overflow was observed.
+- The home page only renders returned category/profile data and explains absence of profiles without inventing records, counts, statistics, reviews, or other marketplace claims.
+- The mobile primary action visibly reads “Search,” retains its accessible action label, and uses a safe-area-aware sticky position within the search sheet so the action remains reachable during short viewport/keyboard states.

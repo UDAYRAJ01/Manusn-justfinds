@@ -72,7 +72,11 @@
   .skip-link:focus, .skip-link[data-focused="true"] { top: 1rem; }
   @media (min-width: 640px) { .container { padding-left: 1.5rem; padding-right: 1.5rem; } }
   @media (min-width: 1024px) { .container { padding-left: 2rem; padding-right: 2rem; max-width: 1280px; } }
-  @media (max-width: 639px) { .jf-section { padding-block: 2.25rem; } }
+  @media (max-width: 639px) {
+    .jf-section { padding-block: 2.25rem; }
+    .jf-home-search > div > div > button { position: sticky; bottom: max(.75rem, env(safe-area-inset-bottom)); z-index: 10; margin-top: .25rem; box-shadow: 0 10px 24px rgba(37,99,235,.24); }
+    .jf-home-search > div > div > button[aria-label="Search local businesses"]::before { content: "Search"; }
+  }
 }
 
 @keyframes jf-skeleton-shimmer { to { background-position: -135% 0; } }
