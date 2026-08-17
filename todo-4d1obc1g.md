@@ -386,3 +386,9 @@
 - [x] Implement serious business-identity, permitted-steps, evidence-guidance, secure-upload, and submission-state interfaces without decorative claims
 - [x] Implement a friendly factual 404 recovery card with search, home, and categories paths
 - [x] Add/update focused tests and validate verification access/state feedback, 404 recovery links, responsive layout, accessibility, TypeScript, and regressions before publishing
+
+## Owner workspace and business-platform refinement
+- [x] Audit the owner workspace shell, business switcher, dashboard data contracts, publication/verification/completeness states, and mobile navigation
+- [x] Implement a calm desktop software workspace with selected-business hierarchy, primary navigation, account/support placement, and factual operational dashboard cards
+- [x] Implement compact mobile owner navigation and prioritize real profile, verification, publication, and next-step actions without dummy analytics
+- [x] Add/update focused tests and validate strict owner isolation, selected-business switching, factual metrics and states, responsive layout, accessibility, TypeScript, and regressions before publishing

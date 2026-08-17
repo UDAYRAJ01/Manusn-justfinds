@@ -1,10 +1,12 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { startLogin } from "@/const";
 import { Button } from "@/components/ui/button";
+import { WorkspaceShell } from "@/components/WorkspaceShell";
 import { trpc } from "@/lib/trpc";
 import { getOwnerListingPath, getSelectedBusinessId } from "@/lib/ownerListingNavigation";
+import { getOwnerWorkspaceSummary } from "@/lib/ownerWorkspacePresentation";
 import GoogleImportSettings from "@/pages/GoogleImportSettings";
-import { Building2, Check, ChevronLeft, ChevronRight, CircleAlert, Clock3, ExternalLink, Loader2, MapPin, MessageSquare, Plus, Search, Settings2, ShieldCheck, Sparkles, Tag, UsersRound } from "lucide-react";
+import { Building2, Check, ChevronLeft, ChevronRight, CircleAlert, ClipboardList, Clock3, ExternalLink, LayoutDashboard, Loader2, MapPin, MessageSquare, Plus, Search, Settings2, Sparkles, Tag, UsersRound } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 
@@ -18,6 +20,14 @@ export function getBusinessPlatformRouteMode(location: string) {
 }
 function slugifyBusinessName(value: string) { return value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 240).replace(/-+$/g, ""); }
 type BusinessRow = { business: { id: number; name: string; status: string; profileCompleteness: number; slug: string; shortDescription: string | null }; category: string | null; city: string | null };
+const ownerPlatformNav = [
+  { href: "/owner", label: "Overview", icon: LayoutDashboard },
+  { href: "/business", label: "Profiles", icon: Building2 },
+  { href: "/owner/leads", label: "Leads", icon: UsersRound },
+  { href: "/owner/content", label: "Content", icon: Sparkles },
+  { href: "/owner/jobs", label: "Jobs", icon: ClipboardList },
+  { href: "/owner/settings", label: "Settings", icon: Settings2 },
+];
 
 export default function BusinessPlatform() {
   const { user, loading, isAuthenticated } = useAuth();
@@ -32,6 +42,8 @@ export default function BusinessPlatform() {
     : selectedId && businesses.data?.some(row => row.business.id === selectedId)
       ? selectedId
       : businesses.data?.[0]?.business.id ?? null;
+  const selectedBusiness = businesses.data?.find(row => row.business.id === selected) as BusinessRow | undefined;
+  const selectedSummary = selectedBusiness ? getOwnerWorkspaceSummary(selectedBusiness.business.status, selectedBusiness.business.profileCompleteness) : null;
   useEffect(() => {
     if (selectedFromUrl && businesses.data?.some(row => row.business.id === selectedFromUrl)) setSelectedId(selectedFromUrl);
   }, [selectedFromUrl, businesses.data]);
@@ -47,26 +59,25 @@ export default function BusinessPlatform() {
   if (routeMode === "add_choice") return <AddBusinessChoice onManual={() => navigate(MANUAL_BUSINESS_CREATION_PATH)} onGoogle={() => navigate("/business/add/import")} onBack={() => navigate("/business")} />;
 
   return (
-    <div className="min-h-screen bg-[var(--jf-surface)] text-[var(--jf-text)]">
-      <Header />
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <WorkspaceShell title="Owner workspace" subtitle="Manage your selected local presence" items={ownerPlatformNav} context={businesses.data?.length && selected ? <label className="grid gap-1.5 rounded-2xl border border-slate-200 bg-white p-3 text-xs font-semibold text-slate-700"><span className="text-[10px] font-extrabold uppercase tracking-[.12em] text-slate-500">Selected business</span><select value={selected} onChange={event => selectBusiness(Number(event.target.value))} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-2 text-sm font-semibold text-slate-900"><>{(businesses.data as BusinessRow[]).map(row => <option key={row.business.id} value={row.business.id}>{row.business.name}</option>)}</></select></label> : undefined}>
+      <div className="mx-auto max-w-7xl">
         <div className="jf-card px-6 py-7 sm:px-8 sm:py-9">
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[.14em] text-[var(--jf-primary)]">Business workspace</p>
-            <h1 className="mt-2 text-3xl font-bold tracking-[-.04em] text-[var(--jf-text)] sm:text-4xl">Grow your local presence.</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--jf-muted)]">Start with the essential business facts, submit them for review, then keep improving the same listing from one owner-scoped workspace. Your completion percentage shows what is still missing.</p>
+            <p className="text-xs font-bold uppercase tracking-[.14em] text-[var(--jf-primary)]">{selectedSummary?.label ?? "Business workspace"}</p>
+            <h1 className="mt-2 text-3xl font-bold tracking-[-.04em] text-[var(--jf-text)] sm:text-4xl">{selectedBusiness ? selectedBusiness.business.name : "Grow your local presence."}</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--jf-muted)]">{selectedSummary?.detail ?? "Start with the essential business facts, submit them for review, then keep improving the same listing from one owner-scoped workspace."}</p>
           </div>
           <Button onClick={() => navigate("/business/add")}><Plus className="mr-2 size-4" />Add a business</Button>
           </div>
         </div>
         {businesses.isLoading ? <Loading text="Loading your businesses…" /> : businesses.error ? <ErrorCard onRetry={() => void businesses.refetch()} /> : businesses.data?.length ? <><BusinessSwitcher rows={businesses.data as BusinessRow[]} selected={selected} onSelect={selectBusiness} /><Dashboard businessId={selected!} /></> : <EmptyState onCreate={() => navigate("/business/add")} />}
-      </main>
-    </div>
+      </div>
+    </WorkspaceShell>
   );
 }
 
-function Header() { return <header className="border-b border-[var(--jf-border)] bg-white"><div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8"><Link href="/" className="flex items-center gap-2 text-sm font-bold text-[var(--jf-text)]"><span className="grid size-8 place-items-center rounded-[10px] bg-[var(--jf-primary)] text-[10px] text-white">JF</span>Just Finds <span className="hidden font-medium text-[var(--jf-muted)] sm:inline">/ Business Workspace</span></Link><div className="flex items-center gap-4 text-xs font-semibold"><Link href="/owner" className="text-[var(--jf-primary)] hover:underline">Overview Dashboard</Link><span className="hidden items-center gap-1 text-[var(--jf-muted)] sm:inline-flex"><ShieldCheck className="size-4 text-emerald-600" />Owner-scoped data</span></div></div></header>; }
+function Header() { return <header className="border-b border-[var(--jf-border)] bg-white"><div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8"><Link href="/business" className="flex items-center gap-2 text-sm font-bold text-[var(--jf-text)]"><span className="grid size-8 place-items-center rounded-[10px] bg-[var(--jf-primary)] text-[10px] text-white">JF</span>Just Finds <span className="hidden font-medium text-[var(--jf-muted)] sm:inline">/ Owner onboarding</span></Link><Link href="/" className="text-xs font-semibold text-[var(--jf-primary)] hover:underline">View public site</Link></div></header>; }
 
 function SignIn({ onLogin }: { onLogin: () => void }) { return <div className="local-grid grid min-h-screen place-items-center bg-[var(--jf-ink)] px-4"><div className="w-full max-w-md rounded-[28px] border border-white/15 bg-white p-8 text-center shadow-[0_22px_55px_rgba(0,0,0,.24)]"><span className="mx-auto grid size-14 place-items-center rounded-2xl bg-blue-50 text-[var(--jf-primary)]"><Building2 /></span><h1 className="mt-5 text-2xl font-bold tracking-[-.05em] text-[var(--jf-text)]">Manage a business on Just Finds</h1><p className="mt-3 text-sm leading-6 text-[var(--jf-muted)]">Sign in to create a listing, claim an existing profile, and respond to customers.</p><Button onClick={onLogin} className="jf-action-primary mt-6 w-full font-bold">Continue securely</Button></div></div>; }
 

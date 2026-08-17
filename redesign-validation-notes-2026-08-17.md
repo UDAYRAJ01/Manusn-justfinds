@@ -84,3 +84,9 @@
 - Desktop and mobile verification checks confirmed that an unavailable public verification link uses a concise, serious recovery card. It explains that secure evidence and private review data are not shown publicly and offers only discovery recovery actions.
 - The verified-record interface is driven solely by the existing public certificate contract. Where a published verification certificate exists, it presents the actual business identity and public verification state; no evidence documents, owner notes, reviewer data, or upload details are exposed.
 - The 404 page was verified at desktop and 375px mobile widths. It provides a light recovery card with Search businesses, Go home, and Browse categories actions, no decorative illustration, readable hierarchy, and no horizontal overflow.
+
+## Owner workspace and business-platform refinement validation
+
+- Desktop verification in an authenticated super-administrator session confirmed the owner software shell now uses a calm dark-navy navigation rail, distinct selected-area hierarchy, primary workflow destinations, account/support context at the bottom, and a clear public-site exit. The mobile navigation is supplied from the same first five owner destinations rather than duplicating a separate, divergent route list.
+- The `/business` page retained a layout-shaped, non-destructive loading skeleton while the owner-business request remained unresolved in the connected development session. No business details, completion percentage, publishing state, or metrics were invented while the data was unavailable.
+- Regression coverage validates the status-summary mapper so published language is only used for published records, while draft and review states retain factual, owner-scoped next-step guidance.
