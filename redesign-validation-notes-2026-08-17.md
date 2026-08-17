@@ -102,3 +102,9 @@
 - Desktop validation in an authenticated owner session confirmed a clear first-stage official Google business search. The page leads with “Search, select, then review,” shows a compact two-step flow, and keeps the optional locality input subordinate to the business-name query.
 - Mobile validation at 375px confirmed the two-stage treatment stacks without horizontal overflow. The search card keeps full guidance, visible field focus treatment, and the server-side credential/rate-limit disclosure without introducing ratings, reviews, user content, or photos.
 - The review implementation uses exact “From Google Business data” labels for editable Category, City, and About fields. Unmatched localities explicitly direct an owner to choose a supported city, while duplicate errors render as a neutral recovery panel with a directory-search action instead of silently guessing or creating a duplicate draft.
+
+## Shared business-tools shell validation
+
+- Desktop verification of the selected VISHNOI FACE HOSPITAL profile and analytics routes confirmed a stable back-to-workspace path, visible selected-business context, and a single horizontal tab set limited to currently supported profile, media, operating-hours, services, CRM, availability, appointments, verification, analytics, and website-builder tools.
+- Each route remains a focused operating panel rather than nesting another dashboard. The factual analytics panel identifies its 11 recorded interactions as captured events only and explicitly avoids projections or sample analytics.
+- Mobile verification at 375px confirmed the selected-business context stacks cleanly, supported tabs remain horizontally reachable, the active Analytics panel is legible, and no horizontal page overflow is introduced. The shared shell states that save feedback is only shown after a server action succeeds; removal controls now use an explicit confirmation before their owner-scoped mutation runs.

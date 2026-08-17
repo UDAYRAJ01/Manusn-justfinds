@@ -404,3 +404,9 @@
 - [x] Implement a clear two-stage search/select and editable review journey with inline official-source labels and factual prefill provenance
 - [x] Implement visible neutral duplicate guidance, supported-city selection for unmatched localities, and explicit no-ratings/no-reviews/no-photos import boundaries
 - [x] Add/update focused tests and validate editable prefill, source labels, duplicates, approved-city restriction, no-import safeguards, accessibility, TypeScript, and regressions before publishing
+
+## Shared business-tools shell refinement
+- [x] Audit business-tool routes, ownership guards, shared shell, supported destinations, panel actions, autosave feedback, and destructive controls
+- [x] Implement a stable business identity header, back-to-workspace path, contextual supported-tool navigation, and focused content panels
+- [x] Add truthful save confirmation and audit-friendly destructive-action confirmation across currently supported tool panels
+- [x] Add/update focused tests and validate ownership isolation, supported navigation, save and destructive feedback, responsive layout, accessibility, TypeScript, and regressions before publishing
