@@ -416,3 +416,8 @@
 - [x] Implement a factual desktop list-detail CRM workspace plus compact mobile list/detail flow with lead stage, source, assignee, follow-up, notes, and timestamps
 - [x] Refine contextual appointment approve, reject, and propose-time controls with real availability validation and restrained semantic status colors
 - [x] Add/update focused tests and validate owner isolation, real-data-only pipeline states, appointment action permissions, availability feedback, responsive layout, accessibility, TypeScript, and regressions before publishing
+
+## Booking availability operational-configuration refinement
+- [x] Audit the existing weekly schedule, timezone, slot, notice, booking-window, blackout, request, and publication-state contracts
+- [x] Implement a clear responsive availability configuration with real operational state, readable time-zone context, conflict guidance, preview, and request-rule explanation
+- [x] Add focused presentation coverage and validate save/error feedback, responsive layout, accessibility, TypeScript, and regressions before publishing

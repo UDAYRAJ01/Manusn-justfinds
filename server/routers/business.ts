@@ -281,7 +281,7 @@ export const businessRouter = router({
   }),
 
   appointmentSettings: protectedProcedure.input(businessIdInput).query(async ({ ctx, input }) => {
-    const { db } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
+    const { db, business } = await ownedBusinessOrThrow(input.businessId, ctx.user.id, ctx.user.role);
     const [settings, windows, blackouts, requests, events] = await Promise.all([
       db.select().from(businessAppointmentSettings).where(eq(businessAppointmentSettings.businessId, input.businessId)).limit(1),
       db.select().from(businessAppointmentWindows).where(eq(businessAppointmentWindows.businessId, input.businessId)).orderBy(businessAppointmentWindows.dayOfWeek, businessAppointmentWindows.startsAt),
@@ -289,7 +289,7 @@ export const businessRouter = router({
       db.select({ request: businessAppointmentRequests, lead: businessLeads }).from(businessAppointmentRequests).innerJoin(businessLeads, eq(businessAppointmentRequests.leadId, businessLeads.id)).where(eq(businessAppointmentRequests.businessId, input.businessId)).orderBy(desc(businessAppointmentRequests.startsAt)).limit(60),
       db.select().from(businessAppointmentEvents).where(eq(businessAppointmentEvents.businessId, input.businessId)).orderBy(desc(businessAppointmentEvents.createdAt)).limit(120),
     ]);
-    return { settings: settings[0] ?? { isEnabled: false, timeZone: "Asia/Kolkata", slotDurationMinutes: 30, minimumNoticeMinutes: 120, maximumAdvanceDays: 30 }, windows, blackouts, requests, events };
+    return { listingStatus: business.status, settings: settings[0] ?? { isEnabled: false, timeZone: "Asia/Kolkata", slotDurationMinutes: 30, minimumNoticeMinutes: 120, maximumAdvanceDays: 30 }, windows, blackouts, requests, events };
   }),
 
   ownerAppointmentAvailability: protectedProcedure.input(businessIdInput).query(async ({ ctx, input }) => {
