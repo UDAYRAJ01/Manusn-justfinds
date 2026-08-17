@@ -410,3 +410,9 @@
 - [x] Implement a stable business identity header, back-to-workspace path, contextual supported-tool navigation, and focused content panels
 - [x] Add truthful save confirmation and audit-friendly destructive-action confirmation across currently supported tool panels
 - [x] Add/update focused tests and validate ownership isolation, supported navigation, save and destructive feedback, responsive layout, accessibility, TypeScript, and regressions before publishing
+
+## Factual CRM and appointment pipeline refinement
+- [x] Audit lead/appointment routes, owner-scoped data contracts, stages, notes, assignees, follow-up fields, availability validation, and responsive interactions
+- [x] Implement a factual desktop list-detail CRM workspace plus compact mobile list/detail flow with lead stage, source, assignee, follow-up, notes, and timestamps
+- [x] Refine contextual appointment approve, reject, and propose-time controls with real availability validation and restrained semantic status colors
+- [x] Add/update focused tests and validate owner isolation, real-data-only pipeline states, appointment action permissions, availability feedback, responsive layout, accessibility, TypeScript, and regressions before publishing
