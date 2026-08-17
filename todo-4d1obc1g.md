@@ -300,3 +300,13 @@
 - [x] Update search and location-driven city suggestion/selection so only matching approved Indian cities are offered
 - [x] Preserve owner-editable city review in manual/Google import flows while rejecting unsupported city creation through public selection paths
 - [x] Add regression coverage, validate public/owner mobile and desktop flows, and publish the India-only city experience
+
+## Latest locally runnable project backup
+- [x] Inspect the latest checkpointed project contents and identify files/configuration required for local startup
+- [x] Build a clean source backup archive with migrations and a local setup guide, excluding secrets and generated dependencies
+- [x] Validate the archive contents and deliver the latest backup with database and secret-configuration notes
+
+## Page-by-page modern UI/UX prompt
+- [x] Audit the current Just Finds public discovery, user/owner, and administrator page families for the redesign prompt
+- [x] Define a modern cross-product direction combining Google-style software clarity with Swiggy/Zomato-style discovery and conversion patterns
+- [x] Write implementation-ready prompt blocks for every page family, desktop/mobile behavior, accessibility, states, and non-negotiable functional constraints
