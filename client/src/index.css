@@ -55,6 +55,10 @@
   .jf-field { border-color: var(--jf-border); border-radius: var(--jf-radius-md); background: var(--jf-surface); min-height: 2.875rem; box-shadow: 0 1px 1px rgba(15,23,42,.02); }
   .jf-table-shell { overflow: hidden; border: 1px solid var(--jf-border); border-radius: var(--jf-radius-lg); background: var(--jf-surface); }
   .jf-empty { display: grid; min-height: 14rem; place-items: center; border: 1px dashed #cbd5e1; border-radius: var(--jf-radius-lg); background: rgba(255,255,255,.75); padding: var(--jf-space-8); text-align: center; }
+  .jf-skeleton { overflow: hidden; border: 1px solid var(--jf-border); border-radius: var(--jf-radius-lg); background: linear-gradient(90deg, #f8fafc 25%, #eef2f7 37%, #f8fafc 63%); background-size: 400% 100%; animation: jf-skeleton-shimmer 1.35s ease infinite; }
+  .jf-touch-target { min-height: 2.75rem; min-width: 2.75rem; }
+  .jf-mobile-safe-bottom { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+  .jf-scroll-target { scroll-margin-top: 6rem; }
   .jf-kicker { display: inline-flex; align-items: center; gap: .5rem; border: 1px solid #dbeafe; border-radius: 999px; background: #f8fbff; padding: .4rem .7rem; color: var(--jf-primary); font-size: .72rem; font-weight: 750; letter-spacing: .01em; }
   .jf-action-primary { border-radius: var(--jf-radius-md); background: var(--jf-primary); color: white; box-shadow: 0 6px 14px rgba(37,99,235,.18); transition: background 160ms cubic-bezier(.23,1,.32,1), box-shadow 160ms cubic-bezier(.23,1,.32,1), transform 160ms cubic-bezier(.23,1,.32,1); }
   .jf-action-primary:hover { background: var(--jf-primary-hover); box-shadow: 0 10px 20px rgba(37,99,235,.22); }
@@ -71,5 +75,7 @@
   @media (max-width: 639px) { .jf-section { padding-block: 2.25rem; } }
 }
 
+@keyframes jf-skeleton-shimmer { to { background-position: -135% 0; } }
 @media print { body * { visibility: hidden; } #business-certificate, #business-certificate * { visibility: visible; } #business-certificate { position: fixed; inset: 0; width: 100%; min-height: 100%; border-width: 24px; } }
 @media (prefers-reduced-motion: no-preference) { a, button { transition-timing-function: cubic-bezier(.23,1,.32,1); } button:active, [role="button"]:active { transform: scale(.97); } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; } }

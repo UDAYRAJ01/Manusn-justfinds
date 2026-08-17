@@ -317,3 +317,9 @@
 - [x] Redesign public discovery, search, category, business-detail, and appointment surfaces without changing their data or route contracts
 - [x] Redesign owner and administrator workspace shells and core dashboard surfaces without weakening role or ownership boundaries
 - [x] Add or update UI regression coverage, validate desktop/mobile states, and publish the completed redesign
+
+## Shared interaction, accessibility, and mobile standards
+- [x] Audit shared components and critical page states against the approved action, search, loading, empty/error, accessibility, motion, and mobile rules
+- [x] Add reusable interaction primitives for focused controls, skeleton/loading states, truthful empty/error recovery, reduced-motion support, and touch-safe mobile actions
+- [x] Apply and validate the standards on public discovery and owner/admin critical flows without changing user data, routes, role gates, or query state
+- [x] Run regression and responsive validation, then publish the interaction-standard refinement
