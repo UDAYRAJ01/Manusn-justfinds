@@ -96,3 +96,9 @@
 - Desktop verification in an authenticated owner session confirmed the dedicated manual route renders a readable 10-step sidebar, a focused identity form, factual guidance, inline validation, local-save status, and an explicit safe exit path. Later steps remain unavailable until required identity and approved-city facts are completed.
 - Mobile verification at 375px confirmed the desktop stepper becomes a compact Step 1 of 10 progress indicator. The title and guidance remain legible, fields and actions fit without horizontal overflow, and Continue is visually dominant while Back remains a separate secondary action.
 - The flow preserves only factual inputs, offers an approved-city-only search at the location step, and explicitly warns that review and verification precede public publication. Focused onboarding rules and the complete regression suite passed after the refinement.
+
+## Google import review validation
+
+- Desktop validation in an authenticated owner session confirmed a clear first-stage official Google business search. The page leads with “Search, select, then review,” shows a compact two-step flow, and keeps the optional locality input subordinate to the business-name query.
+- Mobile validation at 375px confirmed the two-stage treatment stacks without horizontal overflow. The search card keeps full guidance, visible field focus treatment, and the server-side credential/rate-limit disclosure without introducing ratings, reviews, user content, or photos.
+- The review implementation uses exact “From Google Business data” labels for editable Category, City, and About fields. Unmatched localities explicitly direct an owner to choose a supported city, while duplicate errors render as a neutral recovery panel with a directory-search action instead of silently guessing or creating a duplicate draft.

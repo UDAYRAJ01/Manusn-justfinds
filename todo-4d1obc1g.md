@@ -398,3 +398,9 @@
 - [x] Implement clear desktop stepper and mobile progress navigation with focused titles, guidance, explicit Back and Save/continue actions, and truthful saved state feedback
 - [x] Refine editable identity, category, approved city/location, contact, hours, services, facilities/offers, media, AI content, SEO, preview, and submission review steps
 - [x] Add/update focused tests and validate saved-state truthfulness, editable fact persistence, approved India Tier-1/Tier-2 city limits, submission warnings, responsive layout, accessibility, TypeScript, and regressions before publishing
+
+## Transparent Google import review refinement
+- [x] Audit official Google search/select, editable Category/City/About prefill, duplicate checking, supported-city recovery, and draft creation contracts
+- [x] Implement a clear two-stage search/select and editable review journey with inline official-source labels and factual prefill provenance
+- [x] Implement visible neutral duplicate guidance, supported-city selection for unmatched localities, and explicit no-ratings/no-reviews/no-photos import boundaries
+- [x] Add/update focused tests and validate editable prefill, source labels, duplicates, approved-city restriction, no-import safeguards, accessibility, TypeScript, and regressions before publishing
