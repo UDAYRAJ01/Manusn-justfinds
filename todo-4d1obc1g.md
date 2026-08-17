@@ -329,3 +329,10 @@
 - [x] Implement the desktop 7/5 hero, single-action search, real-data discovery modules, category rail/grid, and compact sticky public header
 - [x] Implement the mobile stacked search sheet, keyboard-safe sticky search action, and horizontal category-chip affordance
 - [x] Add/update focused tests and validate factual empty/loading states, approved-city search, desktop/mobile accessibility, and regressions before publishing
+
+## High-confidence factual search-results refinement
+- [x] Audit current Search Results, filters, BusinessCard, and map-fallback contracts against the supplied page specification
+- [x] Implement the desktop filter rail/results layout with compact persistent query and approved-city controls, factual count, applied chips, and data-backed filters only
+- [x] Implement the mobile sticky summary with accessible Filters and Sort sheets, plus truthful loading and empty/error states
+- [x] Refine factual result cards and map/list behavior without inventing ratings, reviews, photos, availability, or unsupported map data
+- [x] Add/update focused tests and validate desktop/mobile controls, map fallback, accessibility, TypeScript, and regressions before publishing

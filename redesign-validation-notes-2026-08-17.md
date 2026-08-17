@@ -34,3 +34,9 @@
 - Mobile verification confirmed a compact header, stacked search controls, full-width primary search action, horizontal category-chip rail, compact category cards, touch-safe result cards, and safe-area-aware bottom navigation. No horizontal page overflow was observed.
 - The home page only renders returned category/profile data and explains absence of profiles without inventing records, counts, statistics, reviews, or other marketplace claims.
 - The mobile primary action visibly reads “Search,” retains its accessible action label, and uses a safe-area-aware sticky position within the search sheet so the action remains reachable during short viewport/keyboard states.
+
+## Search decision-workspace refinement validation
+
+- Desktop verification confirmed that the compact query/city control, factual published-result count, filter rail, recommended sort control, location affordance, and compact business profile card remain scannable without rating or review claims.
+- Mobile verification confirmed a visible result summary plus touch-safe Filters and Sort actions, a compact card hierarchy, retained query/city context, no horizontal overflow, and the existing factual fallback behavior for unavailable map data.
+- The search UI only presents category, verification, and distance controls when supported by the current discovery contract; it does not create unsupported filters, fabricated availability, ratings, or review totals.
