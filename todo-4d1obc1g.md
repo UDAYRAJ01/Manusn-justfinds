@@ -392,3 +392,9 @@
 - [x] Implement a calm desktop software workspace with selected-business hierarchy, primary navigation, account/support placement, and factual operational dashboard cards
 - [x] Implement compact mobile owner navigation and prioritize real profile, verification, publication, and next-step actions without dummy analytics
 - [x] Add/update focused tests and validate strict owner isolation, selected-business switching, factual metrics and states, responsive layout, accessibility, TypeScript, and regressions before publishing
+
+## Save-safe manual onboarding refinement
+- [x] Audit the 10-step manual route, onboarding resume/autosave behavior, field validation, approved-city picker, and pre-submission review surfaces
+- [x] Implement clear desktop stepper and mobile progress navigation with focused titles, guidance, explicit Back and Save/continue actions, and truthful saved state feedback
+- [x] Refine editable identity, category, approved city/location, contact, hours, services, facilities/offers, media, AI content, SEO, preview, and submission review steps
+- [x] Add/update focused tests and validate saved-state truthfulness, editable fact persistence, approved India Tier-1/Tier-2 city limits, submission warnings, responsive layout, accessibility, TypeScript, and regressions before publishing

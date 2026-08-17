@@ -90,3 +90,9 @@
 - Desktop verification in an authenticated super-administrator session confirmed the owner software shell now uses a calm dark-navy navigation rail, distinct selected-area hierarchy, primary workflow destinations, account/support context at the bottom, and a clear public-site exit. The mobile navigation is supplied from the same first five owner destinations rather than duplicating a separate, divergent route list.
 - The `/business` page retained a layout-shaped, non-destructive loading skeleton while the owner-business request remained unresolved in the connected development session. No business details, completion percentage, publishing state, or metrics were invented while the data was unavailable.
 - Regression coverage validates the status-summary mapper so published language is only used for published records, while draft and review states retain factual, owner-scoped next-step guidance.
+
+## Save-safe manual onboarding validation
+
+- Desktop verification in an authenticated owner session confirmed the dedicated manual route renders a readable 10-step sidebar, a focused identity form, factual guidance, inline validation, local-save status, and an explicit safe exit path. Later steps remain unavailable until required identity and approved-city facts are completed.
+- Mobile verification at 375px confirmed the desktop stepper becomes a compact Step 1 of 10 progress indicator. The title and guidance remain legible, fields and actions fit without horizontal overflow, and Continue is visually dominant while Back remains a separate secondary action.
+- The flow preserves only factual inputs, offers an approved-city-only search at the location step, and explicitly warns that review and verification precede public publication. Focused onboarding rules and the complete regression suite passed after the refinement.
