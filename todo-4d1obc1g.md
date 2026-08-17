@@ -362,3 +362,9 @@
 - [x] Implement a polished selected-design mini-site with factual identity, services, about, hours/contact, conditional booking/contact CTA, and a Just Finds listing return path
 - [x] Refine published and unpublished states so ownership/admin guidance appears only to authorized users and no business facts or claims are invented
 - [x] Add/update focused tests and validate public/unpublished behavior, responsive layout, accessibility, TypeScript, and regressions before publishing
+
+## Factual saved-listings refinement
+- [x] Audit the saved-listings route, current personal saved-record contract, authentication state, and removal behavior
+- [x] Implement a compact personal saved-listing page with lightweight sorting, factual cards, and a discovery-linked empty state
+- [x] Implement a reversible remove control with truthful undo and failure feedback without creating placeholder records
+- [x] Add/update focused tests and validate personal data isolation, empty/remove/undo states, accessibility, responsive layout, TypeScript, and regressions before publishing

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createPublicBusinessReview, findNearestApprovedCity, findNearestLocality, getActiveCategories, getActiveCities, getPublicBusinessByRoute, getPublicBusinesses, getPublicCategoryBySlug, getPublicCategoryFields, getPublicCityBySlug, getPublicLocalities, getPublicSavedBusiness, getPublicSearchPage, getPublicSubcategories, getPublicBusinessTypes, getPublicCertificateVerification, logPublicInteraction, logPublicSearch, reportPublicBusinessReview, searchCities, searchLocalities, togglePublicSavedBusiness } from "../db";
+import { createPublicBusinessReview, findNearestApprovedCity, findNearestLocality, getActiveCategories, getActiveCities, getPublicBusinessByRoute, getPublicBusinesses, getPublicCategoryBySlug, getPublicCategoryFields, getPublicCityBySlug, getPublicLocalities, getPublicSavedBusiness, getPublicSavedBusinesses, getPublicSearchPage, getPublicSubcategories, getPublicBusinessTypes, getPublicCertificateVerification, logPublicInteraction, logPublicSearch, reportPublicBusinessReview, searchCities, searchLocalities, togglePublicSavedBusiness } from "../db";
 import { parseSearchIntent } from "../domain/searchIntent";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 
@@ -117,6 +117,7 @@ export const discoveryRouter = router({
     return detail ? { ...detail, isFixture: false, reviewSummary: "No Just Finds reviews yet" } : null;
   }),
   saved: protectedProcedure.input(z.object({ businessId: z.number().int().positive() })).query(({ ctx, input }) => getPublicSavedBusiness(ctx.user.id, input.businessId)),
+  savedListings: protectedProcedure.query(({ ctx }) => getPublicSavedBusinesses(ctx.user.id)),
   toggleSave: protectedProcedure.input(z.object({ businessId: z.number().int().positive() })).mutation(async ({ ctx, input }) => togglePublicSavedBusiness(ctx.user.id, input.businessId)),
   submitReview: protectedProcedure.input(z.object({ businessId: z.number().int().positive(), rating: z.number().int().min(1).max(5), content: z.string().trim().max(2000).optional() })).mutation(({ ctx, input }) => createPublicBusinessReview({ ...input, userId: ctx.user.id })),
   reportReview: protectedProcedure.input(z.object({ reviewId: z.number().int().positive(), reason: z.string().trim().min(3).max(240), details: z.string().trim().max(1000).optional() })).mutation(({ ctx, input }) => reportPublicBusinessReview({ ...input, reporterId: ctx.user.id })),

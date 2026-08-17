@@ -60,3 +60,9 @@
 - The sample profile has no enabled service, hours, gallery, or appointment availability records, so those sections and actions are correctly absent rather than replaced with placeholder content. The enquiry form remains available because the business has real contact information and an enabled contact path.
 - Mobile verification at 375px confirmed readable hierarchy, stacked action controls, full-width safe enquiry submission control, non-stretched layout, and a clear footer link back to the Just Finds listing.
 - The unavailable-route verification rendered the calm “Website not published” state with a public discovery exit. The active browser session had a super-administrator role, so it additionally displayed the authorized administrator recovery path; automated coverage confirms ordinary users receive no workspace recovery action.
+
+## Saved listings validation
+
+- Desktop verification of `/saved` confirmed a clear personal-collection header, a factual no-saved-places state, and a single recovery action back to discovery. The active session returned no saved records, so no placeholder businesses, ratings, or fabricated saved history appeared.
+- Mobile verification at 375px confirmed a compact app-like composition with readable hierarchy, touch-safe discovery action, and no horizontal overflow. The empty state explains that saved places appear only after a listing is actually saved.
+- The protected saved-list contract returns only the authenticated user’s saved records joined to currently published businesses. Removal uses the existing toggle contract and presents an explicit Undo affordance only after a real removal succeeds.

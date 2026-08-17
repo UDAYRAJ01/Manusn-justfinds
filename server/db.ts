@@ -723,6 +723,35 @@ export async function getPublicSavedBusiness(userId: number, businessId: number)
   return Boolean(row[0]);
 }
 
+export async function getPublicSavedBusinesses(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    id: businesses.id,
+    name: businesses.name,
+    slug: businesses.slug,
+    shortDescription: businesses.shortDescription,
+    address: businesses.address,
+    phone: businesses.phone,
+    website: businesses.website,
+    isVerified: businesses.isVerified,
+    category: categories.name,
+    categorySlug: categories.slug,
+    city: cities.name,
+    citySlug: cities.slug,
+    locality: localities.name,
+    savedAt: savedBusinesses.createdAt,
+  })
+    .from(savedBusinesses)
+    .innerJoin(businesses, eq(savedBusinesses.businessId, businesses.id))
+    .innerJoin(categories, eq(businesses.categoryId, categories.id))
+    .innerJoin(cities, eq(businesses.cityId, cities.id))
+    .leftJoin(localities, eq(businesses.localityId, localities.id))
+    .where(and(eq(savedBusinesses.userId, userId), eq(businesses.status, "published")))
+    .orderBy(desc(savedBusinesses.createdAt))
+    .limit(120);
+}
+
 export async function createPublicBusinessReview(input: { userId: number; businessId: number; rating: number; content?: string }) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
