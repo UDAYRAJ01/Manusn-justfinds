@@ -6,6 +6,7 @@ import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { JustFindsLogo } from "./JustFindsLogo";
 import { NotificationBell } from "./NotificationBell";
+import { MobileBottomNav } from "./ProductPrimitives";
 
 const links = [
   { label: "Explore", href: "/search", icon: Search },
@@ -47,13 +48,7 @@ export function PageFrame({ children, className }: { children: React.ReactNode; 
       </div></div>}
     </header>
     <main id="main-content" tabIndex={-1} className="flex-1">{children}</main>
-    <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-w-[640px] items-center justify-around rounded-t-[1.35rem] border-x border-t border-[var(--jf-border)] bg-white/95 px-2 pb-[max(.55rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_28px_rgba(15,23,42,.10)] backdrop-blur-xl md:hidden" aria-label="Mobile navigation">
-      <MobileNav href="/" icon={Home} label="Home" active={location === "/"} />
-      <MobileNav href="/search" icon={Search} label="Search" active={location.startsWith("/search")} />
-      <MobileNav href="/saved" icon={Heart} label="Saved" active={location.startsWith("/saved")} />
-      <MobileNav href="/jobs" icon={BriefcaseBusiness} label="Jobs" active={location.startsWith("/jobs")} />
-      <MobileNav href={primaryHref} icon={UserRound} label={user ? "Listings" : "Sign in"} active={location.startsWith("/business") || location === "/login"} />
-    </nav>
+    <MobileBottomNav className="md:hidden" items={[{ href: "/", icon: Home, label: "Home" }, { href: "/search", icon: Search, label: "Search" }, { href: "/saved", icon: Heart, label: "Saved" }, { href: "/jobs", icon: BriefcaseBusiness, label: "Jobs" }, { href: primaryHref, icon: UserRound, label: user ? "Listings" : "Sign in" }]} />
     <footer className="border-t border-[var(--jf-border)] bg-white pb-24 pt-10 text-[var(--jf-text)] md:pb-10">
       <div className="container grid gap-8 md:grid-cols-[1.2fr_.8fr_.8fr_.9fr]">
         <div><JustFindsLogo /><p className="mt-4 max-w-sm text-sm leading-6 text-[var(--jf-muted)]">Find local businesses, services, and opportunities with clear, factual information.</p></div>
@@ -64,10 +59,6 @@ export function PageFrame({ children, className }: { children: React.ReactNode; 
       <div className="container mt-9 border-t border-slate-100 pt-5 text-xs text-slate-400">© {new Date().getFullYear()} Just Finds. Local discovery with clearer information.</div>
     </footer>
   </div>;
-}
-
-function MobileNav({ href, icon: Icon, label, active }: { href: string; icon: React.ElementType; label: string; active: boolean }) {
-  return <Link href={href} className={cn("flex min-w-[58px] flex-col items-center gap-1 rounded-xl px-2 py-1.5 text-[10px] font-bold transition-colors", active ? "bg-blue-50 text-[var(--jf-primary)]" : "text-[var(--jf-muted)] hover:bg-slate-50 hover:text-[var(--jf-text)]")}><span className={cn("grid size-7 place-items-center rounded-lg", active && "bg-[var(--jf-primary)] text-white shadow-sm")}><Icon className="size-[17px]" /></span>{label}</Link>;
 }
 
 function FooterColumn({ title, links }: { title: string; links: Array<{ href: string; label: string }> }) {

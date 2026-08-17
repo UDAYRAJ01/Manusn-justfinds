@@ -5,7 +5,7 @@ const homeSource = readFileSync(new URL("./Home.tsx", import.meta.url), "utf8");
 
 describe("intent-first Home discovery contract", () => {
   it("keeps the approved-city search control and a single factual profile section", () => {
-    expect(homeSource).toContain("<SearchHero />");
+    expect(homeSource).toContain("<SearchBar />");
     expect(homeSource).toContain('title="Available local profiles"');
     expect(homeSource).toContain("Try browsing categories or searching by city.");
   });

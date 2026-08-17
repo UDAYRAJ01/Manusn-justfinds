@@ -1,6 +1,6 @@
 import { BusinessCard, type BusinessCardData } from "@/components/BusinessCard";
 import { PageFrame } from "@/components/PageFrame";
-import { SearchHero } from "@/components/SearchHero";
+import { SearchBar } from "@/components/SearchBar";
 import { SearchResultsMap } from "@/components/SearchResultsMap";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -99,7 +99,7 @@ export default function SearchResults() {
   const filterControls = <FilterControls categories={categories} localities={localities} selectedCityName={selectedCity?.name} category={category} locality={locality} verified={verified} nearbyActive={sort === "nearby"} locationDisabled={locationStatus === "requesting" || locationStatus === "unsupported"} locationLoading={locationStatus === "requesting"} onUpdate={updateSearch} onNearby={enableNearby} />;
 
   return <PageFrame>
-    <section className="border-b border-[var(--jf-border)] bg-white py-4 sm:py-5"><div className="container"><SearchHero compact initialQuery={query} initialCity={city} initialLocality={locality} /></div></section>
+    <section className="border-b border-[var(--jf-border)] bg-white py-4 sm:py-5"><div className="container"><SearchBar compact initialQuery={query} initialCity={city} initialLocality={locality} /></div></section>
     <section className="container py-7 sm:py-9">
       <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2 text-xs text-[var(--jf-muted)]"><span>Home</span><span>/</span><span>Explore</span><span>/</span><span className="font-medium text-[var(--jf-text)]">{query || "Local discovery"}</span></nav>
       <div className="mt-4 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">

@@ -1,6 +1,6 @@
 import { BusinessCard, BusinessCardData } from "@/components/BusinessCard";
 import { LocationPill, PageFrame } from "@/components/PageFrame";
-import { SearchHero } from "@/components/SearchHero";
+import { SearchBar } from "@/components/SearchBar";
 import { trpc } from "@/lib/trpc";
 import { ArrowRight, BriefcaseBusiness, Building2, ChevronRight, HeartPulse, Hotel, MapPin, Utensils, Wrench } from "lucide-react";
 import { useMemo } from "react";
@@ -23,7 +23,7 @@ export default function Home() {
           <span className="jf-kicker"><MapPin className="size-3.5" />India-first local discovery</span>
           <h1 className="mt-5 max-w-3xl text-balance text-4xl font-bold leading-[1.08] tracking-[-.05em] text-[var(--jf-text)] sm:text-5xl lg:text-[3.5rem]">What are you looking for,<br /><span className="text-[var(--jf-primary)]">and where?</span></h1>
           <p className="mt-5 max-w-2xl text-pretty text-base leading-7 text-[var(--jf-muted)] sm:text-lg">Search local businesses, services, and opportunities with clear information before you decide.</p>
-          <div className="jf-home-search mt-7"><SearchHero /></div>
+          <div className="jf-home-search mt-7"><SearchBar /></div>
           <div className="mt-4 flex items-center gap-2 overflow-x-auto pb-1 text-sm [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <span className="shrink-0 text-xs font-bold text-[var(--jf-muted)]">Try a search:</span>
             {["Hospitals", "Restaurants", "Electricians", "Doctors", "Hotels", "Jobs"].map(item => <Link key={item} href={`/search?query=${encodeURIComponent(item)}`} className="shrink-0 rounded-full border border-[var(--jf-border)] bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:border-blue-200 hover:text-[var(--jf-primary)]">{item}</Link>)}

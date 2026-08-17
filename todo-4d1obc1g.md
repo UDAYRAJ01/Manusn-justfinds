@@ -439,3 +439,9 @@
 - [x] Implement conservative mapping and settings controls with source type, mapped category, activation state, explicit review, and safe save feedback
 - [x] Add warnings and confirmation where a change can affect public behavior, while preserving owner-data boundaries and prohibiting silent publishing or automatic import success
 - [x] Add/update focused coverage and validate authorization, factual state, privacy boundaries, responsive layout, accessibility, TypeScript, and regressions before publishing
+
+## Reusable responsive component-system refinement
+- [x] Audit PageFrame, WorkspaceShell, BusinessCard, search, feedback, metrics, table, mobile-navigation, sticky-action, token, and responsive-state implementations for safe consolidation
+- [x] Build/refine reusable Page Frame, Workspace Shell, Business Card, Search Bar, Status Badge, EmptyState, SectionHeader, MetricCard, DataTable, MobileBottomNav, and StickyActionBar primitives using the existing token layer and suitable shadcn controls
+- [x] Apply shared primitives to representative public discovery, owner, and administrator screens without changing routes, role gates, approved-city search, data contracts, or Google-import restrictions
+- [x] Add/update focused coverage and validate loading, empty, error, hover, focus, disabled, keyboard, responsive, factual-content, TypeScript, and full-regression states before publishing

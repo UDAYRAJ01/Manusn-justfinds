@@ -6,7 +6,7 @@ const landingSource = readFileSync(new URL("./DiscoveryLanding.tsx", import.meta
 describe("factual local-exploration landing contract", () => {
   it("keeps breadcrumbs, compact shared search, and published-listing discovery", () => {
     expect(landingSource).toContain('aria-label="Breadcrumb"');
-    expect(landingSource).toContain("<SearchHero");
+    expect(landingSource).toContain("<SearchBar");
     expect(landingSource).toContain("Published profiles");
     expect(landingSource).toContain("trpc.discovery.search.useQuery");
   });
