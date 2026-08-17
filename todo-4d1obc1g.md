@@ -368,3 +368,9 @@
 - [x] Implement a compact personal saved-listing page with lightweight sorting, factual cards, and a discovery-linked empty state
 - [x] Implement a reversible remove control with truthful undo and failure feedback without creating placeholder records
 - [x] Add/update focused tests and validate personal data isolation, empty/remove/undo states, accessibility, responsive layout, TypeScript, and regressions before publishing
+
+## Factual jobs and normal-user authentication refinement
+- [x] Audit Jobs data routes, records, filters, mobile behavior, and the normal authentication entry routes against the supplied specifications
+- [x] Implement a compact factual Jobs discovery workspace with role/title search, approved-city/job-type filtering, and real-record-only cards
+- [x] Implement a focused normal-user authentication entry with secure sign-in, privacy/support microcopy, discovery return path, and no administrator access mixing
+- [x] Add/update focused tests and validate job truthfulness, filter states, mobile filter sheet, authentication routes, accessibility, TypeScript, and regressions before publishing

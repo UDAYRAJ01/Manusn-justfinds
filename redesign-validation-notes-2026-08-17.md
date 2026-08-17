@@ -66,3 +66,9 @@
 - Desktop verification of `/saved` confirmed a clear personal-collection header, a factual no-saved-places state, and a single recovery action back to discovery. The active session returned no saved records, so no placeholder businesses, ratings, or fabricated saved history appeared.
 - Mobile verification at 375px confirmed a compact app-like composition with readable hierarchy, touch-safe discovery action, and no horizontal overflow. The empty state explains that saved places appear only after a listing is actually saved.
 - The protected saved-list contract returns only the authenticated user’s saved records joined to currently published businesses. Removal uses the existing toggle contract and presents an explicit Undo affordance only after a real removal succeeds.
+
+## Jobs and normal-user authentication refinement validation
+
+- Desktop verification of `/jobs` confirmed the role/title search control, factual published-job count, approved-city and employment-type filters, and an empty state that explains why no roles are present without creating a sample job, salary, rating, or urgency label. The filter rail uses only the supported city and job-type contract.
+- Mobile verification at 375px confirmed a compact stacked role search control and a clearly reachable Filters trigger for the bottom-sheet job filters. The no-jobs state remains legible and the page has no horizontal overflow.
+- Desktop and mobile verification of `/login` confirmed a low-distraction identity-only shell: compact Just Finds mark, direct return to discovery, a centered appropriately sized secure-sign-in card, privacy microcopy, and a single `Continue to secure sign-in` action. The normal entry path does not surface administrator navigation or role-selection controls.

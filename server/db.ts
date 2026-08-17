@@ -673,12 +673,13 @@ export async function getPendingBusinesses() {
   });
 }
 
-export async function getPublishedJobs(query?: string, citySlug?: string) {
+export async function getPublishedJobs(query?: string, citySlug?: string, jobType?: "full_time" | "part_time" | "contract" | "internship" | "freelance") {
   const db = await getDb();
   if (!db) return [];
   const conditions = [eq(jobs.status, "published")];
   if (query?.trim()) conditions.push(or(like(jobs.title, `%${query.trim()}%`), like(jobs.category, `%${query.trim()}%`))!);
   if (citySlug) conditions.push(eq(cities.slug, citySlug));
+  if (jobType) conditions.push(eq(jobs.jobType, jobType));
   return db.select({ job: jobs, city: cities.name, citySlug: cities.slug, company: businesses.name })
     .from(jobs)
     .leftJoin(cities, eq(jobs.cityId, cities.id))
