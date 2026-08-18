@@ -406,3 +406,9 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Redesign city governance around the curated India Tier-1/Tier-2 catalogue, including state, tier, active status, and coordinates as managed data.
 - [x] Prevent arbitrary public city creation and provide clear curated-coverage guidance with a safe feedback path for unsupported places.
 - [x] Add regression coverage and verify the controlled governance views on desktop and mobile.
+
+## Administrator Runtime Repair
+
+- [x] Trace and reproduce the live `data?.reduce is not a function` failure in the administrator workspace.
+- [x] Harden the affected catalogue data boundary against non-array responses without masking real API errors.
+- [x] Add regression coverage for the unexpected response shape and verify the live administrator route renders safely.

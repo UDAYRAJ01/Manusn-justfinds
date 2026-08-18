@@ -7,6 +7,12 @@ export const analyticsRangeOptions = [
 type ActionCount = { action: string; count: number | string };
 type DailyCount = { day: string; count: number | string };
 
+export function recordedInteractionTotal(value: unknown) {
+  if (!value || typeof value !== "object") return 0;
+  const total = Number((value as { totalInteractions?: unknown }).totalInteractions);
+  return Number.isFinite(total) && total >= 0 ? total : 0;
+}
+
 export function analyticsSummary(actions: ActionCount[], totalInteractions: number, daily: DailyCount[]) {
   const countFor = (...names: string[]) => actions.filter(item => names.includes(item.action)).reduce((total, item) => total + Number(item.count || 0), 0);
   return {
