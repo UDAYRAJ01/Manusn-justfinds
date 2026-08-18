@@ -445,3 +445,19 @@
 - [x] Build/refine reusable Page Frame, Workspace Shell, Business Card, Search Bar, Status Badge, EmptyState, SectionHeader, MetricCard, DataTable, MobileBottomNav, and StickyActionBar primitives using the existing token layer and suitable shadcn controls
 - [x] Apply shared primitives to representative public discovery, owner, and administrator screens without changing routes, role gates, approved-city search, data contracts, or Google-import restrictions
 - [x] Add/update focused coverage and validate loading, empty, error, hover, focus, disabled, keyboard, responsive, factual-content, TypeScript, and full-regression states before publishing
+
+## Business Detail approved-information assistant repair
+- [x] Audit the public Business Detail assistant UI, assistant procedure, approved-facts context, response contract, and current loading/error logs
+- [x] Repair the assistant so it handles loading and failures clearly and answers only from approved published business information
+- [x] Add/update focused tests and validate factual response boundaries, unavailable states, detail-page interaction, TypeScript, and regressions before publishing
+
+## Production analytics response-shape crash repair
+- [x] Locate the page that calls reduce on an object-shaped analytics response and confirm the actual owner-scoped contract
+- [x] Guard analytics rendering against unexpected response shapes while preserving real unavailable and zero-data states
+- [x] Add focused regression coverage and validate the repaired page, approved-information assistant, TypeScript, and full regression suite before publishing
+
+## Reference-inspired public Business Detail layout
+- [x] Audit the current detail-page facts, media, actions, section anchors, and factual-content guards for the supplied layout direction
+- [x] Implement a responsive detail view with top section tabs, real-media gallery, business summary, conditional services/facilities, sticky contact-and-booking panel, and factual assistant entry
+- [x] Preserve approved-business-only data, hide unavailable actions/sections, and exclude fabricated reviews, photos, facilities, ratings, availability, and claims
+- [x] Add/update focused coverage and validate desktop/mobile layout, anchors, actions, assistant state, accessibility, TypeScript, and regressions before publishing

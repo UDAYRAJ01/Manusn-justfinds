@@ -1,11 +1,12 @@
 export type BusinessDetailSection = {
-  id: "overview" | "services" | "hours" | "location" | "photos" | "website" | "offers" | "details" | "reviews";
+  id: "overview" | "services" | "facilities" | "hours" | "location" | "photos" | "website" | "offers" | "details" | "reviews" | "appointments";
   label: string;
 };
 
 export type BusinessDetailSectionFacts = {
   hasOverview: boolean;
   hasServices: boolean;
+  hasFacilities?: boolean;
   hasHours: boolean;
   hasLocation: boolean;
   hasPhotos: boolean;
@@ -13,12 +14,14 @@ export type BusinessDetailSectionFacts = {
   hasOffers: boolean;
   hasFaqs: boolean;
   hasReviews: boolean;
+  hasAppointments?: boolean;
 };
 
 export function getBusinessDetailSections(facts: BusinessDetailSectionFacts): BusinessDetailSection[] {
   const candidates: Array<BusinessDetailSection & { show: boolean }> = [
     { id: "overview", label: "Overview", show: facts.hasOverview },
     { id: "services", label: "Services", show: facts.hasServices },
+    { id: "facilities", label: "Facilities", show: facts.hasFacilities === true },
     { id: "hours", label: "Hours", show: facts.hasHours },
     { id: "location", label: "Location", show: facts.hasLocation },
     { id: "photos", label: "Photos", show: facts.hasPhotos },
@@ -26,6 +29,7 @@ export function getBusinessDetailSections(facts: BusinessDetailSectionFacts): Bu
     { id: "offers", label: "Offers", show: facts.hasOffers },
     { id: "details", label: "Details", show: facts.hasFaqs },
     { id: "reviews", label: "Reviews", show: facts.hasReviews },
+    { id: "appointments", label: "Appointments", show: facts.hasAppointments === true },
   ];
 
   return candidates.filter(({ show }) => show).map(({ show: _show, ...section }) => section);

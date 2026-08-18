@@ -6,6 +6,7 @@ describe("business detail section rules", () => {
     const sections = getBusinessDetailSections({
       hasOverview: true,
       hasServices: false,
+      hasFacilities: false,
       hasHours: true,
       hasLocation: true,
       hasPhotos: false,
@@ -13,6 +14,7 @@ describe("business detail section rules", () => {
       hasOffers: false,
       hasFaqs: false,
       hasReviews: false,
+      hasAppointments: false,
     });
 
     expect(sections).toEqual([
@@ -20,6 +22,28 @@ describe("business detail section rules", () => {
       { id: "hours", label: "Hours" },
       { id: "location", label: "Location" },
       { id: "website", label: "Website" },
+    ]);
+  });
+
+  it("includes facilities and appointments only when the profile publishes those real capabilities", () => {
+    const sections = getBusinessDetailSections({
+      hasOverview: false,
+      hasServices: true,
+      hasFacilities: true,
+      hasHours: false,
+      hasLocation: false,
+      hasPhotos: false,
+      hasWebsite: false,
+      hasOffers: false,
+      hasFaqs: false,
+      hasReviews: false,
+      hasAppointments: true,
+    });
+
+    expect(sections).toEqual([
+      { id: "services", label: "Services" },
+      { id: "facilities", label: "Facilities" },
+      { id: "appointments", label: "Appointments" },
     ]);
   });
 

@@ -8,8 +8,6 @@ import {
   businessUnansweredQuestions,
 } from "../../../drizzle/schema";
 import { getBusinessAiFacts, getDb } from "../../db";
-import { generateStructured } from "./provider";
-import { buildChatPrompt } from "./prompts";
 import type { BusinessAiFacts } from "./types";
 
 const FALLBACK = "I don't have that information for this business.";
@@ -93,8 +91,41 @@ export function rankKnowledge(question: string, items: Array<{ id: number; label
   }).filter(entry => entry.score > 0).sort((left, right) => right.score - left.score || left.item.id - right.item.id).slice(0, limit).map(entry => entry.item);
 }
 
-function containsUnsupportedNumber(answer: string, grounded: string) {
-  return (answer.match(/\b\d+(?:[.,]\d+)?\b/g) ?? []).some(number => !grounded.includes(number));
+type ApprovedKnowledgeItem = {
+  id: number;
+  label: string;
+  content: string;
+  sourceType?: string;
+};
+
+const sourceHints: Array<{ pattern: RegExp; sources: KnowledgeSourceType[] }> = [
+  { pattern: /\b(service|services|offer|offers|provide|available|treatment|treatments)\b/i, sources: ["service", "facility", "offer"] },
+  { pattern: /\b(hour|hours|open|opening|close|closing|time|timing|timings)\b/i, sources: ["hours"] },
+  { pattern: /\b(address|location|where|directions|reach|there|city|phone|call|whatsapp|email|contact)\b/i, sources: ["profile"] },
+  { pattern: /\b(facility|facilities|amenit|feature|features)\b/i, sources: ["facility"] },
+];
+
+/** Uses only already-approved listing records so public chat remains fast and factual. */
+export function retrieveApprovedKnowledge(question: string, items: ApprovedKnowledgeItem[], limit = 3) {
+  const ranked = rankKnowledge(question, items, limit);
+  if (ranked.length) return ranked;
+
+  const hint = sourceHints.find(item => item.pattern.test(question));
+  if (hint) {
+    const contextual = items.filter(item => hint.sources.includes(item.sourceType as KnowledgeSourceType));
+    if (contextual.length) return contextual.slice(0, limit);
+  }
+
+  return items.filter(item => item.sourceType === "profile").slice(0, 1);
+}
+
+export function createApprovedBusinessAnswer(items: ApprovedKnowledgeItem[]) {
+  const entries = items.map(item => item.content.trim()).filter(Boolean).slice(0, 3);
+  if (!entries.length) return { answer: FALLBACK, answered: false };
+  return {
+    answer: `Based on this business's approved information:\n\n${entries.map(entry => `• ${entry}`).join("\n")}`,
+    answered: true,
+  };
 }
 
 async function recordUnanswered(db: Awaited<ReturnType<typeof getDb>>, businessId: number, question: string) {
@@ -116,24 +147,14 @@ export async function answerBusinessQuestion(input: { businessId: number; questi
   if (!facts) return { answer: FALLBACK, answered: false, knowledgeItemIds: [], sessionId: input.sessionId ?? randomUUID() };
   await syncBusinessKnowledge(input.businessId);
   const knowledge = await getBusinessKnowledge(input.businessId);
-  const retrieved = rankKnowledge(input.question, knowledge);
+  const retrieved = retrieveApprovedKnowledge(input.question, knowledge);
   const sessionId = input.sessionId ?? randomUUID();
   let answer = FALLBACK;
   let answered = false;
   if (retrieved.length) {
-    const grounded = retrieved.map(item => `[${item.id}] ${item.content}`).join("\n");
-    const prompt = buildChatPrompt({ business: facts.business, retrievedKnowledge: grounded }, input.question);
-    const response = await generateStructured<{ answer: string; answered: boolean }>({
-      system: `${prompt.system}\nUse only the retrieved knowledge entries. Set answered=false and use the exact fallback when the entries do not answer the question.`,
-      user: prompt.user,
-      outputSchema: { name: "just_finds_business_chat", strict: true, schema: { type: "object", properties: { answer: { type: "string" }, answered: { type: "boolean" } }, required: ["answer", "answered"], additionalProperties: false } },
-      maxTokens: 500,
-    });
-    const candidate = response.data.answer?.trim();
-    if (response.data.answered && candidate && candidate !== FALLBACK && !containsUnsupportedNumber(candidate, grounded)) {
-      answer = candidate;
-      answered = true;
-    }
+    const deterministicAnswer = createApprovedBusinessAnswer(retrieved);
+    answer = deterministicAnswer.answer;
+    answered = deterministicAnswer.answered;
   }
   if (!answered) await recordUnanswered(db, input.businessId, input.question);
   const sessions = await db.select({ id: businessChatSessions.id, messageCount: businessChatSessions.messageCount, unansweredCount: businessChatSessions.unansweredCount }).from(businessChatSessions).where(and(eq(businessChatSessions.businessId, input.businessId), eq(businessChatSessions.sessionId, sessionId))).limit(1);
