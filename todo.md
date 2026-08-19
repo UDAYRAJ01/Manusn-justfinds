@@ -412,3 +412,11 @@ The user reports that `/owner/profile` and `/business` still expose separate bus
 - [x] Trace and reproduce the live `data?.reduce is not a function` failure in the administrator workspace.
 - [x] Harden the affected catalogue data boundary against non-array responses without masking real API errors.
 - [x] Add regression coverage for the unexpected response shape and verify the live administrator route renders safely.
+
+## Automated Import AI Writing
+
+- [x] Review the high-volume and preview import completion paths alongside the existing AI rewrite batch worker.
+- [x] Confirm the automatic rewrite and Gemini-capable model approach, including the bulk-generation cost and quality tradeoff.
+- [x] Automatically enqueue a source-grounded business SEO rewrite batch once imported listings are successfully created.
+- [x] Surface AI rewrite batch status and progress in recent import history without auto-publishing generated changes.
+- [x] Add tests for automatic queueing, deduplication, approval boundaries, and the selected model provider.

@@ -420,6 +420,7 @@ export const bulkImports = mysqlTable("bulk_imports", {
   sourceFileSize: int("sourceFileSize"),
   sourceUploadedAt: timestamp("sourceUploadedAt"),
   scheduleCronTaskUid: varchar("scheduleCronTaskUid", { length: 65 }),
+  aiRewriteBatchId: varchar("aiRewriteBatchId", { length: 64 }),
   totalRows: int("totalRows").default(0).notNull(),
   validRows: int("validRows").default(0).notNull(),
   failedRows: int("failedRows").default(0).notNull(),
@@ -437,7 +438,7 @@ export const bulkImports = mysqlTable("bulk_imports", {
   cancelledAt: timestamp("cancelledAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, table => [index("bulk_import_status_idx").on(table.status, table.createdAt), index("bulk_import_phase_progress_idx").on(table.phase, table.status, table.updatedAt), index("bulk_import_schedule_cron_idx").on(table.scheduleCronTaskUid)]);
+}, table => [index("bulk_import_status_idx").on(table.status, table.createdAt), index("bulk_import_phase_progress_idx").on(table.phase, table.status, table.updatedAt), index("bulk_import_schedule_cron_idx").on(table.scheduleCronTaskUid), index("bulk_import_ai_batch_idx").on(table.aiRewriteBatchId)]);
 
 export const bulkImportSourceChunks = mysqlTable("bulk_import_source_chunks", {
   id: int("id").autoincrement().primaryKey(),

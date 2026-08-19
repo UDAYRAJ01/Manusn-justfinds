@@ -45,19 +45,22 @@ async function startServer() {
   registerOAuthRoutes(app);
   registerHighVolumeUploadProxy(app);
 
-  app.post("/api/scheduled/process-high-volume-imports", async (req, res) => {
-    try {
-      const user = await sdk.authenticateRequest(req);
-      if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only" });
-      const result = await processNextHighVolumeImportChunk(user.taskUid);
-      if ("workerRan" in result && shouldPauseHighVolumeImportSchedule(result.phase)) {
-        try {
-          await updateHeartbeatJob(user.taskUid, { enable: false }, "");
-        } catch (pauseError) {
-          console.warn("[HighVolumeImport] could not pause completed task", pauseError);
-        }
-      }
-      return res.json({ ok: true, result, timestamp: new Date().toISOString() });
+ app.post("/api/scheduled/process-high-volume-imports", async (req, res) => {
+   try {
+     const user = await sdk.authenticateRequest(req);
+     if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only" });
+     const result = await processNextHighVolumeImportChunk(user.taskUid);
+      const rewriteResult = await processAiGenerationBatchChunk({ taskUid: user.taskUid, maxJobs: 3 });
+      const importSettled = ("workerRan" in result && shouldPauseHighVolumeImportSchedule(result.phase)) || ("reason" in result && result.reason === "no_owned_queued_import");
+      const rewriteSettled = !("done" in rewriteResult) || rewriteResult.done;
+      if (importSettled && rewriteSettled) {
+       try {
+         await updateHeartbeatJob(user.taskUid, { enable: false }, "");
+       } catch (pauseError) {
+         console.warn("[HighVolumeImport] could not pause completed task", pauseError);
+       }
+     }
+      return res.json({ ok: true, result, rewriteResult, timestamp: new Date().toISOString() });
     } catch (error) {
       const detail = error instanceof Error ? error.message : "The import processor failed.";
       console.error("[HighVolumeImport] scheduled processor failed", error);

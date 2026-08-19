@@ -34,9 +34,12 @@ export class AiProviderResponseError extends Error {
   }
 }
 
-// `gpt-5-mini` is the verified live structured-output fallback for high-volume factual rewrites.
-// Deployments may still select another available model through AI_DEFAULT_MODEL.
+// `gpt-5-mini` remains the verified general structured-output default. Imported
+// listings opt into the managed Gemini pair below so the normal editor path does
+// not change unexpectedly.
 const DEFAULT_MODEL = process.env.AI_DEFAULT_MODEL?.trim() || "gpt-5-mini";
+export const IMPORT_REWRITE_FIRST_PASS_MODEL = "gemini-3-flash-preview";
+export const IMPORT_REWRITE_QUALITY_MODEL = "gemini-3.1-pro-preview";
 
 function getTextContent(content: Message["content"]): string {
   if (typeof content === "string") return content;

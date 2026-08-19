@@ -3,11 +3,21 @@ import { and, asc, desc, eq, inArray, max, or, sql } from "drizzle-orm";
 import { aiContentVersions, aiGenerationBatches, aiGenerationJobs, aiUsageEvents, businessAiContent, businessRevisions, businesses } from "../../../drizzle/schema";
 import { getBusinessAiFacts, getDb } from "../../db";
 import { buildContentPrompt, PROMPT_VERSION, type PromptContentType } from "./prompts";
-import { generateStructured, classifyAiError } from "./provider";
+import { generateStructured, classifyAiError, IMPORT_REWRITE_FIRST_PASS_MODEL, IMPORT_REWRITE_QUALITY_MODEL } from "./provider";
 import type { AiContentType, BusinessAiFacts, GeneratedContent, ValidationResult } from "./types";
 
 const forbiddenClaims = /\b(guaranteed|guarantee|award[- ]winning|best in|number one|#1|top[- ]rated|five[- ]star|5[- ]star|testimonial|review says|cheap|lowest price|discount|free consultation)\b/i;
 const numberPattern = /\b\d+(?:[.,]\d+)?\b/g;
+export const AUTOMATED_IMPORT_REWRITE_BATCH_PREFIX = "import-seo-";
+
+export function automaticImportRewriteModelPlan(batchId: string | null | undefined, contentType: AiContentType) {
+  const automaticImportRewrite = Boolean(batchId?.startsWith(AUTOMATED_IMPORT_REWRITE_BATCH_PREFIX) && contentType === "business_seo_profile");
+  return {
+    automaticImportRewrite,
+    initialModel: automaticImportRewrite ? IMPORT_REWRITE_FIRST_PASS_MODEL : undefined,
+    qualityFallbackModel: automaticImportRewrite ? IMPORT_REWRITE_QUALITY_MODEL : undefined,
+  };
+}
 
 const outputSchemaFor = (type: AiContentType) => ({
   name: `just_finds_${type}`,
@@ -150,10 +160,30 @@ export async function processAiGenerationJob(jobId: number) {
     if (!facts) throw new Error("Business facts are unavailable");
     const prompt = buildContentPrompt(job.contentType as PromptContentType, factsForPrompt(facts));
     await db.update(aiGenerationJobs).set({ progressPercent: 30 }).where(eq(aiGenerationJobs.id, jobId));
-    const result = await generateStructured<GeneratedContent>({ system: prompt.system, user: prompt.user, outputSchema: outputSchemaFor(job.contentType as AiContentType), maxTokens: 1800 });
+    const modelPlan = automaticImportRewriteModelPlan(job.batchId, job.contentType as AiContentType);
+    let result = await generateStructured<GeneratedContent>({
+      system: prompt.system,
+      user: prompt.user,
+      outputSchema: outputSchemaFor(job.contentType as AiContentType),
+      maxTokens: 1800,
+      model: modelPlan.initialModel,
+    });
     await db.update(aiGenerationJobs).set({ progressPercent: 70 }).where(eq(aiGenerationJobs.id, jobId));
     const previousVersions = await getLatestAiContent(job.businessId, job.contentType as AiContentType);
-    const validation = validateGeneratedContent(job.contentType as AiContentType, result.data, facts, previousVersions.map(version => version.content));
+    let validation = validateGeneratedContent(job.contentType as AiContentType, result.data, facts, previousVersions.map(version => version.content));
+    // Automatic imports use a cost-conscious Gemini Flash first pass. Only a
+    // factual/format validation rejection is escalated to Gemini Pro; drafts
+    // are still saved as review-required and never published by this worker.
+    if (modelPlan.qualityFallbackModel && !validation.accepted) {
+      result = await generateStructured<GeneratedContent>({
+        system: prompt.system,
+        user: prompt.user,
+        outputSchema: outputSchemaFor(job.contentType as AiContentType),
+        maxTokens: 2200,
+        model: modelPlan.qualityFallbackModel,
+      });
+      validation = validateGeneratedContent(job.contentType as AiContentType, result.data, facts, previousVersions.map(version => version.content));
+    }
     const version = await nextVersion(job.businessId, job.contentType as AiContentType);
     const content = contentText(job.contentType as AiContentType, validation.normalized);
     await db.update(aiGenerationJobs).set({ progressPercent: 85 }).where(eq(aiGenerationJobs.id, jobId));
@@ -193,13 +223,17 @@ export async function processAiGenerationJob(jobId: number) {
 export async function enqueueAiGenerationBatch(input: { businessIds: number[]; contentTypes: AiContentType[]; requestedById: number; batchId: string }) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
-  const businessIds = Array.from(new Set(input.businessIds)).slice(0, 1000);
+  const businessIds = Array.from(new Set(input.businessIds)).slice(0, 100_000);
   const contentTypes = Array.from(new Set(input.contentTypes));
   const values = businessIds.flatMap(businessId => contentTypes.map(contentType => ({ businessId, contentType, requestedById: input.requestedById, batchId: input.batchId, status: "queued" as const, attempts: 0, progressPercent: 0 })));
   if (!values.length) return { batchId: input.batchId, jobIds: [], queued: 0 };
   await db.insert(aiGenerationBatches).values({ id: input.batchId, requestedById: input.requestedById, status: "queued", totalJobs: values.length, completedJobs: 0, failedJobs: 0 });
-  const inserted = await db.insert(aiGenerationJobs).values(values).$returningId();
-  return { batchId: input.batchId, jobIds: inserted.map(item => Number(item.id)), queued: values.length };
+  const jobIds: number[] = [];
+  for (let cursor = 0; cursor < values.length; cursor += 500) {
+    const inserted = await db.insert(aiGenerationJobs).values(values.slice(cursor, cursor + 500)).$returningId();
+    jobIds.push(...inserted.map(item => Number(item.id)));
+  }
+  return { batchId: input.batchId, jobIds, queued: values.length };
 }
 
 export async function attachAiGenerationBatchSchedule(batchId: string, taskUid: string) {
@@ -220,7 +254,7 @@ export async function getAiGenerationBatch(batchId: string) {
 export async function processAiGenerationBatchChunk(input: { taskUid: string; maxJobs?: number }) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
-  const [batch] = await db.select().from(aiGenerationBatches).where(eq(aiGenerationBatches.scheduleCronTaskUid, input.taskUid)).limit(1);
+  const [batch] = await db.select().from(aiGenerationBatches).where(and(eq(aiGenerationBatches.scheduleCronTaskUid, input.taskUid), inArray(aiGenerationBatches.status, ["queued", "processing"]))).orderBy(asc(aiGenerationBatches.createdAt)).limit(1);
   if (!batch || ["completed", "cancelled"].includes(batch.status)) return { processed: false, reason: "no_owned_queued_batch" as const };
   const batchId = batch.id;
   const staleBefore = new Date(Date.now() - 3 * 60_000);

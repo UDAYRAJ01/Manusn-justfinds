@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray, lt, or } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { approvalQueue, businesses, businessAiContent, businessFieldValues, businessHours, businessNotifications, businessReviewReports, businessReviews, businessServices, businessTypes, bulkImportRows, bulkImports, bulkImportSourceChunks, categories, categoryFields, cities, googlePlaceCategoryMappings, localities, subcategories, users } from "../../drizzle/schema";
+import { aiGenerationBatches, approvalQueue, businesses, businessAiContent, businessFieldValues, businessHours, businessNotifications, businessReviewReports, businessReviews, businessServices, businessTypes, bulkImportRows, bulkImports, bulkImportSourceChunks, categories, categoryFields, cities, googlePlaceCategoryMappings, localities, subcategories, users } from "../../drizzle/schema";
 import { deleteInternalValidationBusiness, getAdminCounts, getCategorySchemas, getDb, getInternalValidationBusinesses, getOwnerBusinesses, getPendingBusinesses } from "../db";
 import { canManageAdmins, canManageBusiness, canModerate } from "../domain/permissions";
 import { buildVoiceIntroductionScript } from "../domain/voiceScript";
@@ -15,6 +15,7 @@ import { normalizeDuplicateText, scoreDuplicateCandidate } from "../domain/dupli
 import { HIGH_VOLUME_FILE_LIMIT, HIGH_VOLUME_IMPORT_CHUNK, HIGH_VOLUME_ROW_LIMIT, HIGH_VOLUME_VALIDATION_CHUNK, highVolumeProgress, isSupportedImportFilename, sourceQueueIssue } from "../domain/highVolumeImportPolicy";
 import { highVolumeFormatIssue, highVolumeUploadPartBytes, highVolumeUploadPartCount } from "../domain/highVolumeUploadPolicy";
 import { HIGH_VOLUME_IMPORT_CALLBACK_PATH, HIGH_VOLUME_IMPORT_CRON } from "../domain/highVolumeImportSchedule";
+import { attachAiGenerationBatchSchedule, enqueueAiGenerationBatch } from "../domain/ai/content";
 import { heartbeatSessionFromHeaders } from "../domain/heartbeatSession";
 import { mapWithConcurrency } from "../domain/asyncPool";
 import { withRequestDeadline } from "../domain/requestDeadline";
@@ -28,6 +29,8 @@ type JustFindsRole = "user" | "business_owner" | "admin" | "super_admin";
 const HIGH_VOLUME_STORAGE_READ_CONCURRENCY = 3;
 const HIGH_VOLUME_STORAGE_READ_ATTEMPTS = 3;
 const HIGH_VOLUME_STORAGE_READ_TIMEOUT_MS = 15_000;
+const AUTOMATED_IMPORT_AI_CRON = "0 * * * * *";
+const AUTOMATED_IMPORT_AI_CALLBACK_PATH = "/api/scheduled/process-ai-rewrites";
 
 function delay(milliseconds: number) {
   return new Promise(resolve => setTimeout(resolve, milliseconds));
@@ -74,6 +77,30 @@ async function enableHighVolumeImportSchedule(importId: number, taskUid: string 
     description: `Process durable high-volume import ${importId} in safe chunks.`,
   }, userSession);
   return created.taskUid;
+}
+
+async function enableAutomatedImportAiSchedule(importId: number, userSession: string) {
+  const created = await createHeartbeatJob({
+    name: `just-finds-import-ai-${importId}`,
+    cron: AUTOMATED_IMPORT_AI_CRON,
+    path: AUTOMATED_IMPORT_AI_CALLBACK_PATH,
+    method: "POST",
+    description: `Create draft-only Gemini SEO profiles for imported listings in batch ${importId}.`,
+  }, userSession);
+  return created.taskUid;
+}
+
+async function queueAutomatedImportRewrites(input: { db: NonNullable<Awaited<ReturnType<typeof getDb>>>; importId: number; requestedById: number; scheduleCronTaskUid?: string | null }) {
+  const batchId = `import-seo-${input.importId}`;
+  const existing = await input.db.select({ id: aiGenerationBatches.id }).from(aiGenerationBatches).where(eq(aiGenerationBatches.id, batchId)).limit(1);
+  if (existing.length) return batchId;
+  const rows = await input.db.select({ businessId: bulkImportRows.createdBusinessId }).from(bulkImportRows).where(and(eq(bulkImportRows.importId, input.importId), eq(bulkImportRows.status, "imported")));
+  const businessIds = rows.flatMap(row => row.businessId ? [row.businessId] : []);
+  if (!businessIds.length) return null;
+  await enqueueAiGenerationBatch({ businessIds, contentTypes: ["business_seo_profile"], requestedById: input.requestedById, batchId });
+  if (input.scheduleCronTaskUid) await attachAiGenerationBatchSchedule(batchId, input.scheduleCronTaskUid);
+  await input.db.update(bulkImports).set({ aiRewriteBatchId: batchId }).where(eq(bulkImports.id, input.importId));
+  return batchId;
 }
 
 async function approvedCityOrThrow(db: Awaited<ReturnType<typeof getDb>> & {}, cityId: number) {
@@ -369,8 +396,9 @@ async function validateHighVolumeCsvPart(db: NonNullable<Awaited<ReturnType<type
 async function importHighVolumeChunk(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, job: typeof bulkImports.$inferSelect) {
   const readyRows = await db.select().from(bulkImportRows).where(and(eq(bulkImportRows.importId, job.id), eq(bulkImportRows.status, "valid"))).orderBy(asc(bulkImportRows.rowNumber)).limit(HIGH_VOLUME_IMPORT_CHUNK);
   if (!readyRows.length) {
-    await db.update(bulkImports).set({ status: "completed", phase: "completed", progressPercent: 100, finishedAt: new Date(), errorMessage: null, errorCategory: null }).where(eq(bulkImports.id, job.id));
-    return { importId: job.id, phase: "completed", processed: 0 };
+    const aiRewriteBatchId = job.aiRewriteBatchId ?? await queueAutomatedImportRewrites({ db, importId: job.id, requestedById: job.initiatedById, scheduleCronTaskUid: job.scheduleCronTaskUid });
+    await db.update(bulkImports).set({ status: "completed", phase: "completed", progressPercent: 100, aiRewriteBatchId, finishedAt: new Date(), errorMessage: null, errorCategory: null }).where(eq(bulkImports.id, job.id));
+    return { importId: job.id, phase: "completed", processed: 0, aiRewriteBatchId };
   }
   const existingSlugs = new Set((await db.select({ slug: businesses.slug }).from(businesses)).map(row => row.slug));
   let created = 0;
@@ -813,7 +841,7 @@ export const workspaceRouter = router({
           payload.faqs?.length ? db.insert(businessAiContent).values({ businessId, about: listing.description || null, faqs: payload.faqs, status: "pending" }) : Promise.resolve(),
           payload.services?.length ? db.insert(businessServices).values(payload.services.map((service, sortOrder) => ({ businessId, name: service.name, sortOrder }))) : Promise.resolve(),
           db.insert(approvalQueue).values({ entityType: "business", businessId, submittedById: ctx.user.id, status: "pending" }),
-          db.update(bulkImportRows).set({ status: "imported" }).where(eq(bulkImportRows.id, row.id)),
+          db.update(bulkImportRows).set({ status: "imported", createdBusinessId: businessId }).where(eq(bulkImportRows.id, row.id)),
         ]);
         createdRows += 1;
       } catch (error) {
@@ -822,13 +850,18 @@ export const workspaceRouter = router({
         await db.update(bulkImportRows).set({ status: "invalid", validationErrors: [message] }).where(eq(bulkImportRows.id, row.id));
       }
     }
-    await db.update(bulkImports).set({ status: createdRows ? "completed" : "failed", validRows: createdRows, failedRows: importJob.failedRows + skippedRows }).where(eq(bulkImports.id, input.importId));
-    return { importId: input.importId, createdRows, skippedRows, alreadyCompleted: false };
+    let aiRewriteBatchId: string | null = null;
+    if (createdRows) {
+      const taskUid = await enableAutomatedImportAiSchedule(input.importId, heartbeatSessionFromHeaders(ctx.req.headers.cookie, ctx.req.headers.authorization, COOKIE_NAME));
+      aiRewriteBatchId = await queueAutomatedImportRewrites({ db, importId: input.importId, requestedById: ctx.user.id, scheduleCronTaskUid: taskUid });
+    }
+    await db.update(bulkImports).set({ status: createdRows ? "completed" : "failed", validRows: createdRows, failedRows: importJob.failedRows + skippedRows, aiRewriteBatchId }).where(eq(bulkImports.id, input.importId));
+    return { importId: input.importId, createdRows, skippedRows, aiRewriteBatchId, alreadyCompleted: false };
   }),
   bulkImportHistory: protectedProcedure.query(async ({ ctx }) => {
     requireModerator(ctx.user.role);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "The import service is temporarily unavailable." });
-    return db.select({ id: bulkImports.id, filename: bulkImports.filename, status: bulkImports.status, phase: bulkImports.phase, totalRows: bulkImports.totalRows, validRows: bulkImports.validRows, failedRows: bulkImports.failedRows, validationCursor: bulkImports.validationCursor, processedRows: bulkImports.processedRows, progressPercent: bulkImports.progressPercent, errorMessage: bulkImports.errorMessage, errorCategory: bulkImports.errorCategory, sourceUploadedAt: bulkImports.sourceUploadedAt, createdAt: bulkImports.createdAt, updatedAt: bulkImports.updatedAt }).from(bulkImports).where(eq(bulkImports.initiatedById, ctx.user.id)).orderBy(desc(bulkImports.createdAt)).limit(20);
+    return db.select({ id: bulkImports.id, filename: bulkImports.filename, status: bulkImports.status, phase: bulkImports.phase, totalRows: bulkImports.totalRows, validRows: bulkImports.validRows, failedRows: bulkImports.failedRows, validationCursor: bulkImports.validationCursor, processedRows: bulkImports.processedRows, progressPercent: bulkImports.progressPercent, errorMessage: bulkImports.errorMessage, errorCategory: bulkImports.errorCategory, sourceUploadedAt: bulkImports.sourceUploadedAt, aiRewriteBatchId: bulkImports.aiRewriteBatchId, aiRewriteStatus: aiGenerationBatches.status, aiRewriteTotalJobs: aiGenerationBatches.totalJobs, aiRewriteCompletedJobs: aiGenerationBatches.completedJobs, aiRewriteFailedJobs: aiGenerationBatches.failedJobs, createdAt: bulkImports.createdAt, updatedAt: bulkImports.updatedAt }).from(bulkImports).leftJoin(aiGenerationBatches, eq(bulkImports.aiRewriteBatchId, aiGenerationBatches.id)).where(eq(bulkImports.initiatedById, ctx.user.id)).orderBy(desc(bulkImports.createdAt)).limit(20);
   }),
 });

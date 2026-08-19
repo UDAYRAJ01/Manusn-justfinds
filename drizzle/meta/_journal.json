@@ -225,6 +225,13 @@
       "when": 1786878054831,
       "tag": "0031_smart_king_bedlam",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "5",
+      "when": 1787118280360,
+      "tag": "0032_plain_inhumans",
+      "breakpoints": true
     }
   ]
 }
